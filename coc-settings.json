@@ -1,0 +1,31 @@
+{
+  "inlayHint.enable": false,
+  "suggest.noselect": true,
+  "diagnostic.messageTarget": "float",
+  "diagnostic.checkCurrentLine": true,
+  "diagnostic.virtualText": false,
+  "diagnostic.virtualTextCurrentLineOnly": false,
+  "diagnostic.virtualTextPrefix": " <- ",
+
+  "Lua.telemetry.enable": false,
+  "Lua.diagnostics.globals": [ "api", "jit", "vim" ],
+  "Lua.diagnostics.disable": [ "inject-field" ],
+  "Lua.runtime.version": "LuaJIT",
+  "Lua.workspace.library": [
+    "/usr/local/share/nvim/runtime/lua",
+    "/usr/local/share/nvim/runtime/lua/vim",
+    "/usr/local/share/nvim/runtime/lua/vim/lsp",
+    "/usr/local/share/nvim/runtime/lua/vim/treesitter"
+  ],
+
+  "clangd.fallbackFlags": [
+    "-I/usr/lib/jvm/default/include",
+    "-I/usr/lib/jvm/default/include/linux"
+  ],
+
+  "sumneko-lua.checkUpdate": false,
+  "clangd.checkUpdates": false,
+  "rust-analyzer.updates": false,
+
+  "snippets.ultisnips.pythonPrompt": false
+}

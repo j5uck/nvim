@@ -1,0 +1,90 @@
+
+-- -- -- REQUIREMENTS -- -- --
+
+Neovim (>= 0.11.0)
+Patched font (eg. Nerd font)
+ripgrep (for telescope) => https://github.com/BurntSushi/ripgrep
+fd (for telescope)
+c compiler (for telescope-fzf-native)
+make or cmake (for telescope-fzf-native)
+
+-- -- -- NOTES -- -- --
+
+-- nvim-treesitter --
+
+  :lua vim.iter(vim.fn.sort(vim.tbl_keys(require("nvim-treesitter.parsers").list))):each(function(_)vim.print(_)end)
+
+  https://github.com/nvim-treesitter/nvim-treesitter#supported-languages
+
+-- ------------------------- x ------------------------- --
+
+-- assert(vim.fn.has("nvim-0.111") == 1, "NVIM version too smol!!!")
+if vim.fn.has("nvim-0.11") == 0 then
+  return require("_").notify.warn("NVIM version too smol!!!")
+end
+
+
+TODO:
+tpope/vim-fugitive
+  https://www.youtube.com/watch?v=uUrKrYCAl1Y
+tpope/vim-rhubarb
+keybind: align lines by char
+undo tree rewrite
+lua explorer hl system
+
+https://github.com/nvim-tree/nvim-tree.lua
+
+https://github.com/bassamsdata/namu.nvim/
+https://github.com/OXY2DEV/ui.nvim/
+QuickFix: https://www.youtube.com/watch?v=AuXZA-xCv04
+https://github.com/kevinhwang91/nvim-hlslens/
+https://github.com/tpope/vim-fugitive/blob/master/plugin/fugitive.vim
+https://github.com/tpope/vim-commentary
+
+nvim_set_current_win({window})
+ls drives
+
+undofile reload
+https://github.com/stevearc/oil.nvim
+  lua/oil/util.lua
+
+FOR PREVIEW --
+local wi = vim.fn.getwininfo(vim.api.nvim_get_current_win())
+local bi = vim.fn.getbufinfo(vim.api.nvim_get_current_buf())
+wi.topline
+wi.botline
+
+vim.api.nvim_win_get_config(vim.api.nvim_get_current_win())
+
+vim.fn.getregtype(reg)
+vim.fn.resolve(dir)
+vim.fn.fnamemodify(dir, ":p")
+
+vim.fn.getfperm(d)
+
+vim.wo.eventignorewin
+
+vim.ui.open
+
+vim.bo.spelllang
+
+vim.o.colorcolumn = "72"
+
+vim.keymap.set('n', 'k', "v:count == 0 ? 'gk' : 'k'", { expr = true, silent = true })
+vim.keymap.set('n', 'j', "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = true })
+
+vim.on_key({fn}, {ns_id}, {opts})
+
+M.fs = {}
+
+M.fs.joinpath = function(...)
+  return ({string.gsub(vim.fs.joinpath(...), "/+", "/")})[1]
+end
+
+if vim.fn.has("win32") == 1 then
+  M.fs.lsdrives = function()
+    local cmd = { vim.fn.exepath("powershell"), "wmic", "logicaldisk", "get", "name" }
+    return vim.list_slice(vim.fn.split(vim.system(cmd):wait().stdout),2)
+  end
+end
+
