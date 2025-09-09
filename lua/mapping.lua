@@ -236,7 +236,7 @@ map("n", "<leader>u", undotree.toggle, { desc = "toggle [u]ndo tree" })
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "undotree",
   callback = function()
-    map("n", { "<CR>", "2-LeftMouse" }, undotree.select, { buffer = true, desc = "Select state" })
+    map("n", { "<CR>", "<2-LeftMouse>" }, undotree.select, { buffer = true, desc = "Select state" })
     map("n", "u", undotree.undo, { buffer = true, desc = "Undo" })
     map("n", { "U", "<c-r>" }, undotree.redo, { buffer = true, desc = "Redo" })
   end

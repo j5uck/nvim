@@ -203,7 +203,8 @@ PLUG_SYNC.fetch = function(name, plug, callback)
     t{ "git", "fetch", "origin", "--depth=1", "--progress" }
     t{ "git", "ls-remote", "--symref", "origin", "HEAD" }
     t(function(o)
-      return { "git", "switch", ({string.gsub(vim.fn.split(o.stdout)[2], ".+/(.+)$", "%1")})[1] }
+      local s = string.gsub(vim.fn.split(o.stdout)[2], ".+/(.+)$", "%1")
+      return { "git", "switch", s }
     end)
   end
 
@@ -235,7 +236,7 @@ end
 PLUG_SYNC.finally = function()
   vim.cmd[[hi link PlugSyncDone Label]]
   notify.warn("[LUA-PLUG] Elapsed time: %.3f seconds",
-              vim.fn.split(vim.fn.reltimestr(vim.fn.reltime(PLUG_SYNC.reltime)))[1])
+              vim.trim(vim.fn.reltimestr(vim.fn.reltime(PLUG_SYNC.reltime))))
 end
 
 vim.api.nvim_create_user_command("PlugSync", PLUG_SYNC.start, {

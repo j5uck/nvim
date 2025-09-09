@@ -35,6 +35,8 @@ M.new = function()
 
     vim.b.is_undotree = true
 
+    vim.cmd.clearjumps()
+
     return vim.t.undotree.w.undo
   end)
 end
@@ -192,7 +194,7 @@ end
 
 vim.fn["undotree#set"]{
   log = log,
-  gettime = M.gettime,
+  gettime = M.gettime
 }
 
 vim.api.nvim_create_autocmd("BufNew", { callback = vim.schedule_wrap(function(ev)

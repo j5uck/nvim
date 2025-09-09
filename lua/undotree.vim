@@ -1,6 +1,6 @@
 function! undotree#set(a)
   let s:gettime = a:a.gettime
-  let s:log = a:a.log
+  let s:log     = a:a.log
 endfunction
 
 "=================================================
@@ -154,7 +154,6 @@ function! s:undotree.Render() abort
     let newline = " "
     let newmeta = {}
     let node = slots[index]
-    " call s:log(slots)
     if type(node) == TYPE_X
       let newmeta = { 'seq': -1, 'p': [], 'time': -1 } "invalid node.
       if index+1 != len(slots) " not the last one, append '\'
