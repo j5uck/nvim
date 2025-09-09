@@ -100,7 +100,7 @@ M.update = function()
 
   if skip then return end
 
-  local reuse_buf = false
+  local changes = true
   local buf = vim.api.nvim_get_current_buf()
 
   if vim.bo.modifiable and #vim.bo.buftype == 0 then
@@ -108,12 +108,13 @@ M.update = function()
     local new, old = vim.t.undotree.rawtree, vim.t.undotree._rawtree
 
     if vim.t.undotree.b.target == buf and old.seq_last == new.seq_last then
-      vim.cmd[[let t:undotree.rawtree = t:undotree._rawtree]]
-      vim.cmd[[call t:undotree.ConvertInput()]]
-      reuse_buf = old.seq_cur ~= new.seq_cur or old.save_last ~= new.save_last
+      changes = old.seq_cur ~= new.seq_cur or   -- current index
+                old.seq_last ~= new.seq_last or -- max index
+                old.save_last ~= new.save_last  -- last save (index save)
     end
 
     vim.cmd[[let t:undotree.rawtree = t:undotree._rawtree]]
+    vim.cmd[[unlet t:undotree._rawtree]]
   else
     vim.cmd[[
       let t:undotree.rawtree = {
@@ -128,14 +129,26 @@ M.update = function()
     ]]
   end
 
-  if not reuse_buf then
+  if changes then
     vim.cmd("let t:undotree.b.target = " .. buf)
     vim.cmd[[
       let t:undotree.seq_last = t:undotree.rawtree.seq_last
       let t:undotree.seq_cur = -1
       let t:undotree.seq_curhead = -1
       let t:undotree.seq_newhead = -1
-      call t:undotree.ConvertInput() "update all.
+      let t:undotree.seq_saved = {}
+
+      let t:undotree.tree = { 'seq': 0, 'p': [], 'time': 0 }
+
+      call t:undotree._parseNode(t:undotree.rawtree.entries,t:undotree.tree)
+
+      let t:undotree.seq_cur   = t:undotree.rawtree.seq_cur
+      let t:undotree.save_last = t:undotree.rawtree.save_last
+
+      " undo history is cleared
+      if empty(t:undotree.rawtree.entries)
+        let t:undotree.seq_cur = 0
+      endif
     ]]
 
     M.render()
@@ -190,6 +203,9 @@ end
 
 M.render = function()
   vim.cmd[[call t:undotree.Render()]]
+  if true then return end
+
+
 end
 
 vim.fn["undotree#set"]{

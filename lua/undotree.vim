@@ -3,24 +3,6 @@ function! undotree#set(a)
   let s:log     = a:a.log
 endfunction
 
-"=================================================
-" undotree panel class.
-" extended from panel.
-"
-
-" {rawtree}
-"     |
-"     | ConvertInput()               {seq2index}--> [seq1:index1]
-"     v                                             [seq2:index2] ---+
-"  {tree}                                               ...          |
-"     |                                    [asciimeta]               |
-"     | Render()                                |                    |
-"     v                                         v                    |
-" [asciitree] --> [" * | SEQ DDMMYY "] <==> [node1{seq,time,..}]     |
-"                 [" |/             "]      [node2{seq,time,..}] <---+
-"                         ...                       ...
-
-
 let s:undotree = {}
 
 function! undotree#undotreeDeepcopy()
@@ -51,25 +33,6 @@ function! s:undotree._parseNode(in,out) abort
     call extend(curnode.p,[newnode])
     let curnode = newnode
   endfor
-endfunction
-
-function! s:undotree.ConvertInput() abort
-  let self.seq_cur = -1
-  let self.seq_curhead = -1
-  let self.seq_newhead = -1
-  let self.seq_saved = {}
-
-  let self.tree = { 'seq': 0, 'p': [], 'time': 0 }
-
-  call self._parseNode(self.rawtree.entries,self.tree)
-
-  let self.seq_cur   = self.rawtree.seq_cur
-  let self.save_last = self.rawtree.save_last
-
-  " undo history is cleared
-  if empty(self.rawtree.entries)
-    let self.seq_cur = 0
-  endif
 endfunction
 
 "
@@ -124,10 +87,9 @@ function! s:undotree.Render() abort
     endfor
 
     " Then, find the element with minimum seq.
-    let minseq = 99999999
+    let minseq = t:undotree.seq_last + 1
     let minnode = {}
     if foundx == 0
-      "assume undo level isn't more than this... of course
       for i in range(len(slots))
         if type(slots[i]) == TYPE_E
           if slots[i].seq < minseq
