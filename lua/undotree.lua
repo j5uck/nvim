@@ -1,9 +1,8 @@
+-- local notify = require("_").notify
 local log, notify = (function()
   local _ = require("_")
   return _.log, _.notify
 end)()
-
-vim.cmd.source{ vim.fn.stdpath("config") .. "/lua/undotree.vim" }
 
 local M = {}
 
@@ -83,16 +82,6 @@ M.gettime = function(time)
   end
 end
 
-local EMPTY_UNDOTREE = {
-  entries = {},
-  save_cur = 0,
-  save_last = 0,
-  seq_cur = 0,
-  seq_last = 0,
-  synced = 1,
-  time_cur = 0
-}
-
 M.update = function()
   local skip = vim.b.is_undotree or
     (not vim.api.nvim_win_is_valid(vim.t.undotree.w.undo)) or
@@ -102,56 +91,83 @@ M.update = function()
 
   local changes = true
   local buf = vim.api.nvim_get_current_buf()
+  local t_undotree = vim.t.undotree
 
   if vim.bo.modifiable and #vim.bo.buftype == 0 then
-    vim.cmd[[let t:undotree._rawtree = undotree()]]
-    local new, old = vim.t.undotree.rawtree, vim.t.undotree._rawtree
+    local new, old = vim.fn.undotree(), t_undotree.rawtree
 
     if vim.t.undotree.b.target == buf and old.seq_last == new.seq_last then
-      changes = old.seq_cur ~= new.seq_cur or   -- current index
-                old.seq_last ~= new.seq_last or -- max index
-                old.save_last ~= new.save_last  -- last save (index save)
+      changes = old.seq_cur   ~= new.seq_cur or  -- current index
+                old.seq_last  ~= new.seq_last or -- max index
+                old.save_last ~= new.save_last   -- last save (index save)
     end
 
-    vim.cmd[[let t:undotree.rawtree = t:undotree._rawtree]]
-    vim.cmd[[unlet t:undotree._rawtree]]
+    t_undotree.rawtree = new
   else
-    vim.cmd[[
-      let t:undotree.rawtree = {
-          \'seq_last':0,
-          \'entries':[],
-          \'time_cur':0,
-          \'save_last':0,
-          \'synced':1,
-          \'save_cur':0,
-          \'seq_cur':0
-        \}
-    ]]
+    t_undotree.rawtree = {
+      entries   = {},
+      save_cur  = 0,
+      save_last = 0,
+      seq_cur   = 0,
+      seq_last  = 0,
+      synced    = 1,
+      time_cur  = 0
+    }
   end
 
   if changes then
-    vim.cmd("let t:undotree.b.target = " .. buf)
+    t_undotree.b.target = buf
+    t_undotree.seq_last = t_undotree.rawtree.seq_last
+    t_undotree.seq_cur = -1
+    t_undotree.seq_curhead = -1
+    t_undotree.seq_newhead = -1
+    t_undotree.seq_saved = vim.empty_dict()
+    t_undotree.tree = { seq = 0, p = {}, time =  0 }
+
+    vim.t.undotree = t_undotree
     vim.cmd[[
-      let t:undotree.seq_last = t:undotree.rawtree.seq_last
-      let t:undotree.seq_cur = -1
-      let t:undotree.seq_curhead = -1
-      let t:undotree.seq_newhead = -1
-      let t:undotree.seq_saved = {}
+      function! s:parseNode(in,out) abort
+        " type(in) == type([]) && type(out) == type({})
+        if empty(a:in) "empty
+          return
+        endif
+        let curnode = a:out
+        for i in a:in
+          if has_key(i,'alt')
+            call s:parseNode(i.alt,curnode)
+          endif
+          let newnode = { 'seq': i.seq, 'p': [], 'time': i.time }
+          if has_key(i,'newhead')
+            let t:undotree.seq_newhead = i.seq
+          endif
+          if has_key(i,'curhead')
+            let t:undotree.seq_curhead = i.seq
+            let t:undotree.seq_cur = curnode.seq
+          endif
+          if has_key(i,'save')
+            let t:undotree.seq_saved[i.save] = i.seq
+          endif
+          call extend(curnode.p,[newnode])
+          let curnode = newnode
+        endfor
+      endfunction
 
-      let t:undotree.tree = { 'seq': 0, 'p': [], 'time': 0 }
-
-      call t:undotree._parseNode(t:undotree.rawtree.entries,t:undotree.tree)
-
-      let t:undotree.seq_cur   = t:undotree.rawtree.seq_cur
-      let t:undotree.save_last = t:undotree.rawtree.save_last
-
-      " undo history is cleared
-      if empty(t:undotree.rawtree.entries)
-        let t:undotree.seq_cur = 0
-      endif
+      call s:parseNode(t:undotree.rawtree.entries, t:undotree.tree)
     ]]
+    t_undotree = vim.t.undotree
+
+    t_undotree.seq_cur = t_undotree.rawtree.seq_cur
+    t_undotree.save_last = t_undotree.rawtree.save_last
+
+    if #t_undotree.rawtree.entries == 0 then
+      t_undotree.seq_cur = 0
+    end
+
+    vim.t.undotree = t_undotree
 
     M.render()
+  else
+    vim.t.undotree = t_undotree
   end
 
   vim.api.nvim_win_call(vim.t.undotree.w.undo, function()
@@ -194,24 +210,181 @@ M.update = function()
     vim.bo.modifiable = false
 
     if u.seq_cur ~= -1 then
-      vim.cmd("silent normal! " .. #u.asciitree - u.seq2index[tostring(u.seq_cur)] .. "G")
+      vim.api.nvim_win_set_cursor(0, { #u.asciitree - u.seq2index[tostring(u.seq_cur)], 0 })
     end
   end)
-
-  vim.cmd[[silent! unlet t:undotree._rawtree]]
 end
+
+-- Example --
+
+-- 6 8  7
+-- |/   |
+-- 2    4
+--  \   |
+--   1  3  5
+--    \ | /
+--      0
+
+-- Tree sieve, p:fork, x:none --
+
+-- x         8
+-- 8x        | 7
+-- 87         \ \
+-- x87       6 | |
+-- 687       |/ /
+-- p7x       | | 5
+-- p75       | 4 |
+-- p45       | 3 |
+-- p35       | |/
+-- pp        2 |
+-- 2p        1 |
+-- 1p        |/
+-- p         0
+-- 0
 
 M.render = function()
-  vim.cmd[[call t:undotree.Render()]]
-  if true then return end
+  vim.t.gettime = M.gettime
+  vim.cmd[[
+    let s:gettime = t:gettime
 
+    let tree = t:undotree.tree
+    let slots = [tree]
+    let out = []
+    let outmeta = []
+    let seq2index = {}
+    let TYPE_E = type({})
+    let TYPE_P = type([])
+    let TYPE_X = type('x')
+    while slots != []
+      "find next node
+      let foundx = 0 " 1 if x element is found.
+      let index = 0 " Next element to be print.
 
+      " Find x element first.
+      for i in range(len(slots))
+        if type(slots[i]) == TYPE_X
+          let foundx = 1
+          let index = i
+          break
+        endif
+      endfor
+
+      " Then, find the element with minimum seq.
+      let minseq = t:undotree.seq_last + 1
+      let minnode = {}
+      if foundx == 0
+        for i in range(len(slots))
+          if type(slots[i]) == TYPE_E
+            if slots[i].seq < minseq
+              let minseq = slots[i].seq
+              let index = i
+              let minnode = slots[i]
+              continue
+            endif
+          endif
+          if type(slots[i]) == TYPE_P
+            for j in slots[i]
+              if j.seq < minseq
+                let minseq = j.seq
+                let index = i
+                let minnode = j
+                continue
+              endif
+            endfor
+          endif
+        endfor
+      endif
+
+      " output.
+      let newline = " "
+      let newmeta = {}
+      let node = slots[index]
+      if type(node) == TYPE_X
+        let newmeta = { 'seq': -1, 'p': [], 'time': -1 } "invalid node.
+        if index+1 != len(slots) " not the last one, append '\'
+          for i in range(len(slots))
+            if i < index
+              let newline = newline.'| '
+            endif
+            if i > index
+              let newline = newline.' \'
+            endif
+          endfor
+        endif
+        call remove(slots,index)
+      endif
+      if type(node) == TYPE_E
+        let newmeta = node
+        let seq2index[node.seq]=len(out)
+        for i in range(len(slots))
+          if index == i
+            let newline = newline.'* '
+          else
+            let newline = newline.'| '
+          endif
+        endfor
+        let newline = newline.'   '.(node.seq).'    ('.s:gettime(node.time).')'
+        " update the printed slot to its child.
+        if empty(node.p)
+          let slots[index] = 'x'
+        endif
+        if len(node.p) == 1 "only one child.
+          let slots[index] = node.p[0]
+        endif
+        if len(node.p) > 1 "insert p node
+          let slots[index] = node.p
+        endif
+        let node.p = [] "cut reference.
+      endif
+      if type(node) == TYPE_P
+        let newmeta = { 'seq': -1, 'p': [], 'time': -1 } "invalid node.
+        for k in range(len(slots))
+          if k < index
+            let newline = newline."| "
+          endif
+          if k == index
+            let newline = newline."|/ "
+          endif
+          if k > index
+            let newline = newline."/ "
+          endif
+        endfor
+        call remove(slots,index)
+        if len(node) == 2
+          if node[0].seq > node[1].seq
+            call insert(slots,node[1],index)
+            call insert(slots,node[0],index)
+          else
+            call insert(slots,node[0],index)
+            call insert(slots,node[1],index)
+          endif
+        endif
+        " split P to E+P if elements in p > 2
+        if len(node) > 2
+          call remove(node,index(node,minnode))
+          call insert(slots,minnode,index)
+          call insert(slots,node,index)
+        endif
+      endif
+      unlet node
+      if newline != " "
+        let newline = substitute(newline,'\s*$','','g') "remove trailing space.
+        call add(out,newline)
+        call add(outmeta,newmeta)
+      endif
+    endwhile
+
+    let t:undotree.asciitree = out
+    " let t:undotree.asciitree = reverse(out)
+    let t:undotree.asciimeta = reverse(outmeta)
+
+    " let totallen = len(out)
+    " for i in keys(seq2index)
+    "   let seq2index[i] = totallen - 1 - seq2index[i]
+    " endfor
+    let t:undotree.seq2index = seq2index
+  ]]
 end
-
-vim.fn["undotree#set"]{
-  log = log,
-  gettime = M.gettime
-}
 
 vim.api.nvim_create_autocmd("BufNew", { callback = vim.schedule_wrap(function(ev)
   if not vim.api.nvim_buf_is_valid(ev.buf) then return end
@@ -226,27 +399,22 @@ vim.api.nvim_create_autocmd("BufNew", { callback = vim.schedule_wrap(function(ev
 end) })
 
 local function fn_TabNew()
-  vim.cmd[[
-    let t:undotree = undotree#undotreeDeepcopy()
+  vim.t.undotree = {
+    w = { undo = -1, target = -1 },
+    b = { undo = -1, target = -1 },
 
-    let t:undotree.w = { "undo": -1, "target": -1 }
-    let t:undotree.b = { "undo": -1, "target": -1 }
-
-    let t:undotree.rawtree = {}  "data passed from undotree()
-    let t:undotree.tree = {}     "data converted to internal format.
-    let t:undotree.seq_last = -1
-    let t:undotree.save_last = -1
-
-    " seqs
-    let t:undotree.seq_cur = -1
-    let t:undotree.seq_curhead = -1
-    let t:undotree.seq_newhead = -1
-    let t:undotree.seq_saved = {} "{saved value -> seq} pair
-
-    let t:undotree.asciitree = []     "output data.
-    let t:undotree.asciimeta = []     "meta data behind ascii tree.
-    let t:undotree.seq2index = {}     "table used to convert seq to index.
-  ]]
+    asciimeta   = {},               -- meta data behind ascii tree.
+    asciitree   = {},               -- output data.
+    rawtree     = vim.empty_dict(), -- data passed from undotree()
+    save_last   = -1,
+    seq2index   = vim.empty_dict(), -- table used to convert seq to index.
+    seq_cur     = -1,
+    seq_curhead = -1,
+    seq_last    = -1,
+    seq_newhead = -1,
+    seq_saved   = vim.empty_dict(), -- { saved value -> seq } pair
+    tree        = vim.empty_dict(), -- data converted to internal format.
+  }
 end
 
 fn_TabNew()
