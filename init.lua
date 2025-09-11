@@ -14,7 +14,8 @@ end
 
 -- if vim.fn.has("win32") == 1 then
 --   -- for WINDOWS --
---   vim.cmd[[set shell=C:/Users/user/stuff/bin/busybox.exe\ bash]]
+--   vim.cmd("set shell=" .. vim.fn.exepath("powershell"))
+--   -- vim.cmd[[set shell=C:/Users/user/stuff/bin/busybox.exe\ bash]]
 --   vim.cmd[[set shellxquote=]]
 --   vim.cmd[[set shellcmdflag=-c]]
 -- elseif vim.fn.has('mac') == 1 then
