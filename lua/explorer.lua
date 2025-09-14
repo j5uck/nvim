@@ -67,12 +67,29 @@ end or function(src, dest)
 end
 
 fs.move = function(src, dest)
-  return vim.fn.rename(src, dest) == 0
+  local r = vim.fn.rename(src, dest) == 0
+  if not r then notify.error("ERROR fs.move: %s => %s", src, dest) end
+  return r
 end
 
 fs.remove = function(src)
-  return vim.fn.delete(src, "rf") == 0
+  local r = vim.fn.delete(src, "rf") == 0
+  -- if not r then notify.error("ERROR fs.remove: %s", src) end
+  return r
 end
+
+-- local DEBUG = false
+-- if DEBUG then
+--   local log = require("_").log
+--   local _fs = fs
+--   fs = {}
+--   for k, v in pairs(_fs) do
+--     fs[k] = function(...)
+--       log(k, ...)
+--       v(...)
+--     end
+--   end
+-- end
 
 local BUFFERS = {}
 local BUFFERS_BY_PATH = {}
@@ -184,7 +201,11 @@ M.parse = function(line)
 end
 
 M.go = function(d)
-  M.go = function(dir)
+  M.go = vim.fn.has("win32") == 1 and function(dir)
+    M.dir = string.gsub(dir, "/", "\\")
+    w:show()
+    pcall(vim.cmd.edit, { vim.fn.fnameescape(M.path_to_URL(dir)) })
+  end or function(dir)
     M.dir = dir
     w:show()
     pcall(vim.cmd.edit, { vim.fn.fnameescape(M.path_to_URL(dir)) })
@@ -260,6 +281,10 @@ local function ls(dir)
       vim.list_extend(content, t)
     end
     vim.uv.fs_closedir(fd)
+  end
+
+  if vim.fn.has("win32") == 1 then
+    content = vim.tbl_filter(function(e) return e.type ~= "link" end, content)
   end
 
   for _, e in ipairs(content) do
@@ -483,9 +508,15 @@ local function fn_BufWriteCmd__parse_buffers()
 
     buffer_ls = vim.tbl_map(function(f)
       local t = M.parse(f)
-      if t and (not string.match(t.name, "/")) and (not is_entry_dupped(t.name)) then return t end
-      error = true
-      table.insert(string_builder, "  >> " .. f)
+      if not t or string.match(t.name, "/") then
+        table.insert(string_builder, "  PARSING ERROR:\n    >> " .. f)
+        error = true
+      elseif is_entry_dupped(t.name) then
+        table.insert(string_builder, "  ENTRY ALREADY EXISTS:\n    >> " .. f)
+        error = true
+      else
+        return t
+      end
     end, buffer_ls)
 
     if error then
@@ -537,7 +568,7 @@ fn_BufWriteCmd = function()
   end
 
   local error, buffers_ls = fn_BufWriteCmd__parse_buffers()
-  if error then return notify.error("ERROR") end -- TODO: error handling
+  if error then return end
 
   for _, buffer in ipairs(buffers_ls) do
     local buffer_name, info = buffer[1], buffer[2]

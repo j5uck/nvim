@@ -12,19 +12,19 @@ if vim.fn.exists("#FileExplorer") == 1 then
   vim.api.nvim_del_augroup_by_name("FileExplorer")
 end
 
--- if vim.fn.has("win32") == 1 then
---   -- for WINDOWS --
---   vim.cmd("set shell=" .. vim.fn.exepath("powershell"))
---   -- vim.cmd[[set shell=C:/Users/user/stuff/bin/busybox.exe\ bash]]
---   vim.cmd[[set shellxquote=]]
---   vim.cmd[[set shellcmdflag=-c]]
+if vim.fn.has("win32") == 1 then
+  -- for WINDOWS --
+  vim.cmd("set shell=" .. vim.fn.exepath("powershell"))
+  -- vim.cmd[[set shell=C:/Users/user/stuff/bin/busybox.exe\ bash]]
+  vim.cmd[[set shellxquote=]]
+  vim.cmd[[set shellcmdflag=-c]]
 -- elseif vim.fn.has('mac') == 1 then
 --   -- for MAC --
 --   vim.cmd("set shell=/bin/bash")
 -- else
 --   -- for POSIX --
 --   vim.cmd("set shell=/bin/bash")
--- end
+end
 
 -- NO sourcing of $VIMRUNTIME/plugin/rrhelper.vim --
 vim.g.loaded_rrhelper = 1
@@ -67,7 +67,7 @@ vim.opt.cursorline = false
 vim.opt.number = false
 vim.opt.relativenumber = false
 
-vim.opt.cmdheight = 0
+-- vim.opt.cmdheight = 0
 
 vim.opt.signcolumn = "no"
 

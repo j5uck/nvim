@@ -640,7 +640,7 @@ local ts_extensions = {
   "make",
   "markdown",
   "markdown_inline",
-  "norg",
+  -- "norg",
   "ocaml",
   "php",
   "printf",

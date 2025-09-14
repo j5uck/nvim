@@ -156,13 +156,13 @@ vim.api.nvim_create_autocmd("FileType", {
 
 local fw = window:new{
   on_show = vim.schedule_wrap(function(ev)
-    vim.cmd[[norm! 0]]
+    vim.cmd[[silent! norm! 0]]
     local n = vim.api.nvim_buf_get_name(ev.buf)
     if vim.fn.match(n, "^term://.*") == -1 then
       vim.cmd.term()
     end
     vim.cmd.clearjumps()
-    vim.cmd.startinsert()
+    vim.cmd[[silent! startinsert]]
   end),
   size = function()
     local width = math.ceil(math.min(vim.o.columns, math.max(80, vim.o.columns - 20)))

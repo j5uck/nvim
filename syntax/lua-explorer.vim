@@ -7,12 +7,10 @@ syn match Error /%./ oneline
 syn match Error /%$/ oneline
 syn match Error /%=>/ oneline
 
-syn match Special /%[nprs]/ oneline
-syn match Comment / %=> / oneline
+if !has("win32")
+  syn match Special /%[nprs]/ oneline
+  syn match Comment / %=> / oneline
+endif
 
-syn match LEId /^\/\d*/ conceal oneline
-syn match LEDelimiter /%D / conceal oneline
-
-
-hi def link LEId WarningMsg
-hi def link LEDelimiter WarningMsg
+syn match WarningMsg /^\/\d*/ conceal oneline
+syn match WarningMsg /%D / conceal oneline

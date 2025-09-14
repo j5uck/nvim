@@ -1,3 +1,8 @@
+if exists("b:current_syntax")
+  finish
+endif
+let b:current_syntax = "undotree"
+
 syn match Question   ' \zs\*\ze '       " Node
 syn match Statement  '\zs\*\ze.*>\d\+<' " NodeCurrent
 syn match Function   '(.*)$'            " TimeStamp
