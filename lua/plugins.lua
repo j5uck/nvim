@@ -653,6 +653,7 @@ local ts_extensions = {
   "vala",
   "vim",
   "vimdoc",
+  "vue",
   "yaml"
 }
 
@@ -703,6 +704,9 @@ local coc_extensions = {
   "coc-svg",
   "coc-tsserver",
   "coc-typos",
+
+  "@yaegassy/coc-typescript-vue-plugin",
+  "@yaegassy/coc-volar",
 
   "coc-marketplace",
   -- "coc-discord-rpc",

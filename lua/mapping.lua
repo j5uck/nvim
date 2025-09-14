@@ -21,6 +21,9 @@ map({ "n", "i", "v" }, { "<MiddleMouse>", "<2-MiddleMouse>", "<3-MiddleMouse>", 
 map("i", { "<c-Space>" }, "<esc>", { desc = "escape" })
 map({"i", "t"}, "<M-o>", "<c-\\><c-n>", { desc = "escape" })
 
+map("n", "k", "v:count == 0 ? 'gk' : 'k'", { expr = true, silent = true, desc = "move up" })
+map("n", "j", "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = true, desc = "move down" })
+
 map("n", "U", "<C-r>", { desc = "redo" })
 
 map("n", "<leader>T", "<cmd>tabnew<CR>", { desc = "[t]erminal" })

@@ -245,8 +245,6 @@ end
 M.render = function()
   vim.t.gettime = M.gettime
   vim.cmd[[
-    let s:gettime = t:gettime
-
     let tree = t:undotree.tree
     let slots = [tree]
     let out = []
@@ -323,7 +321,7 @@ M.render = function()
             let newline = newline.'| '
           endif
         endfor
-        let newline = newline.'   '.(node.seq).'    ('.s:gettime(node.time).')'
+        let newline = newline.'   '.(node.seq).'    ('.t:gettime(node.time).')'
         " update the printed slot to its child.
         if empty(node.p)
           let slots[index] = 'x'
@@ -425,15 +423,16 @@ vim.api.nvim_create_autocmd("BufEnter", {
   callback = function()
     local wins = vim.api.nvim_tabpage_list_wins(0)
     for _, w in ipairs(wins) do
-      local _ = vim.b[vim.api.nvim_win_get_buf(w)].is_undotree or
+      local is_undotree = vim.b[vim.api.nvim_win_get_buf(w)].is_undotree or
         vim.api.nvim_win_get_config(w).zindex
-      if not _ then return end
+      if not is_undotree then return end
     end
     for _, id in ipairs(wins) do
       local status, msg = pcall(vim.api.nvim_win_call, id, vim.cmd.q)
       if not status then
         msg = string.gsub(vim.fn.split(msg, "\n")[1], "Error executing lua: (.*)", "%1")
-        notify.error(msg) end
+        notify.error(msg)
+      end
     end
   end
 })

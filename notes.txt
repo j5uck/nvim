@@ -5,8 +5,6 @@ Neovim (>= 0.11.0)
 Patched font (eg. Nerd font)
 ripgrep (for telescope) => https://github.com/BurntSushi/ripgrep
 fd (for telescope)
-c compiler (for telescope-fzf-native)
-make or cmake (for telescope-fzf-native)
 
 -- -- -- NOTES -- -- --
 
@@ -23,13 +21,11 @@ if vim.fn.has("nvim-0.11") == 0 then
   return require("_").notify.warn("NVIM version too smol!!!")
 end
 
+https://samroeca.com/coc-plugin.html#writing-an-extension
+curl https://api.npms.io/v2/search?q=keywords:coc.nvim
 
 TODO:
-tpope/vim-fugitive
-  https://www.youtube.com/watch?v=uUrKrYCAl1Y
-tpope/vim-rhubarb
 keybind: align lines by char
-undo tree rewrite
 lua explorer hl system
 
 https://github.com/nvim-tree/nvim-tree.lua
@@ -54,37 +50,22 @@ local bi = vim.fn.getbufinfo(vim.api.nvim_get_current_buf())
 wi.topline
 wi.botline
 
-vim.api.nvim_win_get_config(vim.api.nvim_get_current_win())
-
 vim.fn.getregtype(reg)
 vim.fn.resolve(dir)
 vim.fn.fnamemodify(dir, ":p")
 
 vim.fn.getfperm(d)
 
-vim.wo.eventignorewin
-
-vim.ui.open
-
 vim.bo.spelllang
 
 vim.o.colorcolumn = "72"
-
-vim.keymap.set('n', 'k', "v:count == 0 ? 'gk' : 'k'", { expr = true, silent = true })
-vim.keymap.set('n', 'j', "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = true })
 
 vim.on_key({fn}, {ns_id}, {opts})
 
 M.fs = {}
 
-M.fs.joinpath = function(...)
-  return ({string.gsub(vim.fs.joinpath(...), "/+", "/")})[1]
-end
-
-if vim.fn.has("win32") == 1 then
-  M.fs.lsdrives = function()
-    local cmd = { vim.fn.exepath("powershell"), "wmic", "logicaldisk", "get", "name" }
-    return vim.list_slice(vim.fn.split(vim.system(cmd):wait().stdout),2)
-  end
+fs.lsdrives = function()
+  local cmd = { vim.fn.exepath("powershell"), "wmic", "logicaldisk", "get", "name" }
+  return vim.list_slice(vim.fn.split(vim.system(cmd):wait().stdout),2)
 end
 
