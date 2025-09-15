@@ -705,7 +705,6 @@ local coc_extensions = {
   "coc-tsserver",
   "coc-typos",
 
-  "@yaegassy/coc-typescript-vue-plugin",
   "@yaegassy/coc-volar",
 
   "coc-marketplace",

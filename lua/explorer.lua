@@ -4,7 +4,12 @@ local C = ffi.C
 ffi.cdef[[
   size_t readlink(const char *restrict, char *restrict, size_t);
   int stat(const char *restrict, void *restrict);
+  // DWORD GetLogicalDriveStrings(DWORD, LPWSTR);
+  int GetLogicalDriveStringsA(int, char *);
 ]]
+
+local BUFFER_SIZE = 8192
+local buffer = ffi.new("char [?]", BUFFER_SIZE)
 
 local notify, window = (function()
   local _ = require("_")
@@ -269,9 +274,6 @@ vim.api.nvim_create_autocmd("BufHidden", {
 })
 
 local function ls(dir)
-  local BUFFER_SIZE = 8192
-  local buffer = ffi.new("char [?]", BUFFER_SIZE)
-
   local fd = vim.uv.fs_opendir(vim.fs.normalize(dir), nil, 16384)
 
   local content = {}
@@ -363,13 +365,6 @@ fn_BufReadCmd = function()
   local status, devicons = pcall(require, "nvim-web-devicons")
   if not status then devicons = nil end
 
-  local is_modifiable = (function()
-    local ft = vim.fn.getftype(M.dir)
-    if #ft == 0 then return true end
-    if ft ~= "dir" then return false end
-    return not not vim.uv.fs_access(M.dir, "W")
-  end)()
-
   vim.bo.bufhidden  = "hide"
   vim.bo.buflisted  = false
   vim.bo.buftype    = "acwrite"
@@ -391,7 +386,26 @@ fn_BufReadCmd = function()
   vim.wo.spell          = false
   vim.wo.wrap           = false
 
-  local list = ls(M.dir)
+  local list, is_modifiable
+
+  if #M.dir == 0 and (vim.fn.has("win32") == 1) then
+    list = vim.tbl_map(function(name)
+      return {
+        is_directory = true,
+        name = string.sub(name, 1, #name - 1),
+        type = "directory"
+      }
+    end, vim.split(ffi.string(buffer, C.GetLogicalDriveStringsA(BUFFER_SIZE, buffer)), "\0", { trimempty = true }))
+
+    is_modifiable = false
+  else
+    list = ls(M.dir)
+
+    local ft = vim.fn.getftype(M.dir)
+    if #ft == 0 then return true end
+    if ft ~= "dir" then return false end
+    is_modifiable = not not vim.uv.fs_access(M.dir, "W")
+  end
 
   local hls = {}
   local text = {}
@@ -570,11 +584,11 @@ fn_BufWriteCmd = function()
   local error, buffers_ls = fn_BufWriteCmd__parse_buffers()
   if error then return end
 
-  for _, buffer in ipairs(buffers_ls) do
-    local buffer_name, info = buffer[1], buffer[2]
-    local cached_info = vim.tbl_extend("force", {}, buffer[3])
+  for _, b in ipairs(buffers_ls) do
+    -- b => { name, new_info, old_info }
+    local buffer_name, cached_info = b[1], vim.tbl_extend("force", {}, b[3])
 
-    for _, entry in ipairs(info) do
+    for _, entry in ipairs(b[2]) do
       local cached_entry = (entry.id and cached_info[vim.fs.basename(PATHS[entry.id])]) or {}
       local to_continue =
           cached_entry.id == entry.id and
@@ -804,11 +818,11 @@ return {
   end,
 
   go_up = vim.fn.has("win32") == 1 and function()
-    -- TODO: ls disks
     if (#M.dir == 0) or string.match(M.dir,"^%w:\\$") then
       M.go("")
     else
-      M.go(vim.fs.normalize(M.dir .. "..") .. "/")
+      local p = string.gsub(vim.fs.normalize(M.dir .. "..") .. "/", "/+", "/")
+      M.go(p)
     end
   end or function()
     local d = vim.fs.normalize(M.dir .. "..")

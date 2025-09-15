@@ -149,7 +149,7 @@ vim.api.nvim_set_hl(term_ns, "Normal", { fg = "#ffffff", bg = "#000000" })
 
 vim.api.nvim_create_autocmd("TermEnter", {
   callback = vim.schedule_wrap(function()
-   vim.api.nvim_win_set_hl_ns(0, term_ns)
+    vim.api.nvim_win_set_hl_ns(0, term_ns)
   end)
 })
 
@@ -158,6 +158,7 @@ vim.api.nvim_create_autocmd("TermOpen", {
     vim.wo.number = false
     vim.wo.relativenumber = false
     vim.wo.cursorline = false
+    vim.api.nvim_win_set_hl_ns(0, term_ns)
   end) end
 })
 

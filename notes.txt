@@ -38,7 +38,6 @@ https://github.com/tpope/vim-fugitive/blob/master/plugin/fugitive.vim
 https://github.com/tpope/vim-commentary
 
 nvim_set_current_win({window})
-ls drives
 
 undofile reload
 https://github.com/stevearc/oil.nvim
@@ -62,10 +61,23 @@ vim.o.colorcolumn = "72"
 
 vim.on_key({fn}, {ns_id}, {opts})
 
-M.fs = {}
 
-fs.lsdrives = function()
-  local cmd = { vim.fn.exepath("powershell"), "wmic", "logicaldisk", "get", "name" }
-  return vim.list_slice(vim.fn.split(vim.system(cmd):wait().stdout),2)
+
+local log = require("_").log
+
+local url = "https://registry.npmjs.com/-/v1/search?text=keywords:coc.nvim"
+
+local r = {}
+
+local i = 0
+while true do
+  local o = vim.json.decode(vim.system({ "curl", "--connect-timeout", "3", url .. "&size=250&from=" .. (250 * i) }):wait().stdout).objects
+  if not o or #o == 0 then break end
+
+  vim.list_extend(r, vim.tbl_map(function(t)
+    return { t.package.name, t.package.keywords }
+  end, o))
+  i = i + 1
 end
 
+log(unpack(r))
