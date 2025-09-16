@@ -1,12 +1,17 @@
 local ffi = require("ffi")
 local C = ffi.C
 
-ffi.cdef[[
-  size_t readlink(const char *restrict, char *restrict, size_t);
-  int stat(const char *restrict, void *restrict);
-  // DWORD GetLogicalDriveStrings(DWORD, LPWSTR);
-  int GetLogicalDriveStringsA(int, char *);
-]]
+if vim.fn.has("win32") == 1 then
+  ffi.cdef[[
+    // DWORD GetLogicalDriveStrings(DWORD, LPWSTR);
+    int GetLogicalDriveStringsA(int, char *);
+  ]]
+else
+  ffi.cdef[[
+    size_t readlink(const char *restrict, char *restrict, size_t);
+    int stat(const char *restrict, void *restrict);
+  ]]
+end
 
 local BUFFER_SIZE = 8192
 local buffer = ffi.new("char [?]", BUFFER_SIZE)
@@ -40,7 +45,7 @@ fs.mkfile = function(file)
   end
 end
 
-fs.mklink =vim.fn.has("win32") == 1 and function(_, _)
+fs.mklink = vim.fn.has("win32") == 1 and function(_, _)
   error("Unsupported platform")
 end or
  function(target, link_name)
@@ -83,7 +88,7 @@ fs.remove = function(src)
   return r
 end
 
--- local DEBUG = false
+-- local DEBUG = true
 -- if DEBUG then
 --   local log = require("_").log
 --   local _fs = fs
@@ -411,17 +416,19 @@ fn_BufReadCmd = function()
   local text = {}
   for i, e in ipairs(list) do
     local _i = i - 1
-    local line = ""
+    local line = {}
+    local line_len = 0
     local function add(txt, hl)
       if hl then
         table.insert(hls, {
           line = _i,
-          col_start = #line,
-          end_col = #line + #txt,
+          col_start = line_len,
+          end_col = line_len + #txt,
           group = hl
         })
       end
-      line = line .. txt .. " "
+      line_len = line_len + #txt + 1
+      table.insert(line, txt)
     end
 
     table.insert(PATHS, M.dir .. e.name)
@@ -453,7 +460,7 @@ fn_BufReadCmd = function()
       add(e.link, e.link_exists and HL.HIDDEN or HL.LINK_ORPHAN)
     end
 
-    table.insert(text, vim.trim(line, 1, #line-1))
+    table.insert(text, table.concat(line, " "))
   end
 
   vim.api.nvim_buf_set_lines(w.buf, 0, -1, false, text)
@@ -589,13 +596,16 @@ fn_BufWriteCmd = function()
     local buffer_name, cached_info = b[1], vim.tbl_extend("force", {}, b[3])
 
     for _, entry in ipairs(b[2]) do
-      local cached_entry = (entry.id and cached_info[vim.fs.basename(PATHS[entry.id])]) or {}
+      local entry_path = PATHS[entry.id]
+      local cached_entry = (entry.id and BUFFERS_BY_PATH[vim.fs.dirname(entry_path)][2][vim.fs.basename(entry_path)]) or {}
       local to_continue =
           cached_entry.id == entry.id and
           cached_entry.name == entry.name and
           cached_entry.link == entry.link and
-          (entry.link or (cached_entry.is_directory == entry.is_directory))
+          (entry.link or (cached_entry.is_directory == entry.is_directory)) and
+          vim.fs.dirname(entry_path) == buffer_name
 
+      -- no changes --
       if to_continue then
         cached_info[entry.name] = nil
         local src = PATHS[entry.id]
@@ -620,34 +630,36 @@ fn_BufWriteCmd = function()
         else
           APPENT_TASK{ TASK.MKFILE, full_path }
         end
-      else
-        local src_buffer = BUFFERS_BY_PATH[vim.fs.dirname(PATHS[entry.id])]
-        local src_file = vim.fs.basename(PATHS[entry.id])
-        if entry.link then
-          if src_buffer[2][src_file].link == entry.link then
-            APPENT_TASK{ TASK.COPY, PATHS[entry.id], full_path }
-          else
-            APPENT_TASK{ TASK.REMOVE, PATHS[entry.id] }
-            if vim.fn.isabsolutepath(entry.link) then
-              APPENT_TASK{ TASK.MKLINK, entry.link, full_path }
-            else
-              APPENT_TASK{ TASK.MKLINK, buffer_name .. slash .. entry.link, full_path }
-            end
-          end
-        elseif entry.is_directory then
-          if cached_entry.is_directory then
-            APPENT_TASK{ TASK.COPY, PATHS[entry.id], full_path }
-          else
-            APPENT_TASK{ TASK.REMOVE, PATHS[entry.id] }
-            APPENT_TASK{ TASK.MKMDIR, full_path }
-          end
+        goto continue
+      end
+
+      -- if entry.id --
+      local src_buffer = BUFFERS_BY_PATH[vim.fs.dirname(PATHS[entry.id])]
+      local src_file = vim.fs.basename(PATHS[entry.id])
+      if entry.link then
+        if src_buffer[2][src_file].link == entry.link then
+          APPENT_TASK{ TASK.COPY, PATHS[entry.id], full_path }
         else
-          if not cached_entry.is_directory and not cached_entry.link then
-            APPENT_TASK{ TASK.COPY, PATHS[entry.id], full_path }
+          APPENT_TASK{ TASK.REMOVE, PATHS[entry.id] }
+          if vim.fn.isabsolutepath(entry.link) then
+            APPENT_TASK{ TASK.MKLINK, entry.link, full_path }
           else
-            APPENT_TASK{ TASK.REMOVE, PATHS[entry.id] }
-            APPENT_TASK{ TASK.MKFILE, full_path }
+            APPENT_TASK{ TASK.MKLINK, buffer_name .. slash .. entry.link, full_path }
           end
+        end
+      elseif entry.is_directory then
+        if cached_entry.is_directory then
+          APPENT_TASK{ TASK.COPY, PATHS[entry.id], full_path }
+        else
+          APPENT_TASK{ TASK.REMOVE, PATHS[entry.id] }
+          APPENT_TASK{ TASK.MKMDIR, full_path }
+        end
+      else
+        if not cached_entry.is_directory and not cached_entry.link then
+          APPENT_TASK{ TASK.COPY, PATHS[entry.id], full_path }
+        else
+          APPENT_TASK{ TASK.REMOVE, PATHS[entry.id] }
+          APPENT_TASK{ TASK.MKFILE, full_path }
         end
       end
       ::continue::
