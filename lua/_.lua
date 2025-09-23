@@ -41,6 +41,33 @@ M.prequire_wrap = function(name, fn)
   return function() return M.prequire(name, fn) end
 end
 
+if false then
+
+M.list = {}
+M.list.sort = function(l, f) return f and table.sort(l,f) or vim.fn.sort(l, "i") end
+M.list.map = vim.tbl_map
+M.list.filter = vim.tbl_filter
+M.list.remove = table.remove
+M.list.slice = vim.list_slice
+M.list.clone = function(t) return vim.list_slice(t, 1, #t) end
+M.list.insert = table.insert
+M.list.merge = function(...)
+  local r = {}
+  for _, t in ipairs{...} do
+    vim.list_extend(r, t)
+  end
+  return r
+end
+
+M.dictionary = {}
+M.dictionary.isempty = vim.tbl_isempty
+M.dictionary.clone = vim.deepcopy
+M.dictionary.keys = vim.tbl_keys
+M.dictionary.merge = function(...) return vim.tbl_extend("force",...) end
+M.dictionary.deep_merge = function(...) return vim.tbl_deep_extend("force",...) end
+
+end
+
 local window = {}
 
 function window:show()

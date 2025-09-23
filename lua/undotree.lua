@@ -1,12 +1,12 @@
 local M = {}
 
 M.new = function()
-  local r
-  vim.api.nvim_win_call(0, function()
+  return vim.api.nvim_win_call(0, function()
     vim.cmd[[noautocmd silent topleft vertical 25 split undotree://]]
+    local w = vim.api.nvim_get_current_win()
 
-    r = vim.api.nvim_get_current_win()
-    vim.cmd("let t:undotree.w.undo = " .. r)
+    vim.cmd("let t:undotree.w.undo = " .. w)
+    vim.cmd("let t:undotree.b.target = -1") -- force update
 
     vim.bo.bufhidden  = "delete"
     vim.bo.buflisted  = false
@@ -31,8 +31,10 @@ M.new = function()
     vim.b.is_undotree = true
 
     vim.cmd.clearjumps()
+
+    ---@diagnostic disable-next-line: redundant-return-value
+    return w
   end)
-  return r
 end
 
 M.toggle = function()
@@ -43,7 +45,6 @@ M.toggle = function()
 
   if #undotree_wins == 0 then
     local w = M.new()
-    vim.cmd("let t:undotree.b.target = -1") -- force update
     vim.api.nvim_win_call(0, M.update)
     vim.api.nvim_set_current_win(w)
   else
@@ -119,37 +120,27 @@ M.update = function()
     t_undotree.seq_saved = vim.empty_dict()
     t_undotree.tree = { seq = 0, p = {}, time =  0 }
 
-    vim.t.undotree = t_undotree
-    vim.cmd[[
-      function! s:parseNode(in,out) abort
-        " type(in) == type([]) && type(out) == type({})
-        if empty(a:in) "empty
-          return
-        endif
-        let curnode = a:out
-        for i in a:in
-          if has_key(i,'alt')
-            call s:parseNode(i.alt,curnode)
-          endif
-          let newnode = { 'seq': i.seq, 'p': [], 'time': i.time }
-          if has_key(i,'newhead')
-            let t:undotree.seq_newhead = i.seq
-          endif
-          if has_key(i,'curhead')
-            let t:undotree.seq_curhead = i.seq
-            let t:undotree.seq_cur = curnode.seq
-          endif
-          if has_key(i,'save')
-            let t:undotree.seq_saved[i.save] = i.seq
-          endif
-          call extend(curnode.p,[newnode])
-          let curnode = newnode
-        endfor
-      endfunction
+    local function parse_node(_in, out)
+      if vim.tbl_isempty(_in) then return end
+      -- local curnode = out
+      for _, i in ipairs(_in) do
+        if i.alt then parse_node(i.alt, out) end
+        if i.newhead then t_undotree.seq_newhead = i.seq end
+        if i.curhead then
+          t_undotree.seq_curhead = i.seq
+          t_undotree.seq_cur = out.seq
+        end
+        if i.save then
+          t_undotree.seq_saved[tostring(i.save)] = i.seq
+        end
 
-      call s:parseNode(t:undotree.rawtree.entries, t:undotree.tree)
-    ]]
-    t_undotree = vim.t.undotree
+        local newnode = { seq = i.seq, p = {}, time = i.time }
+        vim.list_extend(out.p, { newnode })
+        out = newnode
+      end
+    end
+
+    parse_node(t_undotree.rawtree.entries, t_undotree.tree)
 
     t_undotree.seq_cur = t_undotree.rawtree.seq_cur
     t_undotree.save_last = t_undotree.rawtree.save_last
