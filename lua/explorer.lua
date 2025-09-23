@@ -279,6 +279,7 @@ vim.api.nvim_create_autocmd("BufHidden", {
 })
 
 local function ls(dir)
+  ---@diagnostic disable-next-line: param-type-mismatch
   local fd = vim.uv.fs_opendir(vim.fs.normalize(dir), nil, 16384)
 
   local content = {}
@@ -525,7 +526,7 @@ local function fn_BufWriteCmd__parse_buffers()
 
     local buffer_ls = vim.tbl_filter(function(v)
       return v ~= ""
-    end, vim.fn.getbufline(id, 1, "$"))
+    end, vim.api.nvim_buf_get_lines(id, 0, -1, true))
 
     buffer_ls = vim.tbl_map(function(f)
       local t = M.parse(f)
@@ -680,7 +681,7 @@ fn_BufWriteCmd = function()
         tf.gone = true
         if vim.fn.isdirectory(t[2]) == 1 then
           local dir = string.sub(vim.fn.undofile(t[2]), #undodir + 2)
-          for _, f in ipairs(vim.fn.globpath(undodir, dir .. "*", 1, 1, 1)) do
+          for _, f in ipairs(vim.fn.globpath(undodir, dir .. "*", 1, true, 1)) do
             fs.remove(f)
           end
         else
@@ -713,7 +714,7 @@ fn_BufWriteCmd = function()
         if vim.fn.isdirectory(t[3]) == 1 then
           local src_dir = string.sub(vim.fn.undofile(t[2]), #undodir + 2)
           local trim_len = #undodir + 2 + #src_dir
-          for _, f in ipairs(vim.fn.globpath(undodir, src_dir .. "*", 1, 1, 1)) do
+          for _, f in ipairs(vim.fn.globpath(undodir, src_dir .. "*", 1, true, 1)) do
             action(f, vim.fn.undofile(t[3]) .. string.sub(f, trim_len))
           end
         else
@@ -731,7 +732,7 @@ fn_BufWriteCmd = function()
     if vim.fn.isdirectory(lm[2]) == 1 then
       local src_dir = string.sub(vim.fn.undofile(lm[1]), #undodir + 2)
       local trim_len = #undodir + 2 + #src_dir
-      for _, f in ipairs(vim.fn.globpath(undodir, src_dir .. "*", 1, 1, 1)) do
+      for _, f in ipairs(vim.fn.globpath(undodir, src_dir .. "*", 1, true, 1)) do
         fs.move(f, vim.fn.undofile(lm[2]) .. string.sub(f, trim_len))
       end
     else
@@ -808,7 +809,7 @@ vim.api.nvim_create_autocmd("BufEnter", {
 })
 
 vim.api.nvim_create_autocmd("BufEnter", {
-  pattern = (vim.fn.has("win32") == 0) and "/*" or "[A-Z]:\\\\*",
+  pattern = (vim.fn.has("win32") == 0) and "/*" or "[A-Z]:/*",
   callback = vim.schedule_wrap(function(ev)
     if vim.fn.isdirectory(ev.file) == 0 then return end
     vim.cmd[[exe "norm \<c-o>"]]

@@ -61,6 +61,8 @@ vim.o.colorcolumn = "72"
 
 vim.on_key({fn}, {ns_id}, {opts})
 
+tagbar
+
 
 
 local log = require("_").log

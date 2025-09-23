@@ -52,7 +52,7 @@ vim.g.did_load_filetypes = 1
 
 vim.opt.guicursor = { "a:ver25", "n-v-t:block", "o-r-cr:hor20" }
 
-vim.opt.mouse = { a = true }
+vim.opt.mouse = { n = true, v = true }
 
 vim.schedule(vim.cmd.clearjumps)
 

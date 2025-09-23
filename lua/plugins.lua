@@ -82,7 +82,7 @@ PLUG_SYNC.start = function(args)
 
     local untracked = vim.tbl_filter(function(v)
       return PLUGS[string.sub(v,len)] == nil
-    end, vim.fn.globpath(PLUG_HOME, "*", 1, 1)) -- dot files are ignored
+    end, vim.fn.globpath(PLUG_HOME, "*", 1, true)) -- dot files are ignored
 
     if #untracked == 0 then goto continue end
 
@@ -392,7 +392,8 @@ plug{
   setup = prequire_wrap("telescope", function(telescope)
     telescope.setup{
       defaults = {
-        history = false
+        history = false,
+        file_ignore_patterns = { "^.git/" }
       },
       extensions = {
         ["ui-select"] = {
@@ -512,12 +513,13 @@ plug{
       nil,
       function()
         local url = string.gsub(vim.api.nvim_buf_get_name(0), "%%", "%%%%")
-        return vim.o.modified and (url.." [+]") or url
+        return vim.o.modified and (url .. " [+]") or url
       end
     })
 
     local o = { icons_enabled = true, theme = "auto" }
 
+    -- if vim.g.nvy then
     if (vim.fn.has("win32") == 0) and vim.fn.readfile("/etc/hostname")[1] == "host7" then
       o.section_separators   = { left = "",  right = ""  }
       o.component_separators = { left = "|", right = "|" }

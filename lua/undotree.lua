@@ -1,16 +1,12 @@
--- local notify = require("_").notify
-local log, notify = (function()
-  local _ = require("_")
-  return _.log, _.notify
-end)()
-
 local M = {}
 
 M.new = function()
-  return vim.api.nvim_win_call(0, function()
+  local r
+  vim.api.nvim_win_call(0, function()
     vim.cmd[[noautocmd silent topleft vertical 25 split undotree://]]
 
-    vim.cmd("let t:undotree.w.undo = " .. vim.api.nvim_get_current_win())
+    r = vim.api.nvim_get_current_win()
+    vim.cmd("let t:undotree.w.undo = " .. r)
 
     vim.bo.bufhidden  = "delete"
     vim.bo.buflisted  = false
@@ -35,9 +31,8 @@ M.new = function()
     vim.b.is_undotree = true
 
     vim.cmd.clearjumps()
-
-    return vim.t.undotree.w.undo
   end)
+  return r
 end
 
 M.toggle = function()
@@ -431,7 +426,7 @@ vim.api.nvim_create_autocmd("BufEnter", {
       local status, msg = pcall(vim.api.nvim_win_call, id, vim.cmd.q)
       if not status then
         msg = string.gsub(vim.fn.split(msg, "\n")[1], "Error executing lua: (.*)", "%1")
-        notify.error(msg)
+        require("_").notify.error(msg)
       end
     end
   end

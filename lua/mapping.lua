@@ -58,8 +58,12 @@ map("n", "<leader><s-l>", "<cmd>belowright vnew<CR>", { desc = "empty [S]plit [l
 map("x", { "<leader>I", "<leader>A" }, "xgvI", { desc = "replace block" })
 
 map({"n", "v"}, "<leader>y", "\"+y", { desc = "[y]ank to \"+" })
+
 map({"n", "v"}, "<leader>p", "\"+p", { desc = "[p]aste from \"+" })
 map({"n", "v"}, "<leader>P", "\"+P", { desc = "[p]aste from \"+" })
+
+map({"n", "v"}, "<leader>dd", "\"+dd", { desc = "[d]elete and copy to \"+" })
+map({"n", "v"}, "<leader>D",  "\"+D",  { desc = "[d]elete and copy to \"+" })
 
 map("n", "<leader>w", "<cmd>w<CR>", { desc = "[w]rite" })
 map("n", "<leader>x", "<cmd>x<CR>", { desc = "write & e[x]it" })

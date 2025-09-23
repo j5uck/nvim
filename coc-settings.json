@@ -7,7 +7,9 @@
   "diagnostic.virtualTextCurrentLineOnly": false,
   "diagnostic.virtualTextPrefix": " <- ",
 
-  "Lua.telemetry.enable": false,
+  "sumneko-lua.enableNvimLuaDev": true,
+  "sumneko-lua.checkUpdate": false,
+
   "Lua.diagnostics.globals": [ "api", "jit", "vim" ],
   "Lua.diagnostics.disable": [ "inject-field" ],
   "Lua.runtime.version": "LuaJIT",
@@ -18,14 +20,16 @@
     "/usr/local/share/nvim/runtime/lua/vim/treesitter"
   ],
 
+  "java.compile.nullAnalysis.mode": "automatic",
+
+  "clangd.checkUpdates": false,
   "clangd.fallbackFlags": [
     "-I/usr/lib/jvm/default/include",
     "-I/usr/lib/jvm/default/include/linux"
   ],
 
-  "sumneko-lua.checkUpdate": false,
-  "clangd.checkUpdates": false,
-  "rust-analyzer.updates": false,
+  "rust-analyzer.updates.checkOnStartup": false,
+  "rust-analyzer.updates.channel": "stable",
 
   "snippets.ultisnips.pythonPrompt": false
 }
