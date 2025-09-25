@@ -427,6 +427,7 @@ end
 
 local menu = window:new{
   on_show = function()
+    local NS = vim.api.nvim_create_namespace("")
     vim.api.nvim_create_autocmd("CursorMoved", {
       buffer = 0,
       callback = function()
@@ -441,13 +442,28 @@ local menu = window:new{
     map("n", "q",     vim.cmd.q, { buffer = 0, desc = "quit" })
     map("n", "<CR>",  select,    { buffer = 0, desc = "select" })
 
-    local text = {}
-    for i, v in ipairs(LANGS) do
-      table.insert(text, " " .. LANGS_ICON[i] .. "  " .. v)
+    vim.bo.modifiable = true
+
+    local status, devicons = pcall(require, "nvim-web-devicons")
+    if status then
+      for i, v in ipairs(LANGS) do
+        local icon, hl = devicons.get_icon(LANGS_FILENAME[i])
+        vim.api.nvim_buf_set_lines(0, i-1, i-1, true, { " " .. icon .. "  " .. v })
+
+        vim.api.nvim_buf_set_extmark(0, NS, i-1, 1, {
+          end_col = #icon + 2,
+          hl_group = hl,
+          strict = false,
+        })
+      end
+    else
+      for i, v in ipairs(LANGS) do
+        vim.api.nvim_buf_set_lines(0, i-1, i-1, true, { " " .. LANGS_ICON[i] .. "  " .. v })
+      end
     end
 
-    vim.bo.modifiable = true
-    vim.api.nvim_buf_set_lines(0, 0, -1, true, text)
+    vim.cmd[[norm! G"_dd]]
+    vim.cmd[[norm! gg]]
     vim.bo.modifiable = false
   end,
   size = function()
@@ -470,12 +486,13 @@ map("n", "<leader>ii", function()
   menu:show()
 end, { desc = "create example file" })
 
+local MESSAGE = "Hello World!"
 LANGS_EXAMPLES = {
   c = {
     "#include <stdio.h>",
     "",
     "int main(int argc, char *argv[]){",
-    "  printf(\"Hello World!\\n\");",
+    "  printf(\"" .. MESSAGE .. "\\n\");",
     "",
     "  return 0;",
     "}",
@@ -490,7 +507,7 @@ LANGS_EXAMPLES = {
     "    <link href=\"css/style.css\" rel=\"stylesheet\">",
     "  </head>",
     "  <body>",
-    "    <div>Hello World!</div>",
+    "    <div>" .. MESSAGE .. "</div>",
     "  </body>",
     "</html>",
   },
@@ -503,7 +520,7 @@ LANGS_EXAMPLES = {
   },
   javascript = {
     "#!/bin/bun run",
-    "console.log(\"Hello World!\")"
+    "console.log(\"" .. MESSAGE .. "\")"
   },
   kotlin = {
     "fun main() {",
@@ -511,22 +528,22 @@ LANGS_EXAMPLES = {
     "}",
   },
   lua = {
-    "vim.notify(\"Hello World!\", \"WARN\")"
+    "vim.notify(\"" .. MESSAGE .. "\", vim.log.levels.WARN)"
   },
   markdown = {
-    "## Hello World!"
+    "## " .. MESSAGE
   },
   rust = {
     "fn main() {",
-    "  println!(\"{}\", \"Hello World!\");",
+    "  println!(\"{}\", \"" .. MESSAGE .. "\");",
     "}",
   },
   sh = {
     "#!/bin/bash",
-    "echo Hello World"
+    "echo '" .. MESSAGE .. "'"
   },
   typescript = {
     "#!/bin/bun run",
-    "console.log(\"Hello World!\")"
+    "console.log(\"" .. MESSAGE .. "\")"
   },
 }
