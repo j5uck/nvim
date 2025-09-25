@@ -427,12 +427,15 @@ end
 
 local menu = window:new{
   on_show = function()
+    if vim.b.is_menu_loaded then return end
+    vim.b.is_menu_loaded = true
+
     local NS = vim.api.nvim_create_namespace("")
     vim.api.nvim_create_autocmd("CursorMoved", {
       buffer = 0,
       callback = function()
         local y, _ = unpack(vim.api.nvim_win_get_cursor(0))
-        vim.api.nvim_win_set_cursor(0, { y, 0 })
+        vim.api.nvim_win_set_cursor(0, { y, vim.fn.match(vim.api.nvim_get_current_line(), "\\w") })
       end
     })
 
@@ -482,9 +485,7 @@ local menu = window:new{
   border = "rounded",
 }
 
-map("n", "<leader>ii", function()
-  menu:show()
-end, { desc = "create example file" })
+map("n", "<leader>ii", function() menu:show() end, { desc = "create example file" })
 
 local MESSAGE = "Hello World!"
 LANGS_EXAMPLES = {
@@ -513,9 +514,9 @@ LANGS_EXAMPLES = {
   },
   java = {
     "public class Main{",
-    "    public static void main(String[] args){",
-    "        System.out.println(\"Hello world!\");",
-    "    }",
+    "  public static void main(String[] args){",
+    "    System.out.println(\"" .. MESSAGE .. "\");",
+    "  }",
     "}",
   },
   javascript = {
@@ -524,7 +525,7 @@ LANGS_EXAMPLES = {
   },
   kotlin = {
     "fun main() {",
-    "  println(\"Hello, World!\")",
+    "  println(\"" .. MESSAGE .. "\")",
     "}",
   },
   lua = {
