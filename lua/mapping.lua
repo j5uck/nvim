@@ -1,7 +1,7 @@
 
-local notify, notify_once, flags, window, prequire = (function()
+local notify, notify_once, flags, prequire, random, window = (function()
   local _ = require("_")
-  return _.notify, _.notify_once, _.flags, _.window, _.prequire
+  return _.notify, _.notify_once, _.flags, _.prequire, _.random, _.window
 end)()
 local explorer = require("explorer")
 
@@ -80,7 +80,7 @@ map("n", "<leader>O", "O<esc>0\"_D", { desc = "create new line" })
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "qf" },
   callback = function()
-    map("n", "<CR>", "<cmd>.cc<CR>", { buffer = true, desc = "go to error" })
+    map("n", "<CR>", "<cmd>.cc<CR>", { buffer = 0, desc = "go to error" })
   end
 })
 
@@ -108,7 +108,7 @@ map("n", "<c-l>", "<c-i>", { desc = "jump to next location" })
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "help" },
   callback = function()
-    map("n", "<CR>", "<c-]>", { buffer = true, desc = "go to tag" })
+    map("n", "<CR>", "<c-]>", { buffer = 0, desc = "go to tag" })
   end
 })
 
@@ -132,32 +132,32 @@ end, { desc = "toggle [n]umber" })
 
 map("n", "<leader>m", "<cmd>nohlsearch<CR>", { desc = "[m]ute search" })
 
-map("n", "<leader>E", explorer.open, { desc = "open file tre[e]"})
-map("n", "<leader>e", explorer.resume, { desc = "resume file tre[e]"})
+map("n", "<leader>E", explorer.open, { desc = "open file tre[e]" })
+map("n", "<leader>e", explorer.resume, { desc = "resume file tre[e]" })
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "lua-explorer" },
   callback = function()
-    map("n", "<esc>", "<cmd>q<CR>", { buffer = true })
+    map("n", "<esc>", "<cmd>q<CR>", { buffer = 0 })
 
-    map("n", "<2-LeftMouse>", explorer.select, { buffer = true })
-    map("n", "<CR>", explorer.select, { buffer = true })
+    map("n", "<2-LeftMouse>", explorer.select, { buffer = 0 })
+    map("n", "<CR>", explorer.select, { buffer = 0 })
 
-    map("n", "<c-h>", explorer.go_back, { buffer = true })
-    map("n", "<c-l>", explorer.go_next, { buffer = true })
-    map("n", "<c-k>", explorer.go_up, { buffer = true })
+    map("n", "<c-h>", explorer.go_back, { buffer = 0 })
+    map("n", "<c-l>", explorer.go_next, { buffer = 0 })
+    map("n", "<c-k>", explorer.go_up, { buffer = 0 })
 
-    map("n", "<M-h>", explorer.go_back, { buffer = true })
-    map("n", "<M-j>", "<Nop>", { buffer = true })
-    map("n", "<M-k>", explorer.go_up, { buffer = true })
-    map("n", "<M-l>", explorer.go_next, { buffer = true })
+    map("n", "<M-h>", explorer.go_back, { buffer = 0 })
+    map("n", "<M-j>", "<Nop>", { buffer = 0 })
+    map("n", "<M-k>", explorer.go_up, { buffer = 0 })
+    map("n", "<M-l>", explorer.go_next, { buffer = 0 })
 
     map("n", "<leader>A", function()
       local s = explorer.buf_get_name()
       notify.info("%s", s)
       vim.fn.setreg([["]], s)
       vim.fn.setreg([[+]], s)
-    end, { buffer = true })
+    end, { buffer = 0 })
   end
 })
 
@@ -243,9 +243,9 @@ map("n", "<leader>u", undotree.toggle, { desc = "toggle [u]ndo tree" })
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "undotree",
   callback = function()
-    map("n", { "<CR>", "<2-LeftMouse>" }, undotree.select, { buffer = true, desc = "Select state" })
-    map("n", "u", undotree.undo, { buffer = true, desc = "Undo" })
-    map("n", { "U", "<c-r>" }, undotree.redo, { buffer = true, desc = "Redo" })
+    map("n", { "<CR>", "<2-LeftMouse>" }, undotree.select, { buffer = 0, desc = "Select state" })
+    map("n", "u", undotree.undo, { buffer = 0, desc = "Undo" })
+    map("n", { "U", "<c-r>" }, undotree.redo, { buffer = 0, desc = "Redo" })
   end
 })
 
@@ -378,3 +378,155 @@ else
   end
 end
 
+local LANGS = {
+  "C",
+  "HTML",
+  "Java",
+  "Javascript",
+  "Kotlin",
+  "Lua",
+  "Markdown",
+  "Rust",
+  "SH",
+  "Typescript",
+}
+
+local LANGS_FILENAME = {
+  "main.c",
+  "index.html",
+  "Main.java",
+  "script.js",
+  "Main.kt",
+  "script.lua",
+  "README.md",
+  "main.rs",
+  "script.sh",
+  "script.ts",
+}
+
+local LANGS_ICON = { "", "", "", "", "", "", "", "", "", "" }
+local LANGS_EXAMPLES
+
+local TMPDIR = vim.fn.has("win32") == 1 and
+  (vim.env.APPDATA .. "\\..\\Local\\Temp") or
+  vim.env.XDG_RUNTIME_DIR
+
+local select = function()
+  local lnum = vim.api.nvim_win_get_cursor(0)[1]
+  vim.cmd.q()
+
+  local dir = TMPDIR .. "/tmp." .. random(10)
+  vim.fn.mkdir(dir, "p")
+  vim.cmd.e(vim.fn.fnameescape(dir .. "/" .. LANGS_FILENAME[lnum]))
+  vim.api.nvim_buf_set_lines(0, 0, -1, true, LANGS_EXAMPLES[string.lower(LANGS[lnum])])
+  vim.cmd[[noautocmd w]]
+
+  -- TODO: add path to buffer info (to use with compilation shortcut)
+  -- TODO: add color to icons
+end
+
+local menu = window:new{
+  on_show = function()
+    vim.api.nvim_create_autocmd("CursorMoved", {
+      buffer = 0,
+      callback = function()
+        local y, _ = unpack(vim.api.nvim_win_get_cursor(0))
+        vim.api.nvim_win_set_cursor(0, { y, 0 })
+      end
+    })
+
+    vim.api.nvim_win_set_config(0, { title = " NEW ", title_pos = "center" })
+
+    map("n", "<esc>", vim.cmd.q, { buffer = 0, desc = "quit" })
+    map("n", "q",     vim.cmd.q, { buffer = 0, desc = "quit" })
+    map("n", "<CR>",  select,    { buffer = 0, desc = "select" })
+
+    local text = {}
+    for i, v in ipairs(LANGS) do
+      table.insert(text, " " .. LANGS_ICON[i] .. "  " .. v)
+    end
+
+    vim.bo.modifiable = true
+    vim.api.nvim_buf_set_lines(0, 0, -1, true, text)
+    vim.bo.modifiable = false
+  end,
+  size = function()
+    local width = 16
+    local height = math.min(vim.o.lines - 10, #LANGS)
+
+    return {
+      col    = math.ceil(vim.o.columns - width) * 0.5 - 1,
+      row    = math.ceil(vim.o.lines - height) * 0.5 - 1,
+      width  = width,
+      height = height
+    }
+  end,
+  focus = true,
+  focusable = true,
+  border = "rounded",
+}
+
+map("n", "<leader>ii", function()
+  menu:show()
+end, { desc = "create example file" })
+
+LANGS_EXAMPLES = {
+  c = {
+    "#include <stdio.h>",
+    "",
+    "int main(int argc, char *argv[]){",
+    "  printf(\"Hello World!\\n\");",
+    "",
+    "  return 0;",
+    "}",
+  },
+  html = {
+    "<!DOCTYPE html>",
+    "<html lang=\"en\">",
+    "  <head>",
+    "    <meta charset=\"UTF-8\">",
+    "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+    "    <title></title>",
+    "    <link href=\"css/style.css\" rel=\"stylesheet\">",
+    "  </head>",
+    "  <body>",
+    "    <div>Hello World!</div>",
+    "  </body>",
+    "</html>",
+  },
+  java = {
+    "public class Main{",
+    "    public static void main(String[] args){",
+    "        System.out.println(\"Hello world!\");",
+    "    }",
+    "}",
+  },
+  javascript = {
+    "#!/bin/bun run",
+    "console.log(\"Hello World!\")"
+  },
+  kotlin = {
+    "fun main() {",
+    "  println(\"Hello, World!\")",
+    "}",
+  },
+  lua = {
+    "vim.notify(\"Hello World!\", \"WARN\")"
+  },
+  markdown = {
+    "## Hello World!"
+  },
+  rust = {
+    "fn main() {",
+    "  println!(\"{}\", \"Hello World!\");",
+    "}",
+  },
+  sh = {
+    "#!/bin/bash",
+    "echo Hello World"
+  },
+  typescript = {
+    "#!/bin/bun run",
+    "console.log(\"Hello World!\")"
+  },
+}

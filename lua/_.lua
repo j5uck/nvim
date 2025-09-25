@@ -41,6 +41,19 @@ M.prequire_wrap = function(name, fn)
   return function() return M.prequire(name, fn) end
 end
 
+local CHARS = vim.split("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz","")
+M.random = function(len)
+  local ffi = require("ffi")
+  local buffer = ffi.new("char [?]", len)
+  ffi.copy(buffer, vim.uv.random(len), len)
+
+  local l = {}
+  for i = 1, len, 1 do
+    table.insert(l, CHARS[buffer[i] % #CHARS + 1])
+  end
+  return table.concat(l, "")
+end
+
 if false then
 
 M.list = {}
