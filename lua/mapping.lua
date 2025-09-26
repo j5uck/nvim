@@ -521,7 +521,9 @@ LANGS_EXAMPLES = {
   },
   javascript = {
     "#!/bin/bun run",
-    "console.log(\"" .. MESSAGE .. "\")"
+    "(async () => {",
+    "  console.log(\"" .. MESSAGE .. "\")",
+    "})()",
   },
   kotlin = {
     "fun main() {",
@@ -543,8 +545,6 @@ LANGS_EXAMPLES = {
     "#!/bin/bash",
     "echo '" .. MESSAGE .. "'"
   },
-  typescript = {
-    "#!/bin/bun run",
-    "console.log(\"" .. MESSAGE .. "\")"
-  },
 }
+
+LANGS_EXAMPLES.typescript = LANGS_EXAMPLES.javascript
