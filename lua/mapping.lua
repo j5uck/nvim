@@ -405,7 +405,7 @@ local LANGS_FILENAME = {
 }
 
 local LANGS_ICON = { "", "", "", "", "", "", "", "", "", "" }
-local LANGS_EXAMPLES
+local LANGS_EXAMPLES = {}
 
 local TMPDIR = vim.fn.has("win32") == 1 and
   (vim.env.APPDATA .. "\\..\\Local\\Temp") or
@@ -465,8 +465,7 @@ local menu = window:new{
       end
     end
 
-    vim.cmd[[norm! G"_dd]]
-    vim.cmd[[norm! gg]]
+    vim.cmd[[norm! G"_ddgg]]
     vim.bo.modifiable = false
   end,
   size = function()
@@ -488,63 +487,68 @@ local menu = window:new{
 map("n", "<leader>ii", function() menu:show() end, { desc = "create example file" })
 
 local MESSAGE = "Hello World!"
-LANGS_EXAMPLES = {
-  c = {
-    "#include <stdio.h>",
-    "",
-    "int main(int argc, char *argv[]){",
-    "  printf(\"" .. MESSAGE .. "\\n\");",
-    "",
-    "  return 0;",
-    "}",
-  },
-  html = {
-    "<!DOCTYPE html>",
-    "<html lang=\"en\">",
-    "  <head>",
-    "    <meta charset=\"UTF-8\">",
-    "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-    "    <title></title>",
-    "    <link href=\"css/style.css\" rel=\"stylesheet\">",
-    "  </head>",
-    "  <body>",
-    "    <div>" .. MESSAGE .. "</div>",
-    "  </body>",
-    "</html>",
-  },
-  java = {
-    "public class Main{",
-    "  public static void main(String[] args){",
-    "    System.out.println(\"" .. MESSAGE .. "\");",
-    "  }",
-    "}",
-  },
-  javascript = {
-    "#!/bin/bun run",
-    "(async () => {",
-    "  console.log(\"" .. MESSAGE .. "\")",
-    "})()",
-  },
-  kotlin = {
-    "fun main() {",
-    "  println(\"" .. MESSAGE .. "\")",
-    "}",
-  },
-  lua = {
-    "vim.notify(\"" .. MESSAGE .. "\", vim.log.levels.WARN)"
-  },
-  markdown = {
-    "## " .. MESSAGE
-  },
-  rust = {
-    "fn main() {",
-    "  println!(\"{}\", \"" .. MESSAGE .. "\");",
-    "}",
-  },
-  sh = {
-    "#!/bin/bash",
-    "echo '" .. MESSAGE .. "'"
-  },
+LANGS_EXAMPLES.c = {
+  "#include <stdio.h>",
+  "",
+  "int main(int argc, char *argv[]){",
+  "  printf(\"" .. MESSAGE .. "\\n\");",
+  "",
+  "  return 0;",
+  "}"
 }
-
-LANGS_EXAMPLES.typescript = LANGS_EXAMPLES.javascript
+LANGS_EXAMPLES.html = {
+  "<!DOCTYPE html>",
+  "<html lang=\"en\">",
+  "  <head>",
+  "    <meta charset=\"UTF-8\">",
+  "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+  "    <title></title>",
+  "    <link href=\"css/style.css\" rel=\"stylesheet\">",
+  "  </head>",
+  "  <body>",
+  "    <h1>" .. MESSAGE .. "</h1>",
+  "  </body>",
+  "</html>"
+}
+LANGS_EXAMPLES.java = {
+  "public class Main{",
+  "  public static void main(String[] args){",
+  "    System.out.println(\"" .. MESSAGE .. "\");",
+  "  }",
+  "}"
+}
+LANGS_EXAMPLES.javascript = {
+  "#!/bin/bun run",
+  "\"use strict\";",
+  "",
+  "(async () => {",
+  "  console.log(\"" .. MESSAGE .. "\");",
+  "})();"
+}
+LANGS_EXAMPLES.kotlin = {
+  "fun main() {",
+  "  println(\"" .. MESSAGE .. "\")",
+  "}"
+}
+LANGS_EXAMPLES.lua = {
+  "vim.notify(\"" .. MESSAGE .. "\", vim.log.levels.WARN)"
+}
+LANGS_EXAMPLES.markdown = {
+  "## " .. MESSAGE
+}
+LANGS_EXAMPLES.rust = {
+  "fn main() {",
+  "  println!(\"{}\", \"" .. MESSAGE .. "\");",
+  "}"
+}
+LANGS_EXAMPLES.sh = {
+  "#!/bin/bash",
+  "echo '" .. MESSAGE .. "'"
+}
+LANGS_EXAMPLES.typescript = {
+  "#!/bin/bun run",
+  "",
+  "(async () => {",
+  "  console.log(\"" .. MESSAGE .. "\");",
+  "})();"
+}
