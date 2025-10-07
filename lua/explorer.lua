@@ -30,7 +30,7 @@ fs.mkdir = function(dir)
   if s then
     return true
   else
-    notify.error("%s", msg)
+    notify.error(msg)
     return false
   end
 end
@@ -40,7 +40,7 @@ fs.mkfile = function(file)
   if s then
     return true
   else
-    notify.error("%s", msg)
+    notify.error(msg)
     return false
   end
 end
@@ -53,7 +53,7 @@ end or
   if o.code == 0 then
     return true
   else
-    notify.error("%s", vim.split(o.stderr, "\n")[1])
+    notify.error(vim.split(o.stderr, "\n")[1])
     return false
   end
 end
@@ -63,7 +63,7 @@ fs.copy = vim.fn.has("win32") == 1 and function(src, dest)
   if o.code == 0 then
     return true
   else
-    notify.error("%s", vim.split(o.stderr, "\r")[1])
+    notify.error(vim.split(o.stderr, "\r")[1])
     return false
   end
 end or function(src, dest)
@@ -71,20 +71,20 @@ end or function(src, dest)
   if o.code == 0 then
     return true
   else
-    notify.error("%s", vim.split(o.stderr, "\n")[1])
+    notify.error(vim.split(o.stderr, "\n")[1])
     return false
   end
 end
 
 fs.move = function(src, dest)
   local r = vim.fn.rename(src, dest) == 0
-  if not r then notify.error("ERROR fs.move: %s => %s", src, dest) end
+  if not r then notify.error("ERROR fs.move: " .. src .." => " .. dest) end
   return r
 end
 
 fs.remove = function(src)
   local r = vim.fn.delete(src, "rf") == 0
-  -- if not r then notify.error("ERROR fs.remove: %s", src) end
+  -- if not r then notify.error("ERROR fs.remove: " .. src) end
   return r
 end
 
@@ -354,7 +354,7 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
     w.buf = ev.buf
 
     local s, m = pcall(vim.api.nvim_buf_call, ev.buf, fn_BufReadCmd)
-    if not s then notify.error("%s", m) end
+    if not s then notify.error(m) end
   end
 })
 
@@ -543,7 +543,7 @@ local function fn_BufWriteCmd__parse_buffers()
 
     if error then
       if #string_builder > 0 then
-        notify.error("%s\n%s", vim.api.nvim_buf_get_name(id), table.concat(string_builder, "\n"))
+        notify.error(vim.api.nvim_buf_get_name(id) .. "\n" .. table.concat(string_builder, "\n"))
       end
       goto continue
     end

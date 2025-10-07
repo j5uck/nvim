@@ -9,13 +9,13 @@ local WRAP = vim.schedule_wrap
 local I, W, E = vim.log.levels.INFO, vim.log.levels.WARN, vim.log.levels.ERROR
 
 M.notify = {}
-M.notify.info  = WRAP(function(...) vim.notify(string.format(...), I) end)
-M.notify.warn  = WRAP(function(...) vim.notify(string.format(...), W) end)
-M.notify.error = WRAP(function(...) vim.notify(string.format(...), E) end)
+M.notify.info  = WRAP(function(s) vim.notify(s, I) end)
+M.notify.warn  = WRAP(function(s) vim.notify(s, W) end)
+M.notify.error = WRAP(function(s) vim.notify(s, E) end)
 M.notify_once = {}
-M.notify_once.info  = WRAP(function(...) vim.notify_once(string.format(...), I) end)
-M.notify_once.warn  = WRAP(function(...) vim.notify_once(string.format(...), W) end)
-M.notify_once.error = WRAP(function(...) vim.notify_once(string.format(...), E) end)
+M.notify_once.info  = WRAP(function(s) vim.notify_once(s, I) end)
+M.notify_once.warn  = WRAP(function(s) vim.notify_once(s, W) end)
+M.notify_once.error = WRAP(function(s) vim.notify_once(s, E) end)
 
 M.log = function(...)
   local sb = {}
@@ -33,7 +33,7 @@ M.prequire = function(name, fn)
   if status then return fn(plugin) end
 
   if M.flags.warn_missing_module then
-    M.notify_once.warn("Module '%s' not found", name)
+    M.notify_once.warn("Module '" .. name .. "' not found")
   end
 end
 

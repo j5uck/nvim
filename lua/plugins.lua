@@ -1,4 +1,3 @@
-
 local flags, notify, notify_once, prequire_wrap = (function()
   local _ = require("_")
   return _.flags, _.notify, _.notify_once, _.prequire_wrap
@@ -43,8 +42,7 @@ end
 
 PLUG_SYNC.start = function(args)
   if vim.fn.executable("git") == 0 then
-    notify.error("Git not found\n"..
-                 "Cannot proceed")
+    notify.error("Git not found\nCannot proceed")
     return
   end
 
@@ -235,8 +233,8 @@ end
 
 PLUG_SYNC.finally = function()
   vim.cmd[[hi link PlugSyncDone Label]]
-  notify.warn("[LUA-PLUG] Elapsed time: %.3f seconds",
-              vim.trim(vim.fn.reltimestr(vim.fn.reltime(PLUG_SYNC.reltime))))
+  local n = string.format("%.3f", vim.trim(vim.fn.reltimestr(vim.fn.reltime(PLUG_SYNC.reltime))))
+  notify.warn("[LUA-PLUG] Elapsed time: " .. n .. "seconds")
 end
 
 vim.api.nvim_create_user_command("PlugSync", PLUG_SYNC.start, {
@@ -323,9 +321,9 @@ plug{
       icons = {
         DEBUG = "",
         ERROR = "",
-        INFO = "",
+        INFO  = "",
         TRACE = "✎",
-        WARN = ""
+        WARN  = ""
       },
       level = 2,
       max_height = nil,
@@ -722,15 +720,8 @@ plug{
       local e = vim.fn["coc#rpc#request"]("extensionStats",{})
       if type(e) ~= "table" then return coc_extensions, false end
 
-      e = vim.tbl_filter(function(v)
-        return not v.isLocal
-      end, e)
-      e = vim.tbl_map(function(v)
-        return ({string.gsub(v.id, ".*/(.*)", "%1")})[1]
-      end, e)
-
       local filter = {}
-      for _, f in ipairs(e) do
+      for _, f in ipairs(vim.tbl_map(function(v) return v.id end, e)) do
         filter[f] = true
       end
 

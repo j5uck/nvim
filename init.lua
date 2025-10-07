@@ -1,4 +1,3 @@
-
 if vim.loader then vim.loader.enable() end
 
 if not pcall(vim.cmd.pwd, { mods = { silent = true }}) then
@@ -193,4 +192,3 @@ local rec = require("_").window:new{
 
 vim.api.nvim_create_autocmd("RecordingEnter", { callback = function() rec:show() end })
 vim.api.nvim_create_autocmd("RecordingLeave", { callback = function() rec:hide() end })
-

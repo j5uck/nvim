@@ -92,12 +92,12 @@ map("v", ",", "<cmd>norm @q<CR>", { desc = "do [q] macro" })
 map("n", "<leader>t", [[<cmd>exe "terminal" | startinsert<CR>]], { desc = "[t]erminal" })
 
 map("n", "<leader>a", function()
-  notify.info("%s", vim.fn.expand("%:p"))
+  notify.info(vim.fn.expand("%:p"))
 end, { desc = "show buffer path" })
 
 map("n", "<leader>A", function()
   local b = vim.fn.expand("%:p")
-  notify.info("%s", b)
+  notify.info(b)
   vim.fn.setreg("\"", b)
   vim.fn.setreg("+", b)
 end, { desc = "copy buffer path" })
@@ -154,7 +154,7 @@ vim.api.nvim_create_autocmd("FileType", {
 
     map("n", "<leader>A", function()
       local s = explorer.buf_get_name()
-      notify.info("%s", s)
+      notify.info(s)
       vim.fn.setreg([["]], s)
       vim.fn.setreg([[+]], s)
     end, { buffer = 0 })
@@ -488,6 +488,7 @@ map("n", "<leader>ii", function() menu:show() end, { desc = "create example file
 
 local MESSAGE = "Hello World!"
 LANGS_EXAMPLES.c = {
+  "// cc -o main ./main.c && ./main",
   "#include <stdio.h>",
   "",
   "int main(int argc, char *argv[]){",
@@ -511,6 +512,8 @@ LANGS_EXAMPLES.html = {
   "</html>"
 }
 LANGS_EXAMPLES.java = {
+  "// javac Main.java *.java && jar -cfe Main.jar Main Main.class *.class && java -jar Main.jar",
+  "",
   "public class Main{",
   "  public static void main(String[] args){",
   "    System.out.println(\"" .. MESSAGE .. "\");",
@@ -526,6 +529,8 @@ LANGS_EXAMPLES.javascript = {
   "})();"
 }
 LANGS_EXAMPLES.kotlin = {
+  "// kotlinc -d Main.jar Main.kt && java -jar ./Main.jar",
+  "",
   "fun main() {",
   "  println(\"" .. MESSAGE .. "\")",
   "}"
@@ -537,6 +542,8 @@ LANGS_EXAMPLES.markdown = {
   "## " .. MESSAGE
 }
 LANGS_EXAMPLES.rust = {
+  "// rustc ./main.rs && ./main",
+  "",
   "fn main() {",
   "  println!(\"{}\", \"" .. MESSAGE .. "\");",
   "}"
