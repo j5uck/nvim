@@ -1,6 +1,6 @@
-local flags, notify, notify_once, prequire_wrap = (function()
+local flags, notify, notify_once, prequire_wrap, window = (function()
   local _ = require("_")
-  return _.flags, _.notify, _.notify_once, _.prequire_wrap
+  return _.flags, _.notify, _.notify_once, _.prequire_wrap, _.window
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
@@ -781,9 +781,107 @@ plug{
       return
     end
 
-  pcall(vim.api.nvim_del_user_command, "CocStop")
-  local coc_stop = function() vim.fn["coc#rpc#stop"]() end
-  vim.api.nvim_create_user_command("CocStop", coc_stop, { bang = true }) end)
+    pcall(vim.api.nvim_del_user_command, "CocStop")
+    pcall(vim.api.nvim_del_user_command, "CocMarketplace")
+
+    local coc_stop = function() vim.fn["coc#rpc#stop"]() end
+    vim.api.nvim_create_user_command("CocStop", coc_stop, { bang = true })
+
+    local menu
+    local cache = {}
+
+    local function fetch_extensions()
+      local node = vim.fn.exepath("node")
+      if node == "" then
+        notify.error("Node not found\nCannot proceed")
+        return
+      end
+
+      local size = 200
+      local page = 0
+
+      local function url_builder()
+        local url = "https://api.npms.io/v2/search?q=keywords:coc.nvim&size=" .. size .. "&from=" .. page
+        return {
+          "node",
+          "-e",
+          "console.log(await (await fetch(\"" .. url .. "\")).text())"
+        }
+      end
+
+      local function fetch(out)
+        if out.code ~= 0 then
+          notify.error("Fatal error\n" .. out.stderr)
+          return
+        end
+
+        local json = vim.json.decode(out.stdout)
+        for _, v in ipairs(json.results) do
+          table.insert(cache, {
+            name = v.package.name,
+            description = v.package.description,
+            keywords = v.package.keywords
+          })
+        end
+
+        page = page + size
+        if page < json.total then
+          vim.system(url_builder(), { text = true }, fetch)
+        else
+          vim.schedule(function() menu:show() end)
+        end
+      end
+      vim.system(url_builder(), { text = true }, fetch)
+    end
+
+    menu = window:new{
+      on_show = function()
+        vim.bo.modifiable = true
+        if not vim.b.is_coc_menu_loaded then
+          vim.b.is_coc_menu_loaded = true
+          vim.api.nvim_create_autocmd("CursorMoved", {
+            buffer = 0,
+            callback = function()
+              local y, _ = unpack(vim.api.nvim_win_get_cursor(0))
+              vim.api.nvim_win_set_cursor(0, { y, 1 })
+            end
+          })
+        end
+
+        -- https://github.com/fannheyward/coc-marketplace
+        vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.tbl_map(function(e)
+          return string.format("[x] %-30s %s", e.name, e.description)
+        end, cache))
+
+        -- TODO: extension installation
+        -- TODO: cache timeout
+
+        vim.bo.modifiable = false
+      end,
+      size = function()
+        local width = math.min(vim.o.columns - 2, 150)
+        local height = math.min(vim.o.lines - 10, #cache)
+
+        return {
+          col    = math.ceil(vim.o.columns - width) * 0.5 - 1,
+          row    = math.ceil(vim.o.lines - height) * 0.5 - 1,
+          width  = width,
+          height = height
+        }
+      end,
+      focus = true,
+      focusable = true,
+      border = "rounded",
+    }
+
+    vim.api.nvim_create_user_command("CocMarketplace", function()
+      if #cache == 0 then
+        fetch_extensions()
+      else
+        menu:show()
+      end
+    end, { bang = true })
+  end)
 }
 
 ----- ----- ----- ----- ----- X ----- ----- ----- ----- -----

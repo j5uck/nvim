@@ -57,7 +57,7 @@ vim.fn.getfperm(d)
 
 vim.bo.spelllang
 
-vim.o.colorcolumn = "72"
+vim.wo.colorcolumn = "72"
 
 vim.on_key({fn}, {ns_id}, {opts})
 

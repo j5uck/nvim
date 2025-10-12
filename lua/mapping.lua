@@ -378,55 +378,56 @@ else
   end
 end
 
-local LANGS = {
+local LANGS_ORDER = {
   "C",
-  "HTML",
-  "Java",
-  "Javascript",
-  "Kotlin",
   "Lua",
-  "Markdown",
+  "HTML",
+  "CSS",
+  "Javascript",
+  "Typescript",
+  "Java",
+  "Kotlin",
   "Rust",
   "SH",
-  "Typescript",
+  "Markdown"
 }
 
-local LANGS_FILENAME = {
-  "main.c",
-  "index.html",
-  "Main.java",
-  "script.js",
-  "Main.kt",
-  "script.lua",
-  "README.md",
-  "main.rs",
-  "script.sh",
-  "script.ts",
-}
+LANGS = {}
 
-local LANGS_ICON = { "", "", "", "", "", "", "", "", "", "" }
-local LANGS_EXAMPLES = {}
+LANGS.c           = { icon = "", file = "main.c" }
+LANGS.lua         = { icon = "", file = "script.lua" }
+LANGS.html        = { icon = "", file = "index.html" }
+LANGS.css         = { icon = "", file = "style.css" }
+LANGS.javascript  = { icon = "", file = "script.js" }
+LANGS.typescript  = { icon = "", file = "script.ts" }
+LANGS.java        = { icon = "", file = "Main.java" }
+LANGS.kotlin      = { icon = "", file = "Main.kt" }
+LANGS.rust        = { icon = "", file = "main.rs" }
+LANGS.sh          = { icon = "", file = "script.sh" }
+LANGS.markdown    = { icon = "", file = "README.md" }
 
 local TMPDIR = vim.fn.has("win32") == 1 and
   (vim.env.APPDATA .. "\\..\\Local\\Temp") or
-  vim.env.XDG_RUNTIME_DIR
+  (vim.env.XDG_RUNTIME_DIR or "/tmp")
 
 local select = function()
   local lnum = vim.api.nvim_win_get_cursor(0)[1]
+  local lang = LANGS[string.lower(LANGS_ORDER[lnum])]
   vim.cmd.q()
 
   local dir = TMPDIR .. "/tmp." .. random(10)
   vim.fn.mkdir(dir, "p")
-  vim.cmd.e(vim.fn.fnameescape(dir .. "/" .. LANGS_FILENAME[lnum]))
-  vim.api.nvim_buf_set_lines(0, 0, -1, true, LANGS_EXAMPLES[string.lower(LANGS[lnum])])
+  vim.cmd.e(vim.fn.fnameescape(dir .. "/" .. lang.file))
+  vim.api.nvim_buf_set_lines(0, 0, -1, true, lang.code)
   vim.cmd[[noautocmd w]]
 
   -- TODO: add path to buffer info (to use with compilation shortcut)
-  -- TODO: add color to icons
 end
 
 local menu = window:new{
   on_show = function()
+    vim.api.nvim_win_set_config(0, { title = " NEW ", title_pos = "center" })
+
     if vim.b.is_menu_loaded then return end
     vim.b.is_menu_loaded = true
 
@@ -439,8 +440,6 @@ local menu = window:new{
       end
     })
 
-    vim.api.nvim_win_set_config(0, { title = " NEW ", title_pos = "center" })
-
     map("n", "<esc>", vim.cmd.q, { buffer = 0, desc = "quit" })
     map("n", "q",     vim.cmd.q, { buffer = 0, desc = "quit" })
     map("n", "<CR>",  select,    { buffer = 0, desc = "select" })
@@ -449,9 +448,10 @@ local menu = window:new{
 
     local status, devicons = pcall(require, "nvim-web-devicons")
     if status then
-      for i, v in ipairs(LANGS) do
-        local icon, hl = devicons.get_icon(LANGS_FILENAME[i])
-        vim.api.nvim_buf_set_lines(0, i-1, i-1, true, { " " .. icon .. "  " .. v })
+      for i, l in ipairs(LANGS_ORDER) do
+        local lang = LANGS[string.lower(l)]
+        local icon, hl = devicons.get_icon(lang.file)
+        vim.api.nvim_buf_set_lines(0, i-1, i-1, true, { " " .. icon .. "  " .. l })
 
         vim.api.nvim_buf_set_extmark(0, NS, i-1, 1, {
           end_col = #icon + 2,
@@ -460,8 +460,8 @@ local menu = window:new{
         })
       end
     else
-      for i, v in ipairs(LANGS) do
-        vim.api.nvim_buf_set_lines(0, i-1, i-1, true, { " " .. LANGS_ICON[i] .. "  " .. v })
+      for i, l in ipairs(LANGS_ORDER) do
+        vim.api.nvim_buf_set_lines(0, i-1, i-1, true, { " " .. LANGS[string.lower(l)] .. "  " .. l })
       end
     end
 
@@ -470,7 +470,7 @@ local menu = window:new{
   end,
   size = function()
     local width = 16
-    local height = math.min(vim.o.lines - 10, #LANGS)
+    local height = math.min(vim.o.lines - 10, #LANGS_ORDER)
 
     return {
       col    = math.ceil(vim.o.columns - width) * 0.5 - 1,
@@ -487,31 +487,61 @@ local menu = window:new{
 map("n", "<leader>ii", function() menu:show() end, { desc = "create example file" })
 
 local MESSAGE = "Hello World!"
-LANGS_EXAMPLES.c = {
+LANGS.c.code = {
   "// cc -o main ./main.c && ./main",
   "#include <stdio.h>",
   "",
   "int main(int argc, char *argv[]){",
-  "  printf(\"" .. MESSAGE .. "\\n\");",
+  "  printf(\"%s\\n\", \"" .. MESSAGE .. "\");",
   "",
   "  return 0;",
   "}"
 }
-LANGS_EXAMPLES.html = {
+LANGS.lua.code = {
+  "vim.notify(\"" .. MESSAGE .. "\", vim.log.levels.WARN)"
+}
+LANGS.html.code = {
   "<!DOCTYPE html>",
   "<html lang=\"en\">",
   "  <head>",
   "    <meta charset=\"UTF-8\">",
   "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
   "    <title></title>",
-  "    <link href=\"css/style.css\" rel=\"stylesheet\">",
+  "    <link href=\"style.css\" rel=\"stylesheet\">",
   "  </head>",
   "  <body>",
   "    <h1>" .. MESSAGE .. "</h1>",
   "  </body>",
+  "  <script src=\"script.js\" fetchpriority=\"high\"></script>",
   "</html>"
 }
-LANGS_EXAMPLES.java = {
+LANGS.css.code = {
+  "* {",
+  "  margin: 0;",
+  "  padding: 0;",
+  "}",
+  "",
+  "html, body {",
+  "  height: 100%;",
+  "  width: 100%;",
+  "}"
+}
+LANGS.javascript.code = {
+  "#!/bin/bun run",
+  "\"use strict\";",
+  "",
+  "(async () => {",
+  "  console.log(\"" .. MESSAGE .. "\");",
+  "})();"
+}
+LANGS.typescript.code = {
+  "#!/bin/bun run",
+  "",
+  "(async () => {",
+  "  console.log(\"" .. MESSAGE .. "\");",
+  "})();"
+}
+LANGS.java.code = {
   "// javac Main.java *.java && jar -cfe Main.jar Main Main.class *.class && java -jar Main.jar",
   "",
   "public class Main{",
@@ -520,42 +550,24 @@ LANGS_EXAMPLES.java = {
   "  }",
   "}"
 }
-LANGS_EXAMPLES.javascript = {
-  "#!/bin/bun run",
-  "\"use strict\";",
-  "",
-  "(async () => {",
-  "  console.log(\"" .. MESSAGE .. "\");",
-  "})();"
-}
-LANGS_EXAMPLES.kotlin = {
+LANGS.kotlin.code = {
   "// kotlinc -d Main.jar Main.kt && java -jar ./Main.jar",
   "",
   "fun main() {",
   "  println(\"" .. MESSAGE .. "\")",
   "}"
 }
-LANGS_EXAMPLES.lua = {
-  "vim.notify(\"" .. MESSAGE .. "\", vim.log.levels.WARN)"
-}
-LANGS_EXAMPLES.markdown = {
-  "## " .. MESSAGE
-}
-LANGS_EXAMPLES.rust = {
+LANGS.rust.code = {
   "// rustc ./main.rs && ./main",
   "",
   "fn main() {",
   "  println!(\"{}\", \"" .. MESSAGE .. "\");",
   "}"
 }
-LANGS_EXAMPLES.sh = {
+LANGS.sh.code = {
   "#!/bin/bash",
   "echo '" .. MESSAGE .. "'"
 }
-LANGS_EXAMPLES.typescript = {
-  "#!/bin/bun run",
-  "",
-  "(async () => {",
-  "  console.log(\"" .. MESSAGE .. "\");",
-  "})();"
+LANGS.markdown.code = {
+  "## " .. MESSAGE
 }
