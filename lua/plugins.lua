@@ -234,7 +234,7 @@ end
 PLUG_SYNC.finally = function()
   vim.cmd[[hi link PlugSyncDone Label]]
   local n = string.format("%.3f", vim.trim(vim.fn.reltimestr(vim.fn.reltime(PLUG_SYNC.reltime))))
-  notify.warn("[LUA-PLUG] Elapsed time: " .. n .. "seconds")
+  notify.warn("[LUA-PLUG] Elapsed time: " .. n .. " seconds")
 end
 
 vim.api.nvim_create_user_command("PlugSync", PLUG_SYNC.start, {
@@ -495,8 +495,8 @@ plug{
     end
     local function fn(o) return function() return o end end
 
-    ll("help",            { fn("NEOVIM HELP")  }, { nil, PROGRESS, LOCATION })
-    ll("checkhealth",     { fn("CHECK HEALTH") }, { nil, PROGRESS, LOCATION })
+    ll("help", { fn("NEOVIM HELP")  }, { nil, PROGRESS, LOCATION })
+    ll("checkhealth", { fn("CHECK HEALTH") }, { nil, PROGRESS, LOCATION })
     ll("TelescopePrompt", { fn("TELESCOPE") })
     ll("undotree", { fn("UNDOTREE"), nil, function()
       local n = vim.api.nvim_buf_get_name(vim.t.undotree.b.target)
@@ -504,6 +504,7 @@ plug{
       return vim.fs.basename(n)
     end }, { nil, PROGRESS, LOCATION })
 
+    ll("coc-marketplace", { fn("COC-MARKETPLACE")  }, { nil, PROGRESS, LOCATION })
     ll("coc-nvim", { fn("COC-NVIM") }, { nil, PROGRESS, LOCATION })
     ll("lua-plug", { fn("LUA-PLUG") })
     ll("lua-explorer", {
@@ -718,7 +719,6 @@ plug{
   build = function()
     local to_install, is_update_needed = (function()
       local e = vim.fn["coc#rpc#request"]("extensionStats",{})
-      if type(e) ~= "table" then return coc_extensions, false end
 
       local filter = {}
       for _, f in ipairs(vim.tbl_map(function(v) return v.id end, e)) do
@@ -788,7 +788,7 @@ plug{
     vim.api.nvim_create_user_command("CocStop", coc_stop, { bang = true })
 
     local menu
-    local cache = {}
+    local all_extensions = {}
 
     local function fetch_extensions()
       local node = vim.fn.exepath("node")
@@ -817,7 +817,7 @@ plug{
 
         local json = vim.json.decode(out.stdout)
         for _, v in ipairs(json.results) do
-          table.insert(cache, {
+          table.insert(all_extensions, {
             name = v.package.name,
             description = v.package.description,
             keywords = v.package.keywords
@@ -836,8 +836,16 @@ plug{
 
     menu = window:new{
       on_show = function()
+        vim.bo.bufhidden  = "delete"
+        vim.bo.buflisted  = false
+        vim.bo.buftype    = "nowrite"
+        vim.bo.filetype   = "coc-marketplace"
+        vim.bo.modifiable = false
         vim.bo.modifiable = true
-        vim.bo.filetype = "coc-marketplace"
+        vim.bo.swapfile   = false
+        vim.bo.syntax     = "coc-marketplace"
+        vim.bo.undolevels = -1
+
         vim.api.nvim_win_set_config(0, {
           title = " CocMarketplace ",
           title_pos = "center"
@@ -846,22 +854,104 @@ plug{
         if not vim.b.is_coc_menu_loaded then
           vim.b.is_coc_menu_loaded = true
           vim.api.nvim_create_autocmd("CursorMoved", {
-            buffer = 0,
+            buffer = vim.api.nvim_get_current_buf(),
             callback = function()
               local y, _ = unpack(vim.api.nvim_win_get_cursor(0))
               vim.api.nvim_win_set_cursor(0, { y, 1 })
             end
           })
-          vim.keymap.set("n", "Space", function()
-            -- TODO: toggle
-          end)
-          vim.keymap.set("n", "<CR>", function()
+
+          vim.keymap.set("n", "q", vim.cmd.q, { buffer = true })
+          vim.keymap.set("n", "<esc>", vim.cmd.q, { buffer = true })
+
+          vim.keymap.set("n", "<tab>", function()
+            local l = vim.api.nvim_get_current_line()
+            local sign = string.gsub(l, "^%[(.*)%].*", "%1")
+
+            local coc_data = vim.fn["coc#rpc#request"]("extensionStats", {})
+
+            local filter = {}
+            for _, f in ipairs(vim.tbl_map(function(v) return v.id end, coc_data)) do
+              filter[f] = true
+            end
+
+            local new_sign
+            local e = all_extensions[vim.api.nvim_win_get_cursor(0)[1]]
+
+            if filter[e.name] then
+              local f = {}
+              f["✓"] = "✗"
+              f["✗"] = "✓"
+              new_sign = f[sign]
+            else
+              local f = {}
+              f[" "] = "~"
+              f["~"] = " "
+              new_sign = f[sign]
+            end
+
+            vim.bo.modifiable = true
+            vim.api.nvim_set_current_line(string.format("[%s] %-30s %s", new_sign, e.name, e.description))
+            vim.bo.modifiable = false
+          end, { buffer = true })
+
+          vim.keymap.set("v", "<tab>", function()
+            local coc_data = vim.fn["coc#rpc#request"]("extensionStats",{})
+
+            local filter = {}
+            for _, f in ipairs(vim.tbl_map(function(v) return v.id end, coc_data)) do
+              filter[f] = true
+            end
+
+            local min, max = (function()
+              local a, z = vim.fn.getpos("v")[2], vim.fn.getpos(".")[2]
+              if a < z then
+                return a, z
+              else
+                return z, a
+              end
+            end)()
+
+            for i = min, max, 1 do
+              local l = vim.fn.getline(i)
+              local sign = string.gsub(l, "^%[(.*)%].*", "%1")
+
+              local new_sign
+              local e = all_extensions[i]
+
+              if filter[e.name] then
+                new_sign = sign == "✓" and "✗" or "✓"
+              else
+                new_sign = sign == " " and "~" or " "
+              end
+
+              vim.schedule(function()
+                vim.bo.modifiable = true
+                vim.fn.setline(i, string.format("[%s] %-30s %s", new_sign, e.name, e.description))
+                vim.bo.modifiable = false
+              end)
+            end
+
+            return "<esc>"
+          end, { buffer = true, expr = true })
+
+          vim.keymap.set({ "n", "v" }, "<CR>", function()
+            local to_install, to_uninstall = {}, {}
+
+            for i, l in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, true)) do
+              local sign = string.gsub(l, "^%[(.*)%].*", "%1")
+              if sign == "✗" then
+                table.insert(to_uninstall, all_extensions[i].name)
+              elseif sign == "~" then
+                table.insert(to_install, all_extensions[i].name)
+              end
+            end
+
             -- TODO: run
-          end)
+          end, { buffer = true })
         end
 
-        local coc_data = vim.fn["coc#rpc#request"]("extensionStats",{}) or {}
-        if type(coc_data) ~= "table" then coc_data = {} end
+        local coc_data = vim.fn["coc#rpc#request"]("extensionStats",{})
 
         local filter = {}
         for _, f in ipairs(vim.tbl_map(function(v) return v.id end, coc_data)) do
@@ -872,7 +962,7 @@ plug{
         vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.tbl_map(function(e)
           local sign = filter[e.name] and "✓" or " "
           return string.format("[%s] %-30s %s", sign, e.name, e.description)
-        end, cache))
+        end, all_extensions))
 
         -- TODO: extension installation
         -- TODO: cache timeout
@@ -881,7 +971,7 @@ plug{
       end,
       size = function()
         local width = math.min(vim.o.columns - 2, 150)
-        local height = math.min(vim.o.lines - 10, #cache)
+        local height = math.min(vim.o.lines - 10, #all_extensions)
 
         return {
           col    = math.ceil(vim.o.columns - width) * 0.5 - 1,
@@ -896,7 +986,7 @@ plug{
     }
 
     vim.api.nvim_create_user_command("CocMarketplace", function()
-      if #cache == 0 then
+      if #all_extensions == 0 then
         fetch_extensions()
       else
         menu:show()

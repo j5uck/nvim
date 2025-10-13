@@ -161,7 +161,9 @@ vim.api.nvim_create_autocmd("FileType", {
   end
 })
 
-local fw = window:new{
+local fw_size_max = false
+local fw
+fw = window:new{
   on_show = vim.schedule_wrap(function(ev)
     vim.cmd[[silent! norm! 0]]
     local n = vim.api.nvim_buf_get_name(ev.buf)
@@ -170,9 +172,19 @@ local fw = window:new{
     end
     vim.cmd.clearjumps()
     vim.cmd[[silent! startinsert]]
+
+    pcall(vim.api.nvim_buf_del_user_command, 0, "TermSizeToggle")
+    vim.api.nvim_buf_create_user_command(0, "TermSizeToggle", function()
+      fw_size_max = not fw_size_max
+      -- local conf = fw_size_max and { border = { "", "─" ,"", "", "", "─", "", "" } } or { border = "rounded" }
+      -- vim.api.nvim_win_set_config(fw.win, conf)
+      for _, fn in ipairs(fw.on_resize) do fn() end
+    end, {})
   end),
   size = function()
-    local width = math.ceil(math.min(vim.o.columns, math.max(80, vim.o.columns - 20)))
+    local width = fw_size_max and
+        vim.o.columns or
+        math.ceil(math.min(vim.o.columns, math.max(80, vim.o.columns - 20)))
     local height = math.ceil(math.min(vim.o.lines, math.max(20, vim.o.lines - 10)))
     local col = math.ceil(vim.o.columns - width) * 0.5 - 1
     local row = math.ceil(vim.o.lines - height) * 0.5 - 1
