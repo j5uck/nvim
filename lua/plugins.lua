@@ -837,6 +837,12 @@ plug{
     menu = window:new{
       on_show = function()
         vim.bo.modifiable = true
+        vim.bo.filetype = "coc-marketplace"
+        vim.api.nvim_win_set_config(0, {
+          title = " CocMarketplace ",
+          title_pos = "center"
+        })
+
         if not vim.b.is_coc_menu_loaded then
           vim.b.is_coc_menu_loaded = true
           vim.api.nvim_create_autocmd("CursorMoved", {
@@ -846,11 +852,26 @@ plug{
               vim.api.nvim_win_set_cursor(0, { y, 1 })
             end
           })
+          vim.keymap.set("n", "Space", function()
+            -- TODO: toggle
+          end)
+          vim.keymap.set("n", "<CR>", function()
+            -- TODO: run
+          end)
+        end
+
+        local coc_data = vim.fn["coc#rpc#request"]("extensionStats",{}) or {}
+        if type(coc_data) ~= "table" then coc_data = {} end
+
+        local filter = {}
+        for _, f in ipairs(vim.tbl_map(function(v) return v.id end, coc_data)) do
+          filter[f] = true
         end
 
         -- https://github.com/fannheyward/coc-marketplace
         vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.tbl_map(function(e)
-          return string.format("[x] %-30s %s", e.name, e.description)
+          local sign = filter[e.name] and "✓" or " "
+          return string.format("[%s] %-30s %s", sign, e.name, e.description)
         end, cache))
 
         -- TODO: extension installation
@@ -864,7 +885,7 @@ plug{
 
         return {
           col    = math.ceil(vim.o.columns - width) * 0.5 - 1,
-          row    = math.ceil(vim.o.lines - height) * 0.5 - 1,
+          row    = math.ceil(vim.o.lines - height)  * 0.5 - 1,
           width  = width,
           height = height
         }
