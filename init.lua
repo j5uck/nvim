@@ -174,6 +174,12 @@ vim.api.nvim_create_autocmd("TermClose", {
 
 local rec = require("_").window:new{
   on_show = function(self)
+    vim.bo.bufhidden  = "hide"
+    vim.bo.buftype    = "nofile"
+    vim.bo.buflisted  = false
+    vim.bo.swapfile   = false
+    vim.bo.undolevels = -1
+
     vim.api.nvim_buf_set_lines(self.buf, 0, -1, true, {
       " REC @" .. string.upper(vim.fn.reg_recording())
     })

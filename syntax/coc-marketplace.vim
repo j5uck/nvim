@@ -20,4 +20,4 @@ syn match Boolean /\(^\[\)\@<=\~/ oneline
 
 syn match Boolean /^\[/ oneline
 syn match Boolean /\(^\[.\)\@<=\]/ oneline
-syn match Comment /\(^\[.\] [^ ]\+[ ]\+\)\@<=.*$/ oneline
+syn match Comment /\(^\[.\] [^ ]\+[ ]\+\)\@<=.*/ oneline

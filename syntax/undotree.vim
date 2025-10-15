@@ -3,14 +3,14 @@ if exists("b:current_syntax")
 endif
 let b:current_syntax = "undotree"
 
-syn match Question   ' \zs\*\ze '       " Node
-syn match Statement  '\zs\*\ze.*>\d\+<' " NodeCurrent
-syn match Function   '(.*)$'            " TimeStamp
-syn match Constant   '[\|\/\\]'         " Branch
+syn match Question   / \zs\*\ze / oneline       " Node
+syn match Statement  /\zs\*\ze.*>\d\+</ oneline " NodeCurrent
+syn match Function   /(.*)$/ oneline            " TimeStamp
+syn match Constant   /[\|\/\\]/ oneline         " Branch
 
-syn match Comment    ' \zs\d\+\ze '     " Seq
-syn match Statement  '>\d\+<'           " Current
-syn match Type       '{\d\+}'           " Next
-syn match Identifier '\[\d\+]'          " Head
-syn match WarningMsg ' \zss\ze '        " SavedSmall
-syn match MatchParen ' \zsS\ze '        " SavedBig
+syn match Comment    / \zs\d\+\ze / oneline     " Seq
+syn match Statement  />\d\+</ oneline           " Current
+syn match Type       /{\d\+}/ oneline           " Next
+syn match Identifier /\[\d\+]/ oneline          " Head
+syn match WarningMsg / \zss\ze / oneline        " SavedSmall
+syn match MatchParen / \zsS\ze / oneline        " SavedBig

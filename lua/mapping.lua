@@ -152,6 +152,12 @@ vim.api.nvim_create_autocmd("FileType", {
     map("n", "<M-k>", explorer.go_up, { buffer = 0 })
     map("n", "<M-l>", explorer.go_next, { buffer = 0 })
 
+    map("n", "<leader>c", function()
+      local s = explorer.buf_get_name()
+      notify.info(s)
+      vim.cmd.cd(s)
+    end, { buffer = 0 })
+
     map("n", "<leader>A", function()
       local s = explorer.buf_get_name()
       notify.info(s)
@@ -162,24 +168,25 @@ vim.api.nvim_create_autocmd("FileType", {
 })
 
 local fw_size_max = false
-local fw
-fw = window:new{
-  on_show = vim.schedule_wrap(function(ev)
+local fw = window:new{
+  on_show = vim.schedule_wrap(function(self)
+    vim.bo.bufhidden  = "hide"
+    vim.bo.buflisted  = false
+    vim.bo.swapfile   = false
+    vim.bo.undolevels = -1
+
     vim.cmd[[silent! norm! 0]]
-    local n = vim.api.nvim_buf_get_name(ev.buf)
+    local n = vim.api.nvim_buf_get_name(self.buf)
     if vim.fn.match(n, "^term://.*") == -1 then
       vim.cmd.term()
     end
     vim.cmd.clearjumps()
     vim.cmd[[silent! startinsert]]
 
-    pcall(vim.api.nvim_buf_del_user_command, 0, "TermSizeToggle")
-    vim.api.nvim_buf_create_user_command(0, "TermSizeToggle", function()
+    map("n", "<leader>t", function()
       fw_size_max = not fw_size_max
-      -- local conf = fw_size_max and { border = { "", "─" ,"", "", "", "─", "", "" } } or { border = "rounded" }
-      -- vim.api.nvim_win_set_config(fw.win, conf)
-      for _, fn in ipairs(fw.on_resize) do fn() end
-    end, {})
+      for _, fn in ipairs(self.on_resize) do fn(self) end
+    end, { desc = "Toggle [t]erminal size" })
   end),
   size = function()
     local width = fw_size_max and
@@ -383,12 +390,24 @@ if pcall(vim.fn["coc#pum#visible"]) then
 
   -- Remap for rename current word --
   map("n", "<leader>r", "<Plug>(coc-rename)", { desc = "coc rename" })
-
 else
   if flags.warn_missing_module then
     notify_once.warn("Module 'coc' not found")
   end
 end
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = { "coc-marketplace" },
+  callback = function()
+    local coc = require("coc")
+
+    map("n", "q", "<cmd>q<CR>", { buffer = 0 })
+    map("n", "<esc>", "<cmd>q<CR>", { buffer = 0 })
+
+    map({ "n", "v" }, "<tab>", coc.marketplace.option.toggle, { buffer = 0 })
+    map("n", "<CR>", coc.marketplace.run, { buffer = 0 })
+  end
+})
 
 local LANGS_ORDER = {
   "C",
@@ -438,6 +457,12 @@ end
 
 local menu = window:new{
   on_show = function()
+    vim.bo.bufhidden  = "hide"
+    vim.bo.buftype    = "nofile"
+    vim.bo.buflisted  = false
+    vim.bo.swapfile   = false
+    vim.bo.undolevels = -1
+
     vim.api.nvim_win_set_config(0, { title = " NEW ", title_pos = "center" })
 
     if vim.b.is_menu_loaded then return end

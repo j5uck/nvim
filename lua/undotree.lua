@@ -10,7 +10,7 @@ M.new = function()
 
     vim.bo.bufhidden  = "delete"
     vim.bo.buflisted  = false
-    vim.bo.buftype    = "nowrite"
+    vim.bo.buftype    = "nofile"
     vim.bo.filetype   = "undotree"
     vim.bo.modifiable = false
     vim.bo.swapfile   = false

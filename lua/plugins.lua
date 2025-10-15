@@ -1,6 +1,6 @@
-local flags, notify, notify_once, prequire_wrap, window = (function()
+local flags, notify, notify_once, prequire_wrap = (function()
   local _ = require("_")
-  return _.flags, _.notify, _.notify_once, _.prequire_wrap, _.window
+  return _.flags, _.notify, _.notify_once, _.prequire_wrap
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
@@ -53,7 +53,7 @@ PLUG_SYNC.start = function(args)
 
   vim.bo.bufhidden    = "hide"
   vim.bo.buflisted    = false
-  vim.bo.buftype      = "acwrite"
+  vim.bo.buftype      = "nofile"
   vim.bo.swapfile     = false
   vim.bo.undolevels   = -1
   vim.o.concealcursor = "nvic"
@@ -684,51 +684,12 @@ plug{
 
 -- COC --
 
-local coc_extensions = {
-  "coc-clangd",
-  "coc-cmake",
-  "coc-css",
-  "coc-docker",
-  "coc-eslint",
-  "coc-glslx",
-  "coc-go",
-  "coc-html",
-  "coc-java",
-  "coc-jedi",
-  "coc-json",
-  "coc-kotlin",
-  "coc-rust-analyzer",
-  "coc-sh",
-  "coc-snippets",
-  "coc-sql",
-  "coc-sumneko-lua",
-  "coc-svg",
-  "coc-tsserver",
-  "coc-typos",
-
-  "@yaegassy/coc-volar",
-
-  -- "coc-marketplace",
-  -- "coc-discord-rpc",
-}
-
 plug{ github("rafamadriz/friendly-snippets") }
 plug{
   github("neoclide/coc.nvim"),
   branch = "release",
   build = function()
-    local to_install, is_update_needed = (function()
-      local e = vim.fn["coc#rpc#request"]("extensionStats",{})
-
-      local filter = {}
-      for _, f in ipairs(vim.tbl_map(function(v) return v.id end, e)) do
-        filter[f] = true
-      end
-
-      return vim.tbl_filter(function(v)
-        return not filter[v]
-      end, coc_extensions), true
-    end)()
+    local coc = require("coc")
 
     if #vim.fn.getcompletion("CocUpdate", "command") == 0 then
       vim.fn["coc#rpc#restart"]()
@@ -738,260 +699,28 @@ plug{
 
     local empty_window = vim.api.nvim_get_current_win()
 
-    local splits_count = 0
     vim.api.nvim_win_call(empty_window, function()
-      if is_update_needed then
-        vim.fn["coc#rpc#notify"]("updateExtensions", {})
-        splits_count=splits_count+1
-      end
-      for i=1, #to_install, 5 do
-        vim.fn["coc#rpc#notify"]("installExtensions", vim.list_slice(to_install, i, i+4))
-        splits_count=splits_count+1
-      end
+      coc.extensions.update()
+      coc.extensions.install(coc.extensions.missing())
     end)
-    local splits_i = 0
 
-    vim.api.nvim_create_autocmd("BufEnter", {
-      callback = function(ev)
-        splits_i = splits_i+1
-        if splits_i < splits_count then return end
-
-        vim.defer_fn(function()
-          for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-            local buf = vim.api.nvim_win_get_buf(w)
-            local bi = vim.fn.getbufinfo(buf)[1]
-            if vim.api.nvim_buf_get_name(buf) == "" and vim.bo[buf].syntax == "" then
-              vim.api.nvim_buf_call(bi.bufnr, function()
-                vim.cmd[[set nowrap]]
-                vim.cmd[[norm! 0]]
-                vim.cmd[[setf coc-nvim]]
-              end)
-            end
-          end
-        end, 500)
-
-        vim.api.nvim_win_close(empty_window, true)
-        vim.api.nvim_del_autocmd(ev.id)
-      end
-    })
+    vim.defer_fn(vim.schedule_wrap(function()
+      pcall(vim.api.nvim_win_call, empty_window, vim.cmd.q)
+    end), 500)
   end,
   setup = vim.schedule_wrap(function()
+    local coc = require("coc")
+
     if not pcall(vim.fn["coc#pum#visible"]) and flags.warn_missing_module then
       notify_once.warn("Module 'coc' not found")
       return
     end
 
     pcall(vim.api.nvim_del_user_command, "CocStop")
+    vim.api.nvim_create_user_command("CocStop", vim.fn["coc#rpc#stop"], {})
+
     pcall(vim.api.nvim_del_user_command, "CocMarketplace")
-
-    local coc_stop = function() vim.fn["coc#rpc#stop"]() end
-    vim.api.nvim_create_user_command("CocStop", coc_stop, { bang = true })
-
-    local menu
-    local all_extensions = {}
-
-    local function fetch_extensions()
-      local node = vim.fn.exepath("node")
-      if node == "" then
-        notify.error("Node not found\nCannot proceed")
-        return
-      end
-
-      local size = 200
-      local page = 0
-
-      local function url_builder()
-        local url = "https://api.npms.io/v2/search?q=keywords:coc.nvim&size=" .. size .. "&from=" .. page
-        return {
-          "node",
-          "-e",
-          "console.log(await (await fetch(\"" .. url .. "\")).text())"
-        }
-      end
-
-      local function fetch(out)
-        if out.code ~= 0 then
-          notify.error("Fatal error\n" .. out.stderr)
-          return
-        end
-
-        local json = vim.json.decode(out.stdout)
-        for _, v in ipairs(json.results) do
-          table.insert(all_extensions, {
-            name = v.package.name,
-            description = v.package.description,
-            keywords = v.package.keywords
-          })
-        end
-
-        page = page + size
-        if page < json.total then
-          vim.system(url_builder(), { text = true }, fetch)
-        else
-          vim.schedule(function() menu:show() end)
-        end
-      end
-      vim.system(url_builder(), { text = true }, fetch)
-    end
-
-    menu = window:new{
-      on_show = function()
-        vim.bo.bufhidden  = "delete"
-        vim.bo.buflisted  = false
-        vim.bo.buftype    = "nowrite"
-        vim.bo.filetype   = "coc-marketplace"
-        vim.bo.modifiable = false
-        vim.bo.modifiable = true
-        vim.bo.swapfile   = false
-        vim.bo.syntax     = "coc-marketplace"
-        vim.bo.undolevels = -1
-
-        vim.api.nvim_win_set_config(0, {
-          title = " CocMarketplace ",
-          title_pos = "center"
-        })
-
-        if not vim.b.is_coc_menu_loaded then
-          vim.b.is_coc_menu_loaded = true
-          vim.api.nvim_create_autocmd("CursorMoved", {
-            buffer = vim.api.nvim_get_current_buf(),
-            callback = function()
-              local y, _ = unpack(vim.api.nvim_win_get_cursor(0))
-              vim.api.nvim_win_set_cursor(0, { y, 1 })
-            end
-          })
-
-          vim.keymap.set("n", "q", vim.cmd.q, { buffer = true })
-          vim.keymap.set("n", "<esc>", vim.cmd.q, { buffer = true })
-
-          vim.keymap.set("n", "<tab>", function()
-            local l = vim.api.nvim_get_current_line()
-            local sign = string.gsub(l, "^%[(.*)%].*", "%1")
-
-            local coc_data = vim.fn["coc#rpc#request"]("extensionStats", {})
-
-            local filter = {}
-            for _, f in ipairs(vim.tbl_map(function(v) return v.id end, coc_data)) do
-              filter[f] = true
-            end
-
-            local new_sign
-            local e = all_extensions[vim.api.nvim_win_get_cursor(0)[1]]
-
-            if filter[e.name] then
-              local f = {}
-              f["✓"] = "✗"
-              f["✗"] = "✓"
-              new_sign = f[sign]
-            else
-              local f = {}
-              f[" "] = "~"
-              f["~"] = " "
-              new_sign = f[sign]
-            end
-
-            vim.bo.modifiable = true
-            vim.api.nvim_set_current_line(string.format("[%s] %-30s %s", new_sign, e.name, e.description))
-            vim.bo.modifiable = false
-          end, { buffer = true })
-
-          vim.keymap.set("v", "<tab>", function()
-            local coc_data = vim.fn["coc#rpc#request"]("extensionStats",{})
-
-            local filter = {}
-            for _, f in ipairs(vim.tbl_map(function(v) return v.id end, coc_data)) do
-              filter[f] = true
-            end
-
-            local min, max = (function()
-              local a, z = vim.fn.getpos("v")[2], vim.fn.getpos(".")[2]
-              if a < z then
-                return a, z
-              else
-                return z, a
-              end
-            end)()
-
-            for i = min, max, 1 do
-              local l = vim.fn.getline(i)
-              local sign = string.gsub(l, "^%[(.*)%].*", "%1")
-
-              local new_sign
-              local e = all_extensions[i]
-
-              if filter[e.name] then
-                new_sign = sign == "✓" and "✗" or "✓"
-              else
-                new_sign = sign == " " and "~" or " "
-              end
-
-              vim.schedule(function()
-                vim.bo.modifiable = true
-                vim.fn.setline(i, string.format("[%s] %-30s %s", new_sign, e.name, e.description))
-                vim.bo.modifiable = false
-              end)
-            end
-
-            return "<esc>"
-          end, { buffer = true, expr = true })
-
-          vim.keymap.set({ "n", "v" }, "<CR>", function()
-            local to_install, to_uninstall = {}, {}
-
-            for i, l in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, true)) do
-              local sign = string.gsub(l, "^%[(.*)%].*", "%1")
-              if sign == "✗" then
-                table.insert(to_uninstall, all_extensions[i].name)
-              elseif sign == "~" then
-                table.insert(to_install, all_extensions[i].name)
-              end
-            end
-
-            -- TODO: run
-          end, { buffer = true })
-        end
-
-        local coc_data = vim.fn["coc#rpc#request"]("extensionStats",{})
-
-        local filter = {}
-        for _, f in ipairs(vim.tbl_map(function(v) return v.id end, coc_data)) do
-          filter[f] = true
-        end
-
-        -- https://github.com/fannheyward/coc-marketplace
-        vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.tbl_map(function(e)
-          local sign = filter[e.name] and "✓" or " "
-          return string.format("[%s] %-30s %s", sign, e.name, e.description)
-        end, all_extensions))
-
-        -- TODO: extension installation
-        -- TODO: cache timeout
-
-        vim.bo.modifiable = false
-      end,
-      size = function()
-        local width = math.min(vim.o.columns - 2, 150)
-        local height = math.min(vim.o.lines - 10, #all_extensions)
-
-        return {
-          col    = math.ceil(vim.o.columns - width) * 0.5 - 1,
-          row    = math.ceil(vim.o.lines - height)  * 0.5 - 1,
-          width  = width,
-          height = height
-        }
-      end,
-      focus = true,
-      focusable = true,
-      border = "rounded",
-    }
-
-    vim.api.nvim_create_user_command("CocMarketplace", function()
-      if #all_extensions == 0 then
-        fetch_extensions()
-      else
-        menu:show()
-      end
-    end, { bang = true })
+    vim.api.nvim_create_user_command("CocMarketplace", coc.marketplace.show, {})
   end)
 }
 

@@ -21,6 +21,7 @@
   ],
 
   "java.compile.nullAnalysis.mode": "automatic",
+  "java.import.gradle.wrapper.enabled": false,
 
   "clangd.checkUpdates": false,
   "clangd.fallbackFlags": [

@@ -124,9 +124,11 @@ local w = window:new{
 }
 
 local getcwd = (vim.fn.has("win32") == 1) and function()
-  return string.gsub(vim.fn.getcwd() .. "\\", "\\", "/")
+  local r = string.gsub(vim.fn.getcwd() .. "\\", "\\+", "/")
+  return r
 end or function()
-  return vim.fn.getcwd() .. "/"
+  local r = string.gsub(vim.fn.getcwd() .. "/", "/+", "/")
+  return r
 end
 
 local M = {}

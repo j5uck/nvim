@@ -90,11 +90,6 @@ function window:show()
 
   if not vim.api.nvim_buf_is_valid(self.buf) then
     self.buf = vim.api.nvim_create_buf(false, true)
-    vim.bo[self.buf].bufhidden  = "hide"
-    vim.bo[self.buf].buftype    = "nofile"
-    vim.bo[self.buf].buflisted  = false
-    vim.bo[self.buf].swapfile   = false
-    vim.bo[self.buf].undolevels = -1
   end
 
   self.win = vim.api.nvim_open_win(self.buf, self.focus, vim.tbl_extend("force",{
@@ -153,7 +148,7 @@ local function new(conf)
   } end
 
   self.on_show = { conf.on_show }
-  self.on_resize = { function()
+  self.on_resize = { function(_)
     if not vim.api.nvim_win_is_valid(self.win) then return end
     local _ = self.size()
     _.relative = "editor"
@@ -165,7 +160,7 @@ local function new(conf)
   self.ns = vim.api.nvim_create_namespace("")
 
   if conf.hl then
-    self.on_colorscheme = { function()
+    self.on_colorscheme = { function(_)
       for k, v in pairs(conf.hl()) do
         vim.api.nvim_set_hl(self.ns, k, v)
       end
@@ -173,16 +168,16 @@ local function new(conf)
 
     table.insert(self.on_show, function()
       vim.api.nvim_win_set_hl_ns(self.win, self.ns)
-      for _, fn in ipairs(self.on_colorscheme) do fn() end
+      for _, fn in ipairs(self.on_colorscheme) do fn(self) end
     end)
 
     vim.api.nvim_create_autocmd("ColorScheme", { callback = function()
-      for _, fn in ipairs(self.on_colorscheme) do fn() end
+      for _, fn in ipairs(self.on_colorscheme) do fn(self) end
     end})
   end
 
   vim.api.nvim_create_autocmd("VimResized", { callback = function()
-    for _, fn in ipairs(self.on_resize) do fn() end
+    for _, fn in ipairs(self.on_resize) do fn(self) end
   end})
 
   return self
