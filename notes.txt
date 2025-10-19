@@ -6,8 +6,6 @@ Patched font (eg. Nerd font)
 ripgrep (for telescope) => https://github.com/BurntSushi/ripgrep
 fd (for telescope)
 
--- -- -- NOTES -- -- --
-
 -- nvim-treesitter --
 
   :lua vim.iter(vim.fn.sort(vim.tbl_keys(require("nvim-treesitter.parsers").list))):each(function(_)vim.print(_)end)
@@ -16,16 +14,8 @@ fd (for telescope)
 
 -- ------------------------- x ------------------------- --
 
--- assert(vim.fn.has("nvim-0.111") == 1, "NVIM version too smol!!!")
-if vim.fn.has("nvim-0.11") == 0 then
-  return require("_").notify.warn("NVIM version too smol!!!")
-end
-
-https://samroeca.com/coc-plugin.html#writing-an-extension
-curl https://api.npms.io/v2/search?q=keywords:coc.nvim
-
 TODO:
-keybind: align lines by char
+
 lua explorer hl system
 
 https://github.com/nvim-tree/nvim-tree.lua
@@ -37,17 +27,15 @@ https://github.com/kevinhwang91/nvim-hlslens/
 https://github.com/tpope/vim-fugitive/blob/master/plugin/fugitive.vim
 https://github.com/tpope/vim-commentary
 
-nvim_set_current_win({window})
-
 undofile reload
 https://github.com/stevearc/oil.nvim
   lua/oil/util.lua
 
-FOR PREVIEW --
-local wi = vim.fn.getwininfo(vim.api.nvim_get_current_win())
-local bi = vim.fn.getbufinfo(vim.api.nvim_get_current_buf())
-wi.topline
-wi.botline
+-- FOR PREVIEW --
+  local wi = vim.fn.getwininfo(vim.api.nvim_get_current_win())
+  local bi = vim.fn.getbufinfo(vim.api.nvim_get_current_buf())
+  wi.topline
+  wi.botline
 
 vim.fn.getregtype(reg)
 vim.fn.resolve(dir)
@@ -63,23 +51,4 @@ vim.on_key({fn}, {ns_id}, {opts})
 
 tagbar
 
-
-
-local log = require("_").log
-
-local url = "https://registry.npmjs.com/-/v1/search?text=keywords:coc.nvim"
-
-local r = {}
-
-local i = 0
-while true do
-  local o = vim.json.decode(vim.system({ "curl", "--connect-timeout", "3", url .. "&size=250&from=" .. (250 * i) }):wait().stdout).objects
-  if not o or #o == 0 then break end
-
-  vim.list_extend(r, vim.tbl_map(function(t)
-    return { t.package.name, t.package.keywords }
-  end, o))
-  i = i + 1
-end
-
-log(unpack(r))
+notify float open (how ???)

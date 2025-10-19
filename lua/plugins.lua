@@ -248,7 +248,11 @@ vim.api.nvim_create_user_command("PlugSync", PLUG_SYNC.start, {
 })
 
 local function plug(plugin)
-  local name = plugin.as or string.gsub(plugin[1], ".+/(.+)%.git$", "%1")
+  local name = plugin.as or (function()
+    local r = plugin[1]
+    r = string.gsub(r, ".+/(.+)$", "%1")
+    return string.gsub(r, "(.+)%.git$", "%1")
+  end)()
 
   if not PLUGS[name] then table.insert(PLUGS_ORDER, name) end
 
@@ -269,16 +273,6 @@ local function github(p) return "https://github.com/"..p..".git" end
 
 
 -- THEMES --
-
-plug{
-  github("sainnhe/sonokai"),
-  tag = "*",
-  setup = function()
-    vim.g.sonokai_disable_terminal_colors = 1
-  end
-}
-
-plug{ github("rebelot/kanagawa.nvim") }
 
 plug{
   github("folke/tokyonight.nvim"),

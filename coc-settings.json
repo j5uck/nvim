@@ -20,6 +20,9 @@
     "/usr/local/share/nvim/runtime/lua/vim/treesitter"
   ],
 
+  "javascript.suggestionActions.enabled": false,
+  "typescript.suggestionActions.enabled": false,
+
   "java.compile.nullAnalysis.mode": "automatic",
   "java.import.gradle.wrapper.enabled": false,
 

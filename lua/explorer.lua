@@ -594,19 +594,29 @@ fn_BufWriteCmd = function()
   local error, buffers_ls = fn_BufWriteCmd__parse_buffers()
   if error then return end
 
+  local dirname = (vim.fn.has("win32") == 0) and vim.fs.dirname or function(r)
+    r = string.gsub(vim.fs.dirname(r), "/", "\\")
+    return r
+  end
+
+  local basename = (vim.fn.has("win32") == 0) and vim.fs.basename or function(r)
+    r = string.gsub(vim.fs.basename(r), "/", "\\")
+    return r
+  end
+
   for _, b in ipairs(buffers_ls) do
     -- b => { name, new_info, old_info }
     local buffer_name, cached_info = b[1], vim.tbl_extend("force", {}, b[3])
 
     for _, entry in ipairs(b[2]) do
       local entry_path = PATHS[entry.id]
-      local cached_entry = (entry.id and BUFFERS_BY_PATH[vim.fs.dirname(entry_path)][2][vim.fs.basename(entry_path)]) or {}
+      local cached_entry = (entry.id and BUFFERS_BY_PATH[dirname(entry_path)][2][basename(entry_path)]) or {}
       local to_continue =
           cached_entry.id == entry.id and
           cached_entry.name == entry.name and
           cached_entry.link == entry.link and
           (entry.link or (cached_entry.is_directory == entry.is_directory)) and
-          vim.fs.dirname(entry_path) == buffer_name
+          dirname(entry_path) == buffer_name
 
       -- no changes --
       if to_continue then
@@ -637,8 +647,8 @@ fn_BufWriteCmd = function()
       end
 
       -- if entry.id --
-      local src_buffer = BUFFERS_BY_PATH[vim.fs.dirname(PATHS[entry.id])]
-      local src_file = vim.fs.basename(PATHS[entry.id])
+      local src_buffer = BUFFERS_BY_PATH[dirname(PATHS[entry.id])]
+      local src_file = basename(PATHS[entry.id])
       if entry.link then
         if src_buffer[2][src_file].link == entry.link then
           APPENT_TASK{ TASK.COPY, PATHS[entry.id], full_path }

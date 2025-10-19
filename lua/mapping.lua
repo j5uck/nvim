@@ -1,4 +1,3 @@
-
 local notify, notify_once, flags, prequire, random, window = (function()
   local _ = require("_")
   return _.notify, _.notify_once, _.flags, _.prequire, _.random, _.window
@@ -271,7 +270,18 @@ vim.api.nvim_create_autocmd("FileType", {
 -- WINDOWS --
 
 prequire("windows", function()
-  local m = "<cmd>silent! exe 'WindowsEqualize' | silent! WindowsMaximize<CR>"
+  local function m()
+    local w = vim.api.nvim_get_current_win()
+    for _, id in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+      if id == w then goto continue end
+      vim.api.nvim_win_call(id, function() vim.cmd.norm(0) end)
+      ::continue::
+    end
+
+    vim.cmd[[silent! WindowsEqualize]]
+    vim.cmd[[silent! WindowsMaximize]]
+  end
+
   map("n", "<leader>M", m, { desc = "[M]aximize buffer window" })
   map("n", "<leader>N", "<cmd>silent! WindowsEqualize<CR>", { desc = "equalize buffer window" })
 end)
@@ -376,9 +386,10 @@ if pcall(vim.fn["coc#pum#visible"]) then
   map("i", "<tab>",   [[coc#pum#visible() ? coc#pum#next(1) : "<tab>"]], { expr = true, desc = "coc next suggestion" })
   map("i", "<s-tab>", [[coc#pum#visible() ? coc#pum#prev(1) : "<c-h>"]], { expr = true, desc = "coc previous suggestion" })
 
-  map("i", "<cr>",
-    [[coc#pum#visible() && coc#expandableOrJumpable() ? coc#pum#confirm() : "<cr>"]],
-    { expr = true, desc = "coc select suggestion" })
+  map("i", "<Down>", [[coc#pum#visible() ? coc#pum#next(1) : "<Down>"]], { expr = true, desc = "coc next suggestion" })
+  map("i", "<Up>",   [[coc#pum#visible() ? coc#pum#prev(1) : "<Up>"]],   { expr = true, desc = "coc previous suggestion" })
+
+  map("i", "<cr>", [[coc#pum#visible() ? coc#pum#confirm() : "<cr>"]], { expr = true, desc = "coc select suggestion" })
 
   map("n", "<c-k>", "<cmd>call CocAction('diagnosticPrevious')<cr>", { desc = "coc previous error" })
   map("n", "<c-j>", "<cmd>call CocAction('diagnosticNext')<cr>",     { desc = "coc next error" })
@@ -413,9 +424,9 @@ local LANGS_ORDER = {
   "C",
   "Lua",
   "HTML",
-  "CSS",
   "Javascript",
   "Typescript",
+  "NPM",
   "Java",
   "Kotlin",
   "Rust",
@@ -428,9 +439,9 @@ LANGS = {}
 LANGS.c           = { icon = "", file = "main.c" }
 LANGS.lua         = { icon = "", file = "script.lua" }
 LANGS.html        = { icon = "", file = "index.html" }
-LANGS.css         = { icon = "", file = "style.css" }
 LANGS.javascript  = { icon = "", file = "script.js" }
 LANGS.typescript  = { icon = "", file = "script.ts" }
+LANGS.npm         = { icon = "", file = "package.json" }
 LANGS.java        = { icon = "", file = "Main.java" }
 LANGS.kotlin      = { icon = "", file = "Main.kt" }
 LANGS.rust        = { icon = "", file = "main.rs" }
@@ -448,11 +459,21 @@ local select = function()
 
   local dir = TMPDIR .. "/tmp." .. random(10)
   vim.fn.mkdir(dir, "p")
-  vim.cmd.e(vim.fn.fnameescape(dir .. "/" .. lang.file))
-  vim.api.nvim_buf_set_lines(0, 0, -1, true, lang.code)
-  vim.cmd[[noautocmd w]]
 
-  -- TODO: add path to buffer info (to use with compilation shortcut)
+  if lang.code then
+    local file = dir .. "/" .. lang.file
+    vim.fn.writefile(lang.code, file, "")
+    vim.cmd.e(vim.fn.fnameescape(file))
+  elseif lang.project then
+    for name, content in pairs(lang.project) do
+      local full_path = dir .. "/" .. name
+      vim.fn.mkdir(vim.fs.dirname(full_path), "p")
+      vim.fn.writefile(content, full_path, "")
+    end
+    vim.cmd.e(vim.fn.fnameescape(dir))
+  end
+
+  vim.cmd.cd(dir)
 end
 
 local menu = window:new{
@@ -537,7 +558,8 @@ LANGS.c.code = {
 LANGS.lua.code = {
   "vim.notify(\"" .. MESSAGE .. "\", vim.log.levels.WARN)"
 }
-LANGS.html.code = {
+LANGS.html.project = {}
+LANGS.html.project["index.html"] = {
   "<!DOCTYPE html>",
   "<html lang=\"en\">",
   "  <head>",
@@ -552,16 +574,31 @@ LANGS.html.code = {
   "  <script src=\"script.js\" fetchpriority=\"high\"></script>",
   "</html>"
 }
-LANGS.css.code = {
+LANGS.html.project["style.css"] = {
   "* {",
   "  margin: 0;",
   "  padding: 0;",
   "}",
   "",
   "html, body {",
+  "  background-color: #3c3c3c;",
   "  height: 100%;",
   "  width: 100%;",
+  "}",
+  "",
+  "h1 {",
+  "  color: white;",
+  "  font-size: 5rem;",
+  "  width: 100%;",
+  "  text-align: center;",
   "}"
+}
+LANGS.html.project["script.js"] = {
+  "\"use strict\";",
+  "",
+  "(async () => {",
+  "  console.log(\"" .. MESSAGE .. "\");",
+  "})();"
 }
 LANGS.javascript.code = {
   "#!/bin/bun run",
@@ -573,6 +610,23 @@ LANGS.javascript.code = {
 }
 LANGS.typescript.code = {
   "#!/bin/bun run",
+  "",
+  "(async () => {",
+  "  console.log(\"" .. MESSAGE .. "\");",
+  "})();"
+}
+LANGS.npm.project = {}
+LANGS.npm.project["package.json"] = {
+  "{",
+  "  \"name\": \"demo\",",
+  "  \"version\": \"0.0.0\",",
+  "  \"scripts\": { \"dev\": \"bun ./src/index.ts\" },",
+  "  \"type\": \"module\"",
+  "}"
+}
+LANGS.npm.project["src/index.ts"] = {
+  "// npm run dev",
+  "// import { example } from \"example-package\";",
   "",
   "(async () => {",
   "  console.log(\"" .. MESSAGE .. "\");",

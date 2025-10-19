@@ -36,6 +36,7 @@ vim.g.loaded_perl_provider = 0
 vim.g.loaded_python3_provider = 0
 vim.g.loaded_ruby_provider = 0
 
+-- TODO: real fix
 local p = (vim.fn.has("win32") == 0) and
   "/usr/share/nvim/runtime/doc/.*" or
   "C:\\Program Files\\Neovim\\share\\nvim\\runtime\\doc\\.*"
@@ -99,11 +100,6 @@ vim.opt.listchars = { tab = "» ", trail = "·", nbsp = "␣" }
 -- vim.cmd[[silent! set fileencoding=utf-8]]
 -- vim.cmd[[silent! set fileformat=unix]]
 
-vim.opt.expandtab = true
-
-vim.opt.autoindent = true
-vim.opt.smartindent = true
-
 vim.opt.ttyfast = true
 
 vim.opt.modelines = 0
@@ -113,6 +109,10 @@ vim.opt.wrap = false
 vim.opt.shiftwidth = 2
 vim.opt.tabstop = 2
 vim.opt.softtabstop = 2
+
+vim.opt.autoindent = true
+vim.opt.expandtab = true
+vim.opt.smartindent = true
 
 vim.opt.virtualedit = "block"
 
@@ -127,6 +127,11 @@ vim.lsp.set_log_level(vim.log.levels.OFF)
 -- vim.api.nvim_set_hl(0, "NormalNC", { bg = "none" })
 -- vim.api.nvim_set_hl(0, "EndOfBuffer", { bg = "none" })
 
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "man",
+  callback = function() vim.wo.spell = false end
+})
+
 -- ------------------------- x ------------------------- --
 
 if vim.g.nvy then
@@ -138,10 +143,43 @@ require("explorer")
 require("plugins")
 require("mapping")
 
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = "man",
-  callback = function() vim.wo.spell = false end
-})
+local notify, window = (function()
+  local _ = require("_")
+  return _.notify, _.window
+end)()
+
+vim.api.nvim_create_user_command("TabToSpaces", function()
+  vim.cmd("%s/\\t/" .. string.rep(" ", vim.o.tabstop) .. "/g")
+  vim.opt.autoindent = true
+  vim.opt.expandtab = true
+  vim.opt.smartindent = true
+end, {})
+
+vim.api.nvim_create_user_command("LOC", function()
+  local sb = {}
+  local config = vim.fn.stdpath("config") .. "/"
+  local total = 0
+
+  local function loc(s)
+    for _, d in ipairs(vim.fn.sort(vim.fn.globpath(config .. s, "*", 1, true), "i")) do
+      local name = vim.fs.basename(d)
+      if vim.fn.isdirectory(d) == 1 then
+        loc(s .. name .. "/")
+      else
+        local n = #vim.fn.readfile(d)
+        total = total + n
+        table.insert(sb, string.format("%4d", n) .. " :: " .. s .. name)
+      end
+    end
+  end
+
+  loc("")
+
+  table.insert(sb, "")
+  table.insert(sb, string.format("%4d", total) .. " :: total")
+
+  notify.warn(table.concat(sb, "\n"))
+end, {})
 
 local term_ns = vim.api.nvim_create_namespace("")
 vim.api.nvim_set_hl(term_ns, "Normal", { fg = "#ffffff", bg = "#000000" })
@@ -172,7 +210,7 @@ vim.api.nvim_create_autocmd("TermClose", {
   end)
 })
 
-local rec = require("_").window:new{
+local rec = window:new{
   on_show = function(self)
     vim.bo.bufhidden  = "hide"
     vim.bo.buftype    = "nofile"
