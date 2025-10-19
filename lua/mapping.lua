@@ -394,10 +394,11 @@ if pcall(vim.fn["coc#pum#visible"]) then
   map("n", "<c-k>", "<cmd>call CocAction('diagnosticPrevious')<cr>", { desc = "coc previous error" })
   map("n", "<c-j>", "<cmd>call CocAction('diagnosticNext')<cr>",     { desc = "coc next error" })
 
-  map("n", "<leader>gd", "<Plug>(coc-definition)",      { desc = "coc go definition" })
-  map("n", "<leader>gy", "<Plug>(coc-type-definition)", { desc = "coc go type definition" })
-  map("n", "<leader>gi", "<Plug>(coc-implementation)",  { desc = "coc go implementation" })
-  map("n", "<leader>gr", "<Plug>(coc-references)",      { desc = "coc go references" })
+  map("n", "<leader>ga", "<Plug>(coc-codeaction)",      { desc = "coc [g]o [c]ode action" })
+  map("n", "<leader>gd", "<Plug>(coc-definition)",      { desc = "coc [g]o [d]efinition" })
+  map("n", "<leader>gy", "<Plug>(coc-type-definition)", { desc = "coc [g]o t[y]pe definition" })
+  map("n", "<leader>gi", "<Plug>(coc-implementation)",  { desc = "coc [g]o [i]mplementation" })
+  map("n", "<leader>gr", "<Plug>(coc-references)",      { desc = "coc [g]o [r]eferences" })
 
   -- Remap for rename current word --
   map("n", "<leader>r", "<Plug>(coc-rename)", { desc = "coc rename" })
