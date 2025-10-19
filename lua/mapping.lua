@@ -435,19 +435,19 @@ local LANGS_ORDER = {
   "Markdown"
 }
 
-LANGS = {}
-
-LANGS.c           = { icon = "", file = "main.c" }
-LANGS.lua         = { icon = "", file = "script.lua" }
-LANGS.html        = { icon = "", file = "index.html" }
-LANGS.javascript  = { icon = "", file = "script.js" }
-LANGS.typescript  = { icon = "", file = "script.ts" }
-LANGS.npm         = { icon = "", file = "package.json" }
-LANGS.java        = { icon = "", file = "Main.java" }
-LANGS.kotlin      = { icon = "", file = "Main.kt" }
-LANGS.rust        = { icon = "", file = "main.rs" }
-LANGS.sh          = { icon = "", file = "script.sh" }
-LANGS.markdown    = { icon = "", file = "README.md" }
+LANGS = {
+  c           = { icon = "" },
+  lua         = { icon = "" },
+  html        = { icon = "" },
+  javascript  = { icon = "" },
+  typescript  = { icon = "" },
+  npm         = { icon = "" },
+  java        = { icon = "" },
+  kotlin      = { icon = "" },
+  rust        = { icon = "" },
+  sh          = { icon = "" },
+  markdown    = { icon = "" },
+}
 
 local TMPDIR = vim.fn.has("win32") == 1 and
   (vim.env.APPDATA .. "\\..\\Local\\Temp") or
@@ -461,19 +461,16 @@ local select = function()
   local dir = TMPDIR .. "/tmp." .. random(10)
   vim.fn.mkdir(dir, "p")
 
-  if lang.code then
-    local file = dir .. "/" .. lang.file
-    vim.fn.writefile(lang.code, file, "")
-    vim.cmd.e(vim.fn.fnameescape(file))
-  elseif lang.project then
-    for name, content in pairs(lang.project) do
-      local full_path = dir .. "/" .. name
-      vim.fn.mkdir(vim.fs.dirname(full_path), "p")
-      vim.fn.writefile(content, full_path, "")
-    end
-    vim.cmd.e(vim.fn.fnameescape(dir))
+  for name, content in pairs(lang.code) do
+    local full_path = dir .. "/" .. name
+    vim.fn.mkdir(vim.fs.dirname(full_path), "p")
+    vim.fn.writefile(content, full_path, "")
   end
-
+  for _, file in ipairs(lang.init) do
+    vim.cmd.e(vim.fn.fnameescape(dir .. "/" .. file))
+    vim.cmd[[belowright vsplit]]
+  end
+  vim.cmd.q()
   vim.cmd.cd(dir)
 end
 
@@ -505,11 +502,24 @@ local menu = window:new{
 
     vim.bo.modifiable = true
 
+    local examples = {
+      c           = "main.c",
+      html        = "index.html",
+      java        = "Main.java",
+      javascript  = "script.js",
+      kotlin      = "Main.kt",
+      lua         = "script.lua",
+      markdown    = "README.md",
+      npm         = "package.json",
+      rust        = "main.rs",
+      sh          = "script.sh",
+      typescript  = "script.ts",
+    }
+
     local status, devicons = pcall(require, "nvim-web-devicons")
     if status then
       for i, l in ipairs(LANGS_ORDER) do
-        local lang = LANGS[string.lower(l)]
-        local icon, hl = devicons.get_icon(lang.file)
+        local icon, hl = devicons.get_icon(examples[string.lower(l)])
         vim.api.nvim_buf_set_lines(0, i-1, i-1, true, { " " .. icon .. "  " .. l })
 
         vim.api.nvim_buf_set_extmark(0, NS, i-1, 1, {
@@ -546,7 +556,10 @@ local menu = window:new{
 map("n", "<leader>ii", function() menu:show() end, { desc = "create example file" })
 
 local MESSAGE = "Hello World!"
-LANGS.c.code = {
+
+LANGS.c.init = { "main.c" }
+LANGS.c.code = {}
+LANGS.c.code["main.c"] = {
   "// cc -o main ./main.c && ./main",
   "#include <stdio.h>",
   "",
@@ -556,11 +569,16 @@ LANGS.c.code = {
   "  return 0;",
   "}"
 }
-LANGS.lua.code = {
+
+LANGS.lua.init = { "script.lua" }
+LANGS.lua.code = {}
+LANGS.lua.code["script.lua"] = {
   "vim.notify(\"" .. MESSAGE .. "\", vim.log.levels.WARN)"
 }
-LANGS.html.project = {}
-LANGS.html.project["index.html"] = {
+
+LANGS.html.init = { "script.js", "index.html" }
+LANGS.html.code = {}
+LANGS.html.code["index.html"] = {
   "<!DOCTYPE html>",
   "<html lang=\"en\">",
   "  <head>",
@@ -575,7 +593,7 @@ LANGS.html.project["index.html"] = {
   "  <script src=\"script.js\" fetchpriority=\"high\"></script>",
   "</html>"
 }
-LANGS.html.project["style.css"] = {
+LANGS.html.code["style.css"] = {
   "* {",
   "  margin: 0;",
   "  padding: 0;",
@@ -594,14 +612,17 @@ LANGS.html.project["style.css"] = {
   "  text-align: center;",
   "}"
 }
-LANGS.html.project["script.js"] = {
+LANGS.html.code["script.js"] = {
   "\"use strict\";",
   "",
   "(async () => {",
   "  console.log(\"" .. MESSAGE .. "\");",
   "})();"
 }
-LANGS.javascript.code = {
+
+LANGS.javascript.init = { "script.js" }
+LANGS.javascript.code = {}
+LANGS.javascript.code["script.js"] = {
   "#!/bin/bun run",
   "\"use strict\";",
   "",
@@ -609,15 +630,20 @@ LANGS.javascript.code = {
   "  console.log(\"" .. MESSAGE .. "\");",
   "})();"
 }
-LANGS.typescript.code = {
+
+LANGS.typescript.init = { "script.ts" }
+LANGS.typescript.code = {}
+LANGS.typescript.code["script.ts"] = {
   "#!/bin/bun run",
   "",
   "(async () => {",
   "  console.log(\"" .. MESSAGE .. "\");",
   "})();"
 }
-LANGS.npm.project = {}
-LANGS.npm.project["package.json"] = {
+
+LANGS.npm.init = { "src/index.ts" }
+LANGS.npm.code = {}
+LANGS.npm.code["package.json"] = {
   "{",
   "  \"name\": \"demo\",",
   "  \"version\": \"0.0.0\",",
@@ -625,7 +651,7 @@ LANGS.npm.project["package.json"] = {
   "  \"type\": \"module\"",
   "}"
 }
-LANGS.npm.project["src/index.ts"] = {
+LANGS.npm.code["src/index.ts"] = {
   "// npm run dev",
   "// import { example } from \"example-package\";",
   "",
@@ -633,7 +659,10 @@ LANGS.npm.project["src/index.ts"] = {
   "  console.log(\"" .. MESSAGE .. "\");",
   "})();"
 }
-LANGS.java.code = {
+
+LANGS.java.init = { "Main.java" }
+LANGS.java.code = {}
+LANGS.java.code["Main.java"] = {
   "// javac Main.java *.java && jar -cfe Main.jar Main Main.class *.class && java -jar Main.jar",
   "",
   "public class Main{",
@@ -642,24 +671,36 @@ LANGS.java.code = {
   "  }",
   "}"
 }
-LANGS.kotlin.code = {
+
+LANGS.kotlin.init = { "Main.kt" }
+LANGS.kotlin.code = {}
+LANGS.kotlin.code["Main.kt"] = {
   "// kotlinc -d Main.jar Main.kt && java -jar ./Main.jar",
   "",
   "fun main() {",
   "  println(\"" .. MESSAGE .. "\")",
   "}"
 }
-LANGS.rust.code = {
+
+LANGS.rust.init = { "main.rs" }
+LANGS.rust.code = {}
+LANGS.rust.code["main.rs"] = {
   "// rustc ./main.rs && ./main",
   "",
   "fn main() {",
   "  println!(\"{}\", \"" .. MESSAGE .. "\");",
   "}"
 }
-LANGS.sh.code = {
+
+LANGS.sh.init = { "script.sh" }
+LANGS.sh.code = {}
+LANGS.sh.code["script.sh"] = {
   "#!/bin/bash",
   "echo '" .. MESSAGE .. "'"
 }
-LANGS.markdown.code = {
+
+LANGS.markdown.init = { "README.md" }
+LANGS.markdown.code = {}
+LANGS.markdown.code["README.md"] = {
   "## " .. MESSAGE
 }
