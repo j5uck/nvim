@@ -137,6 +137,9 @@ map("n", "<leader>e", explorer.resume, { desc = "resume file tre[e]" })
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "lua-explorer" },
   callback = function()
+    map("n", "<s-k>", "<Nop>", { buffer = 0 })
+    map("n", "<s-j>", "<Nop>", { buffer = 0 })
+
     map("n", "<esc>", "<cmd>q<CR>", { buffer = 0 })
 
     map("n", "<2-LeftMouse>", explorer.select, { buffer = 0 })
@@ -185,7 +188,7 @@ local fw = window:new{
     map("n", "<leader>t", function()
       fw_size_max = not fw_size_max
       for _, fn in ipairs(self.on_resize) do fn(self) end
-    end, { desc = "Toggle [t]erminal size" })
+    end, { buffer = 0, desc = "Toggle [t]erminal size" })
   end),
   size = function()
     local width = fw_size_max and
@@ -270,20 +273,25 @@ vim.api.nvim_create_autocmd("FileType", {
 -- WINDOWS --
 
 prequire("windows", function()
-  local function m()
+  local function norm_0()
     local w = vim.api.nvim_get_current_win()
     for _, id in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
       if id == w then goto continue end
       vim.api.nvim_win_call(id, function() vim.cmd.norm(0) end)
       ::continue::
     end
-
-    vim.cmd[[silent! WindowsEqualize]]
-    vim.cmd[[silent! WindowsMaximize]]
   end
 
-  map("n", "<leader>M", m, { desc = "[M]aximize buffer window" })
-  map("n", "<leader>N", "<cmd>silent! WindowsEqualize<CR>", { desc = "equalize buffer window" })
+  map("n", "<leader>M", function()
+    norm_0()
+    vim.cmd[[silent! WindowsEqualize]]
+    vim.cmd[[silent! WindowsMaximize]]
+  end, { desc = "[M]aximize buffer window" })
+
+  map("n", "<leader>N", function()
+    norm_0()
+    vim.cmd[[silent! WindowsEqualize]]
+  end, { desc = "equalize buffer window" })
 end)
 
 -- TELESCOPE --
@@ -304,7 +312,7 @@ prequire("telescope", function()
   map("n", "<leader>fh", tb.help_tags,   { desc = "[f]ind [h]elp [telescope]" })
   map("n", "<leader>fk", tb.keymaps,     { desc = "[f]ind [k]eymaps [telescope]" })
 
-  map({"n","v"}, "<leader>*", tb.grep_string, { desc = "search selected string [telescope]" })
+  map({ "n", "v" }, "<leader>*", tb.grep_string, { desc = "search selected string [telescope]" })
 
   map("n", "<leader>gd", tb.lsp_definitions,      { desc = "[g]o to [d]efinition [telescope]" })
   map("n", "<leader>gt", tb.lsp_type_definitions, { desc = "[g]o to [t]ype definition [telescope]" })
@@ -383,13 +391,13 @@ end)
 -- COC --
 
 if pcall(vim.fn["coc#pum#visible"]) then
-  map("i", "<tab>",   [[coc#pum#visible() ? coc#pum#next(1) : "<tab>"]], { expr = true, desc = "coc next suggestion" })
-  map("i", "<s-tab>", [[coc#pum#visible() ? coc#pum#prev(1) : "<c-h>"]], { expr = true, desc = "coc previous suggestion" })
+  map("i", "<M-n>", [[coc#pum#visible() ? coc#pum#next(1) : ""]], { expr = true, desc = "coc next suggestion" })
+  map("i", "<M-N>", [[coc#pum#visible() ? coc#pum#prev(1) : ""]], { expr = true, desc = "coc previous suggestion" })
 
-  map("i", "<Down>", [[coc#pum#visible() ? coc#pum#next(1) : "<Down>"]], { expr = true, desc = "coc next suggestion" })
-  map("i", "<Up>",   [[coc#pum#visible() ? coc#pum#prev(1) : "<Up>"]],   { expr = true, desc = "coc previous suggestion" })
+  -- map("i", "<Down>", [[coc#pum#visible() ? coc#pum#next(1) : "<Down>"]], { expr = true, desc = "coc next suggestion" })
+  -- map("i", "<Up>",   [[coc#pum#visible() ? coc#pum#prev(1) : "<Up>"]],   { expr = true, desc = "coc previous suggestion" })
 
-  map("i", "<cr>", [[coc#pum#visible() ? coc#pum#confirm() : "<cr>"]], { expr = true, desc = "coc select suggestion" })
+  map("i", "<tab>", [[coc#pum#visible() ? coc#pum#confirm() : "<tab>"]], { expr = true, desc = "coc select suggestion" })
 
   map("n", "<c-k>", "<cmd>call CocAction('diagnosticPrevious')<cr>", { desc = "coc previous error" })
   map("n", "<c-j>", "<cmd>call CocAction('diagnosticNext')<cr>",     { desc = "coc next error" })

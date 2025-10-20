@@ -88,8 +88,8 @@ vim.opt.mousemodel = "extend"
 vim.opt.scrolloff = 6
 vim.opt.sidescrolloff = 12
 
--- vim.opt.iskeyword:append("_")
--- vim.opt.iskeyword:append("-")
+vim.opt.iskeyword:append("_")
+vim.opt.iskeyword:append("-")
 
 vim.opt.fillchars = { eob = " " }
 
@@ -184,7 +184,8 @@ end, {})
 local term_ns = vim.api.nvim_create_namespace("")
 vim.api.nvim_set_hl(term_ns, "Normal", { fg = "#ffffff", bg = "#000000" })
 
-vim.api.nvim_create_autocmd("TermEnter", {
+vim.api.nvim_create_autocmd({ "TermEnter", "WinEnter", "BufEnter" }, {
+  pattern = "term://*",
   callback = vim.schedule_wrap(function()
     vim.api.nvim_win_set_hl_ns(0, term_ns)
   end)
@@ -205,6 +206,12 @@ end)})
 
 vim.api.nvim_create_autocmd("TermClose", {
   callback = vim.schedule_wrap(function(ev)
+    if vim.fn.match(vim.fn.expand("%:p"), "^term://") == -1 then
+      if vim.api.nvim_get_hl_ns({ winid = 0 }) == term_ns then
+        vim.api.nvim_win_set_hl_ns(0, 0)
+      end
+    end
+
     if not vim.api.nvim_buf_is_valid(ev.buf) then return end
     pcall(vim.api.nvim_buf_delete, ev.buf, {})
   end)

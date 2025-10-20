@@ -18,8 +18,6 @@ TODO:
 
 lua explorer hl system
 
-https://github.com/nvim-tree/nvim-tree.lua
-
 https://github.com/bassamsdata/namu.nvim/
 https://github.com/OXY2DEV/ui.nvim/
 QuickFix: https://www.youtube.com/watch?v=AuXZA-xCv04

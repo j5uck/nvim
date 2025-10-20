@@ -275,6 +275,15 @@ local function github(p) return "https://github.com/"..p..".git" end
 -- THEMES --
 
 plug{
+  github("catppuccin/nvim"),
+  setup = prequire_wrap("catppuccin", function(catppuccin)
+    catppuccin.setup{
+      no_italic = true
+    }
+  end)
+}
+
+plug{
   github("folke/tokyonight.nvim"),
   tag = "stable",
   build = function() vim.cmd[[silent! colorscheme tokyonight-storm]] end,
@@ -711,7 +720,7 @@ plug{
     end
 
     pcall(vim.api.nvim_del_user_command, "CocStop")
-    vim.api.nvim_create_user_command("CocStop", vim.fn["coc#rpc#stop"], {})
+    vim.api.nvim_create_user_command("CocStop", function() vim.fn["coc#rpc#stop"]() end, {})
 
     pcall(vim.api.nvim_del_user_command, "CocMarketplace")
     vim.api.nvim_create_user_command("CocMarketplace", coc.marketplace.show, {})
