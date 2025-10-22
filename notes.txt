@@ -4,7 +4,6 @@
 Neovim (>= 0.11.0)
 Patched font (eg. Nerd font)
 ripgrep (for telescope) => https://github.com/BurntSushi/ripgrep
-fd (for telescope)
 
 -- nvim-treesitter --
 
@@ -16,18 +15,24 @@ fd (for telescope)
 
 TODO:
 
+REPLACE TELESCOPE ASAP!!!!!
+
 lua explorer hl system
 
 https://github.com/bassamsdata/namu.nvim/
 https://github.com/OXY2DEV/ui.nvim/
-QuickFix: https://www.youtube.com/watch?v=AuXZA-xCv04
 https://github.com/kevinhwang91/nvim-hlslens/
-https://github.com/tpope/vim-fugitive/blob/master/plugin/fugitive.vim
 https://github.com/tpope/vim-commentary
+
+QuickFix
+  https://www.youtube.com/watch?v=AuXZA-xCv04
 
 undofile reload
 https://github.com/stevearc/oil.nvim
   lua/oil/util.lua
+
+tagbar
+notify float open (how ???)
 
 -- FOR PREVIEW --
   local wi = vim.fn.getwininfo(vim.api.nvim_get_current_win())
@@ -47,6 +52,5 @@ vim.wo.colorcolumn = "72"
 
 vim.on_key({fn}, {ns_id}, {opts})
 
-tagbar
-
-notify float open (how ???)
+vim.go.path
+vim.bo.path

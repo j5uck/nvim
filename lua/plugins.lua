@@ -159,7 +159,7 @@ PLUG_SYNC.start = function(args)
       for _, name_build in ipairs(po_build) do
         PLUG_SYNC.text[i] = "x " .. name .. ": Building..."
         set_lines()
-        PLUGS[name_build].build()
+        PLUGS[name_build].build{ dir = joinpath(PLUG_HOME, name_build) }
         PLUG_SYNC.text[i] = "- " .. name .. ": Building... Done!"
       end
       set_lines()
@@ -375,6 +375,17 @@ plug{
   end)
 }
 
+-- TELESCOPE-NATIVE --
+
+plug{
+  github("nvim-telescope/telescope-fzf-native.nvim"),
+  build = function(opts)
+    local o  = vim.system({ "make" }, { text = true, cwd = opts.dir, clear_env = true }):wait()
+    if o.code == 0 then return end
+    notify.error("Error compiling fzf:" .. o.stderr)
+  end
+}
+
 -- TELESCOPE-UI --
 
 plug{ github("nvim-telescope/telescope-ui-select.nvim") }
@@ -409,6 +420,7 @@ plug{
         }
       }
     }
+    pcall(telescope.load_extension, "fzf")
     pcall(telescope.load_extension, "noice")
     pcall(telescope.load_extension, "ui-select")
     pcall(telescope.load_extension, "file_browser")

@@ -35,6 +35,9 @@ map("n", ">", "V>",  { desc = "un-tab" })
 map("v", "<", "<gv", { desc = "tab" })
 map("v", ">", ">gv", { desc = "un-tab" })
 
+map("v", "<c-a>", "<c-a>gv", { desc = "increase" })
+map("v", "<c-x>", "<c-x>gv", { desc = "decrease" })
+
 map("i", "<tab>",   "<tab>", { desc = "tab" })
 map("i", "<s-tab>", "<c-h>", { desc = "un-tab" })
 map("i", "<cr>",    "<cr>",  { desc = "enter" })
@@ -115,8 +118,10 @@ map("n", "<leader>l", ":lua require(\"_\").log()<left>", { silent = false, desc 
 map("n", "<leader>0", "<cmd>only<CR> ", { desc = "[0]nly" })
 
 map("n", "<leader>W", function()
-  vim.opt_local.wrap = not vim.o.wrap
-  notify.warn(vim.o.wrap and ":set wrap" or ":set nowrap")
+  local o = not vim.wo.wrap
+  vim.wo.wrap = o
+  vim.wo.linebreak = o
+  notify.warn(o and ":set wrap" or ":set nowrap")
 end, { desc = "toggle [W]rap" })
 
 map("n", "<leader>n", function()
@@ -391,13 +396,17 @@ end)
 -- COC --
 
 if pcall(vim.fn["coc#pum#visible"]) then
-  map("i", "<M-n>", [[coc#pum#visible() ? coc#pum#next(1) : ""]], { expr = true, desc = "coc next suggestion" })
-  map("i", "<M-N>", [[coc#pum#visible() ? coc#pum#prev(1) : ""]], { expr = true, desc = "coc previous suggestion" })
+  map("i", "<tab>",   [[coc#pum#visible() ? coc#pum#next(1) : "<tab>"]], { expr = true, desc = "coc next suggestion" })
+  map("i", "<s-tab>", [[coc#pum#visible() ? coc#pum#prev(1) : "<c-h>"]], { expr = true, desc = "coc previous suggestion" })
+  -- map("i", "<M-n>", [[coc#pum#visible() ? coc#pum#next(1) : ""]], { expr = true, desc = "coc next suggestion" })
+  -- map("i", "<M-N>", [[coc#pum#visible() ? coc#pum#prev(1) : ""]], { expr = true, desc = "coc previous suggestion" })
 
   -- map("i", "<Down>", [[coc#pum#visible() ? coc#pum#next(1) : "<Down>"]], { expr = true, desc = "coc next suggestion" })
   -- map("i", "<Up>",   [[coc#pum#visible() ? coc#pum#prev(1) : "<Up>"]],   { expr = true, desc = "coc previous suggestion" })
 
-  map("i", "<tab>", [[coc#pum#visible() ? coc#pum#confirm() : "<tab>"]], { expr = true, desc = "coc select suggestion" })
+  -- TODO: coc#expandableOrJumpable()
+  map("i", "<cr>", [[coc#pum#visible() ? coc#pum#confirm() : "<cr>"]], { expr = true, desc = "coc select suggestion" })
+  -- map("i", "<tab>", [[coc#pum#visible() ? coc#pum#confirm() : "<tab>"]], { expr = true, desc = "coc select suggestion" })
 
   map("n", "<c-k>", "<cmd>call CocAction('diagnosticPrevious')<cr>", { desc = "coc previous error" })
   map("n", "<c-j>", "<cmd>call CocAction('diagnosticNext')<cr>",     { desc = "coc next error" })

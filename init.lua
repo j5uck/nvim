@@ -7,6 +7,8 @@ end
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
 
+vim.schedule(vim.cmd.clearjumps)
+
 if vim.fn.exists("#FileExplorer") == 1 then
   vim.api.nvim_del_augroup_by_name("FileExplorer")
 end
@@ -36,11 +38,14 @@ vim.g.loaded_perl_provider = 0
 vim.g.loaded_python3_provider = 0
 vim.g.loaded_ruby_provider = 0
 
--- TODO: real fix
-local p = (vim.fn.has("win32") == 0) and
-  "/usr/share/nvim/runtime/doc/.*" or
-  "C:\\Program Files\\Neovim\\share\\nvim\\runtime\\doc\\.*"
-vim.filetype.add{ pattern = { [p] = { "help" } } }
+-- TODO: Send patch???
+for _, line in ipairs(vim.opt.runtimepath:get()) do
+  if vim.fn.match(line, "[\\/]nvim[\\/]runtime$") ~= -1 then
+    local p = line .. "/doc/.*%.txt"
+    vim.filetype.add{ pattern = { [p] = { "help" } } }
+    break
+  end
+end
 
 vim.cmd[[set shortmess+=AacCIqs]]
 
@@ -53,8 +58,6 @@ vim.g.did_load_filetypes = 1
 vim.opt.guicursor = { "a:ver25", "n-v-t:block", "o-r-cr:hor20" }
 
 vim.opt.mouse = { n = true, v = true }
-
-vim.schedule(vim.cmd.clearjumps)
 
 vim.cmd[[silent! set maxsearchcount=0]]
 
@@ -88,8 +91,9 @@ vim.opt.mousemodel = "extend"
 vim.opt.scrolloff = 6
 vim.opt.sidescrolloff = 12
 
-vim.opt.iskeyword:append("_")
-vim.opt.iskeyword:append("-")
+vim.opt.helplang = "en,es"
+
+-- vim.opt.iskeyword:append("-")
 
 vim.opt.fillchars = { eob = " " }
 
