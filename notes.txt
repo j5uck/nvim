@@ -17,7 +17,11 @@ TODO:
 
 REPLACE TELESCOPE ASAP!!!!!
 
+https://github.com/Makaze/watch.nvim
+
+replace <space>gd for lua & vim script
 lua explorer hl system
+has("clipboard")
 
 https://github.com/bassamsdata/namu.nvim/
 https://github.com/OXY2DEV/ui.nvim/
@@ -54,3 +58,33 @@ vim.on_key({fn}, {ns_id}, {opts})
 
 vim.go.path
 vim.bo.path
+
+-- tranparency --
+-- vim.api.nvim_set_hl(0, "Normal", { bg = "none" })
+-- vim.api.nvim_set_hl(0, "NormalNC", { bg = "none" })
+-- vim.api.nvim_set_hl(0, "EndOfBuffer", { bg = "none" })
+
+
+
+M.list = {}
+M.list.sort = function(l, f) return f and table.sort(l,f) or vim.fn.sort(l, "i") end
+M.list.map = vim.tbl_map
+M.list.filter = vim.tbl_filter
+M.list.remove = table.remove
+M.list.slice = vim.list_slice
+M.list.clone = function(t) return vim.list_slice(t, 1, #t) end
+M.list.insert = table.insert
+M.list.merge = function(...)
+  local r = {}
+  for _, t in ipairs{...} do
+    vim.list_extend(r, t)
+  end
+  return r
+end
+
+M.dictionary = {}
+M.dictionary.isempty = vim.tbl_isempty
+M.dictionary.clone = vim.deepcopy
+M.dictionary.keys = vim.tbl_keys
+M.dictionary.merge = function(...) return vim.tbl_extend("force",...) end
+M.dictionary.deep_merge = function(...) return vim.tbl_deep_extend("force",...) end

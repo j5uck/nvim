@@ -1,8 +1,10 @@
-local notify, notify_once, flags, prequire, random, window = (function()
+local notify, notify_once, flags, fs, prequire, window = (function()
   local _ = require("_")
-  return _.notify, _.notify_once, _.flags, _.prequire, _.random, _.window
+  return _.notify, _.notify_once, _.flags, _.fs, _.prequire, _.window
 end)()
 local explorer = require("explorer")
+
+local W = {}
 
 vim.g.mapleader = " "
 
@@ -14,8 +16,13 @@ local function map(mode, lhs, rhs, opts)
   end
 end
 
-map("n", { "<leader>", "<leader>f", "<CR>", "<leader><s-q>", "&" }, "<Nop>", { desc = "do nothing" })
-map({ "n", "i", "v" }, { "<MiddleMouse>", "<2-MiddleMouse>", "<3-MiddleMouse>", "<4-MiddleMouse>" }, "<Nop>", { desc = "do nothing" })
+local nope = {
+  { "n", { "&", "<CR>", "<c-c>", "<leader>", "<leader><s-q>", "<leader>f", "<leader>s" } },
+  { "v", { "<leader>s" } },
+  { { "n", "i", "v" }, { "<MiddleMouse>", "<2-MiddleMouse>", "<3-MiddleMouse>", "<4-MiddleMouse>" } }
+}
+
+for _, v in ipairs(nope) do map(v[1], v[2], "<Nop>", { desc = "do nothing" }) end
 
 map("i", { "<c-Space>" }, "<esc>", { desc = "escape" })
 map({"i", "t"}, "<M-o>", "<c-\\><c-n>", { desc = "escape" })
@@ -73,16 +80,27 @@ map("n", "<leader>x", "<cmd>x<CR>", { desc = "write & e[x]it" })
 map("n", "<leader>q", "<cmd>q<CR>",  { desc = "[q]uit" })
 map("n", "<leader>Q", "<cmd>q!<CR>", { desc = "forced [Q]uit" })
 
-map("n", "<leader>s", "<cmd>%lua<CR>", { desc = "[s]ource" })
-map("v", "<leader>s", ":lua<CR>",      { desc = "[s]ource" })
-
 map("n", "<leader>o", "o<esc>0\"_D", { desc = "create new line" })
 map("n", "<leader>O", "O<esc>0\"_D", { desc = "create new line" })
 
 vim.api.nvim_create_autocmd("FileType", {
+  pattern = "lua",
+  callback = function(ev)
+    map("n", "<leader>s", "<cmd>%lua<CR>", { buffer = ev.buf, desc = "[s]ource" })
+    map("v", "<leader>s", ":lua<CR>",      { buffer = ev.buf, desc = "[s]ource" })
+  end
+})
+
+vim.api.nvim_create_autocmd("TermOpen", {
+  callback = function(ev)
+    map("n", "<M-o>", "<Nop>", { buffer = ev.buf })
+  end
+})
+
+vim.api.nvim_create_autocmd("FileType", {
   pattern = { "qf" },
-  callback = function()
-    map("n", "<CR>", "<cmd>.cc<CR>", { buffer = 0, desc = "go to error" })
+  callback = function(ev)
+    map("n", "<CR>", "<cmd>.cc<CR>", { buffer = ev.buf, desc = "go to error" })
   end
 })
 
@@ -109,8 +127,8 @@ map("n", "<c-l>", "<c-i>", { desc = "jump to next location" })
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "help" },
-  callback = function()
-    map("n", "<CR>", "<c-]>", { buffer = 0, desc = "go to tag" })
+  callback = function(ev)
+    map("n", "<CR>", "<c-]>", { buffer = ev.buf, desc = "go to tag" })
   end
 })
 
@@ -141,86 +159,110 @@ map("n", "<leader>e", explorer.resume, { desc = "resume file tre[e]" })
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "lua-explorer" },
-  callback = function()
-    map("n", "<s-k>", "<Nop>", { buffer = 0 })
-    map("n", "<s-j>", "<Nop>", { buffer = 0 })
+  callback = function(ev)
+    map("n", "<s-k>", "<Nop>", { buffer = ev.buf })
+    map("n", "<s-j>", "<Nop>", { buffer = ev.buf })
 
-    map("n", "<esc>", "<cmd>q<CR>", { buffer = 0 })
+    map("n", "<esc>", "<cmd>q<CR>", { buffer = ev.buf })
 
-    map("n", "<2-LeftMouse>", explorer.select, { buffer = 0 })
-    map("n", "<CR>", explorer.select, { buffer = 0 })
+    map("n", "<2-LeftMouse>", explorer.select, { buffer = ev.buf })
+    map("n", "<CR>", explorer.select, { buffer = ev.buf })
 
-    map("n", "<c-h>", explorer.go_back, { buffer = 0 })
-    map("n", "<c-l>", explorer.go_next, { buffer = 0 })
-    map("n", "<c-k>", explorer.go_up, { buffer = 0 })
+    map("n", "<c-h>", explorer.go_back, { buffer = ev.buf })
+    map("n", "<c-l>", explorer.go_next, { buffer = ev.buf })
+    map("n", "<c-k>", explorer.go_up, { buffer = ev.buf })
 
-    map("n", "<M-h>", explorer.go_back, { buffer = 0 })
-    map("n", "<M-j>", "<Nop>", { buffer = 0 })
-    map("n", "<M-k>", explorer.go_up, { buffer = 0 })
-    map("n", "<M-l>", explorer.go_next, { buffer = 0 })
+    map("n", "<M-h>", explorer.go_back, { buffer = ev.buf })
+    map("n", "<M-j>", "<Nop>", { buffer = ev.buf })
+    map("n", "<M-k>", explorer.go_up, { buffer = ev.buf })
+    map("n", "<M-l>", explorer.go_next, { buffer = ev.buf })
 
     map("n", "<leader>c", function()
       local s = explorer.buf_get_name()
       notify.info(s)
       vim.cmd.cd(s)
-    end, { buffer = 0 })
+    end, { buffer = ev.buf })
 
     map("n", "<leader>A", function()
       local s = explorer.buf_get_name()
       notify.info(s)
       vim.fn.setreg([["]], s)
       vim.fn.setreg([[+]], s)
-    end, { buffer = 0 })
+    end, { buffer = ev.buf })
   end
 })
 
-local fw_size_max = false
-local fw = window:new{
-  on_show = vim.schedule_wrap(function(self)
+local term_buffers = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }
+local term_buffers_i = 1
+local term_buffers_flag = false
+local term_maximized_flag = false
+W.term = window{
+  on_show = function(self)
+    pcall(function()
+      vim.api.nvim_win_set_buf(self.win, term_buffers[term_buffers_i])
+      self.buf = term_buffers[term_buffers_i]
+    end)
+
+    if term_buffers_flag or term_buffers_i > 1 then
+      term_buffers_flag = true
+      vim.api.nvim_win_set_config(0, { title = " [" .. term_buffers_i .. "] ", title_pos = "center" })
+    end
+
+    if term_buffers[term_buffers_i] ~= vim.api.nvim_get_current_buf() then
+      vim.cmd.term()
+      self.buf = vim.api.nvim_get_current_buf()
+      term_buffers[term_buffers_i] = self.buf
+      vim.api.nvim_win_set_buf(self.win, self.buf)
+    end
+
     vim.bo.bufhidden  = "hide"
     vim.bo.buflisted  = false
     vim.bo.swapfile   = false
     vim.bo.undolevels = -1
 
     vim.cmd[[silent! norm! 0]]
-    local n = vim.api.nvim_buf_get_name(self.buf)
-    if vim.fn.match(n, "^term://.*") == -1 then
-      vim.cmd.term()
-    end
     vim.cmd.clearjumps()
     vim.cmd[[silent! startinsert]]
 
+    local function go_wrap(i)
+      return function()
+        term_buffers_i = i
+        for _, fn in ipairs(self.on_show) do fn(self) end
+      end
+    end
+
+    for i=1, 9, 1 do
+      map({ "n", "t" }, "<M-" .. i .. ">", go_wrap(i), { buffer = self.buf })
+    end
+    map({ "n", "t" }, "<M-0>", go_wrap(10), { buffer = self.buf })
+
     map("n", "<leader>t", function()
-      fw_size_max = not fw_size_max
+      term_maximized_flag = not term_maximized_flag
       for _, fn in ipairs(self.on_resize) do fn(self) end
-    end, { buffer = 0, desc = "Toggle [t]erminal size" })
-  end),
+    end, { buffer = self.buf, desc = "Toggle [t]erminal size" })
+
+    vim.api.nvim_create_autocmd("WinLeave", {
+      callback = function() self:hide() end,
+      once = true
+    })
+  end,
   size = function()
-    local width = fw_size_max and
-        vim.o.columns or
+    local width = term_maximized_flag and vim.o.columns or
         math.ceil(math.min(vim.o.columns, math.max(80, vim.o.columns - 20)))
     local height = math.ceil(math.min(vim.o.lines, math.max(20, vim.o.lines - 10)))
-    local col = math.ceil(vim.o.columns - width) * 0.5 - 1
-    local row = math.ceil(vim.o.lines - height) * 0.5 - 1
 
     return {
-      col    = col,
-      row    = row,
+      col = math.ceil(vim.o.columns - width) * 0.5 - 1,
+      row = math.ceil(vim.o.lines - height) * 0.5 - 1,
       width  = width,
       height = height
     }
   end,
-  hl = function() return {
-    Normal = {},
-    Insert = {},
-    FloatBorder = {}
-  } end,
   focus = true,
-  focusable = true,
   border = "rounded",
 }
 
-map({"n", "v", "t"}, "<c-Space>", function() fw:toggle() end, { desc = "toggle floating terminal" })
+map({"n", "v", "t"}, "<c-Space>", function() W.term:toggle() end, { desc = "toggle floating terminal" })
 
 map("n", "<leader>ic", function()
   vim.cmd.cd{vim.fn.stdpath("config"), mods = { silent = true }}
@@ -232,16 +274,17 @@ map("n", "<leader>ip", function()
   explorer.open()
 end, { desc = "go to plug config" })
 
-do
+local zen_toggle = (function()
+  local toggled = false
+
   local status, lualine = pcall(require, "lualine")
   if not status then
     lualine = { hide = function(_) end, refresh = function(_) end }
   end
 
-  local toggle = false
-  map("n", "<leader>z", function()
-    toggle = not toggle
-    if toggle then
+  return function()
+    toggled = not toggled
+    if toggled then
       vim.cmd.IBLDisable{ mods = { silent = true }}
       lualine.hide()
       lualine.refresh{ force = true }
@@ -250,8 +293,9 @@ do
       lualine.hide{ unhide = true }
       lualine.refresh{ force = true }
     end
-  end, { desc = "zen mode" })
-end
+  end
+end)()
+map("n", "<leader>z", zen_toggle, { desc = "zen mode" })
 
 -- Notify --
 prequire("notify", function(n)
@@ -268,10 +312,10 @@ map("n", "<leader>u", undotree.toggle, { desc = "toggle [u]ndo tree" })
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "undotree",
-  callback = function()
-    map("n", { "<CR>", "<2-LeftMouse>" }, undotree.select, { buffer = 0, desc = "Select state" })
-    map("n", "u", undotree.undo, { buffer = 0, desc = "Undo" })
-    map("n", { "U", "<c-r>" }, undotree.redo, { buffer = 0, desc = "Redo" })
+  callback = function(ev)
+    map("n", { "<CR>", "<2-LeftMouse>" }, undotree.select, { buffer = ev.buf, desc = "Select state" })
+    map("n", "u", undotree.undo, { buffer = ev.buf, desc = "Undo" })
+    map("n", { "U", "<c-r>" }, undotree.redo, { buffer = ev.buf, desc = "Redo" })
   end
 })
 
@@ -427,14 +471,14 @@ end
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "coc-marketplace" },
-  callback = function()
+  callback = function(ev)
     local coc = require("coc")
 
-    map("n", "q", "<cmd>q<CR>", { buffer = 0 })
-    map("n", "<esc>", "<cmd>q<CR>", { buffer = 0 })
+    map("n", "q", "<cmd>q<CR>", { buffer = ev.buf })
+    map("n", "<esc>", "<cmd>q<CR>", { buffer = ev.buf })
 
-    map({ "n", "v" }, "<tab>", coc.marketplace.option.toggle, { buffer = 0 })
-    map("n", "<CR>", coc.marketplace.run, { buffer = 0 })
+    map({ "n", "v" }, "<tab>", coc.marketplace.option.toggle, { buffer = ev.buf })
+    map("n", "<CR>", coc.marketplace.run, { buffer = ev.buf })
   end
 })
 
@@ -453,35 +497,28 @@ local LANGS_ORDER = {
 }
 
 LANGS = {
-  c           = { icon = "" },
-  lua         = { icon = "" },
-  html        = { icon = "" },
-  javascript  = { icon = "" },
-  typescript  = { icon = "" },
-  npm         = { icon = "" },
-  java        = { icon = "" },
-  kotlin      = { icon = "" },
-  rust        = { icon = "" },
-  sh          = { icon = "" },
-  markdown    = { icon = "" },
+  c          = { icon = "" },
+  lua        = { icon = "" },
+  html       = { icon = "" },
+  javascript = { icon = "" },
+  typescript = { icon = "" },
+  npm        = { icon = "" },
+  java       = { icon = "" },
+  kotlin     = { icon = "" },
+  rust       = { icon = "" },
+  sh         = { icon = "" },
+  markdown   = { icon = "" },
 }
-
-local TMPDIR = vim.fn.has("win32") == 1 and
-  (vim.env.APPDATA .. "\\..\\Local\\Temp") or
-  (vim.env.XDG_RUNTIME_DIR or "/tmp")
 
 local select = function()
   local lnum = vim.api.nvim_win_get_cursor(0)[1]
   local lang = LANGS[string.lower(LANGS_ORDER[lnum])]
   vim.cmd.q()
 
-  local dir = TMPDIR .. "/tmp." .. random(10)
-  vim.fn.mkdir(dir, "p")
-
+  local dir = fs.mktmp()
   for name, content in pairs(lang.code) do
     local full_path = dir .. "/" .. name
-    vim.fn.mkdir(vim.fs.dirname(full_path), "p")
-    vim.fn.writefile(content, full_path, "")
+    fs.mkfile(full_path, content, "p")
   end
   for _, file in ipairs(lang.init) do
     vim.cmd.e(vim.fn.fnameescape(dir .. "/" .. file))
@@ -491,13 +528,16 @@ local select = function()
   vim.cmd.cd(dir)
 end
 
-local menu = window:new{
-  on_show = function()
+W.langs = window{
+  on_show = function(self)
     vim.bo.bufhidden  = "hide"
     vim.bo.buftype    = "nofile"
     vim.bo.buflisted  = false
     vim.bo.swapfile   = false
     vim.bo.undolevels = -1
+
+    vim.wo.scrolloff = 0
+    vim.wo.sidescrolloff = 0
 
     vim.api.nvim_win_set_config(0, { title = " NEW ", title_pos = "center" })
 
@@ -508,29 +548,31 @@ local menu = window:new{
     vim.api.nvim_create_autocmd("CursorMoved", {
       buffer = 0,
       callback = function()
-        local y, _ = unpack(vim.api.nvim_win_get_cursor(0))
-        vim.api.nvim_win_set_cursor(0, { y, vim.fn.match(vim.api.nvim_get_current_line(), "\\w") })
+        local y, x = unpack(vim.api.nvim_win_get_cursor(0))
+        x = math.max(x, vim.fn.match(vim.api.nvim_get_current_line(), "^ \\S\\+ \\zs") + 1)
+        vim.api.nvim_win_set_cursor(0, { y, x })
       end
     })
 
-    map("n", "<esc>", vim.cmd.q, { buffer = 0, desc = "quit" })
-    map("n", "q",     vim.cmd.q, { buffer = 0, desc = "quit" })
-    map("n", "<CR>",  select,    { buffer = 0, desc = "select" })
+    map("n", { "A", "I", "D", "R", "a", "i", "d", "r" }, "<Nop>", { buffer = self.buf })
+
+    map("n", { "q", "<esc>" }, vim.cmd.q, { buffer = self.buf, desc = "quit" })
+    map("n", "<CR>",  select, { buffer = self.buf, desc = "select" })
 
     vim.bo.modifiable = true
 
     local examples = {
-      c           = "main.c",
-      html        = "index.html",
-      java        = "Main.java",
-      javascript  = "script.js",
-      kotlin      = "Main.kt",
-      lua         = "script.lua",
-      markdown    = "README.md",
-      npm         = "package.json",
-      rust        = "main.rs",
-      sh          = "script.sh",
-      typescript  = "script.ts",
+      c          = "main.c",
+      html       = "index.html",
+      java       = "Main.java",
+      javascript = "script.js",
+      kotlin     = "Main.kt",
+      lua        = "script.lua",
+      markdown   = "README.md",
+      npm        = "package.json",
+      rust       = "main.rs",
+      sh         = "script.sh",
+      typescript = "script.ts",
     }
 
     local status, devicons = pcall(require, "nvim-web-devicons")
@@ -553,6 +595,11 @@ local menu = window:new{
 
     vim.cmd[[norm! G"_ddgg]]
     vim.bo.modifiable = false
+
+    vim.api.nvim_create_autocmd("WinLeave", {
+      callback = function() self:hide() end,
+      once = true
+    })
   end,
   size = function()
     local width = 16
@@ -566,11 +613,10 @@ local menu = window:new{
     }
   end,
   focus = true,
-  focusable = true,
   border = "rounded",
 }
 
-map("n", "<leader>ii", function() menu:show() end, { desc = "create example file" })
+map("n", "<leader>ii", function() W.langs:show() end, { desc = "create example file" })
 
 local MESSAGE = "Hello World!"
 
@@ -664,8 +710,12 @@ LANGS.npm.code["package.json"] = {
   "{",
   "  \"name\": \"demo\",",
   "  \"version\": \"0.0.0\",",
-  "  \"scripts\": { \"dev\": \"bun ./src/index.ts\" },",
-  "  \"type\": \"module\"",
+  "  \"scripts\": { \"dev\": \"bun --watch run ./src/index.ts\" },",
+  "  \"type\": \"module\",",
+  "  \"devDependencies\": {",
+  "    \"@types/bun\": \"*\",",
+  "    \"@types/node\": \"*\"",
+  "  }",
   "}"
 }
 LANGS.npm.code["src/index.ts"] = {

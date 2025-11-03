@@ -1,6 +1,6 @@
-local flags, notify, notify_once, prequire_wrap = (function()
+local flags, fs, notify, notify_once, prequire_wrap = (function()
   local _ = require("_")
-  return _.flags, _.notify, _.notify_once, _.prequire_wrap
+  return _.flags, _.fs, _.notify, _.notify_once, _.prequire_wrap
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
@@ -271,11 +271,11 @@ local function github(p) return "https://github.com/"..p..".git" end
 
 ----- ----- ----- ----- ----- X ----- ----- ----- ----- -----
 
-
 -- THEMES --
 
 plug{
   github("catppuccin/nvim"),
+  as = "catppuccin",
   setup = prequire_wrap("catppuccin", function(catppuccin)
     catppuccin.setup{
       no_italic = true
@@ -534,7 +534,7 @@ plug{
     local o = { icons_enabled = true, theme = "auto" }
 
     -- if vim.g.nvy then
-    if (vim.fn.has("win32") == 0) and vim.fn.readfile("/etc/hostname")[1] == "host7" then
+    if (vim.fn.has("win32") == 0) and fs.readfile("/etc/hostname")[1] == "host7" then
       o.section_separators   = { left = "",  right = ""  }
       o.component_separators = { left = "|", right = "|" }
     else

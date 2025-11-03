@@ -1,3 +1,7 @@
+local ffi = require("ffi")
+
+local IS_WINDOWS = vim.fn.has("win32") == 1
+
 local M = {}
 
 M.flags = {
@@ -41,52 +45,98 @@ M.prequire_wrap = function(name, fn)
   return function() return M.prequire(name, fn) end
 end
 
-local CHARS = vim.split("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz","")
-M.random = function(len)
-  local ffi = require("ffi")
+M.random = {}
+
+local CHARS = vim.split("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", "")
+M.random.string = function(len)
   local buffer = ffi.new("char [?]", len)
   ffi.copy(buffer, vim.uv.random(len), len)
 
-  local l = {}
-  for i = 1, len, 1 do
-    table.insert(l, CHARS[buffer[i] % #CHARS + 1])
+  for i = 0, len - 1, 1 do
+    ffi.copy(buffer+i, CHARS[buffer[i] % #CHARS + 1], 1)
   end
-  return table.concat(l, "")
+  return ffi.string(buffer, len)
 end
 
-if false then
+M.random.number = function()
+  local buffer = ffi.new("uint32_t [1]")
+  ffi.copy(buffer, vim.uv.random(4), 4)
+  return buffer[0]
+end
 
-M.list = {}
-M.list.sort = function(l, f) return f and table.sort(l,f) or vim.fn.sort(l, "i") end
-M.list.map = vim.tbl_map
-M.list.filter = vim.tbl_filter
-M.list.remove = table.remove
-M.list.slice = vim.list_slice
-M.list.clone = function(t) return vim.list_slice(t, 1, #t) end
-M.list.insert = table.insert
-M.list.merge = function(...)
-  local r = {}
-  for _, t in ipairs{...} do
-    vim.list_extend(r, t)
+M.fs = {}
+
+M.fs.mktmp = (function()
+  local d = not IS_WINDOWS and
+    (vim.env.XDG_RUNTIME_DIR or "/tmp") .. "/tmp." or
+    string.gsub(vim.fs.dirname(vim.env.APPDATA) .. "/Local/Temp/tmp.", "/", "\\")
+
+  return function()
+    local r = d .. M.random.string(10)
+    vim.fn.mkdir(r, "p")
+    return r
   end
+end)()
+
+M.fs.mkdir = function(dir)
+  local s, _ = pcall(vim.fn.mkdir, dir, "p")
+  return not s
+end
+
+M.fs.mkfile = function(file, content, flags)
+  flags = flags or ""
+  if vim.fn.match(flags, "p") then M.fs.mkdir(vim.fs.dirname(file)) end
+  local s, _ = pcall(vim.fn.writefile, content or {}, file, flags)
+  return not s
+end
+
+M.fs.mklink = IS_WINDOWS and function(_, _)
+  error("Unsupported platform")
+end or
+ function(target, link_name)
+  local o = vim.system{ vim.fn.exepath("ln"), "--symbolic", target, link_name }:wait()
+  return o.code ~= 0
+end
+
+M.fs.copy = IS_WINDOWS and function(src, dest)
+  local o = vim.system{ vim.fn.exepath("powershell"), "Copy-Item", "-recurse", src, "-destination", dest }:wait()
+  return o.code ~= 0
+end or function(src, dest)
+  local o = vim.system{ vim.fn.exepath("cp"), "--recursive", src, dest }:wait()
+  return o.code ~= 0
+end
+
+M.fs.move = function(src, dest)
+  local s, _ = pcall(vim.fn.rename, src, dest)
+  return s and s ~= 0 or true
+end
+
+M.fs.remove = function(src)
+  local s, _ = pcall(vim.fn.delete, src, "rf")
+  return s and s ~= 0 or true
+end
+
+M.fs.readfile = function(file, type)
+  local s, lines = pcall(vim.fn.readfile, file, type)
+  return s and lines or nil
+end
+
+M.fs.basename = IS_WINDOWS and function(file)
+  local r = vim.fs.basename(file)
+  r = string.gsub(r, "/", "\\")
   return r
-end
+end or vim.fs.basename
 
-M.dictionary = {}
-M.dictionary.isempty = vim.tbl_isempty
-M.dictionary.clone = vim.deepcopy
-M.dictionary.keys = vim.tbl_keys
-M.dictionary.merge = function(...) return vim.tbl_extend("force",...) end
-M.dictionary.deep_merge = function(...) return vim.tbl_deep_extend("force",...) end
-
-end
+M.fs.dirname = IS_WINDOWS and function(file)
+  local r = vim.fs.dirname(file)
+  r = string.gsub(r, "/", "\\")
+  return r
+end or vim.fs.dirname
 
 local window = {}
 
 function window:show()
-  if vim.api.nvim_win_is_valid(self.win) then
-    return
-  end
+  if vim.api.nvim_win_is_valid(self.win) then return end
 
   if not vim.api.nvim_buf_is_valid(self.buf) then
     self.buf = vim.api.nvim_create_buf(false, true)
@@ -98,16 +148,8 @@ function window:show()
     border = self.border,
     zindex = self.zindex,
     hide = false,
-    focusable = self.focusable,
-    noautocmd = self.noautocmd
+    focusable = self.focus,
   }, self.size()))
-
-  if self.focus then
-    vim.api.nvim_create_autocmd("WinLeave", {
-      callback = function() self:hide() end,
-      once = true
-    })
-  end
 
   vim.api.nvim_buf_call(self.buf, function()
     for _, fn in ipairs(self.on_show) do fn(self) end
@@ -137,8 +179,6 @@ local function new(conf)
 
   self.zindex = conf.zindex or 25
   self.focus = not not conf.focus
-  self.focusable = conf.focusable
-  self.noautocmd = conf.noautocmd
   self.border = conf.border or "rounded"
   self.size = conf.size or function() return {
     width = DEFAULT_WIDTH,
@@ -183,7 +223,6 @@ local function new(conf)
   return self
 end
 
-M.window = {}
-function M.window:new(conf) return setmetatable(new(conf), { __index = window }) end
+M.window = function(conf) return setmetatable(new(conf), { __index = window }) end
 
 return M

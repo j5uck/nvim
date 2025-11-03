@@ -113,7 +113,7 @@ local function url(size, page)
   }
 end
 
-local menu = window:new{
+local menu = window{
   on_show = function()
     vim.bo.bufhidden  = "delete"
     vim.bo.buflisted  = false

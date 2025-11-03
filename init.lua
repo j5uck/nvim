@@ -6,6 +6,8 @@ end
 
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
+vim.g.loaded_zip = 1
+vim.g.loaded_zipPlugin = 1
 
 vim.schedule(vim.cmd.clearjumps)
 
@@ -93,8 +95,6 @@ vim.opt.sidescrolloff = 12
 
 vim.opt.helplang = "en,es"
 
--- vim.opt.iskeyword:append("-")
-
 vim.opt.fillchars = { eob = " " }
 
 vim.opt.list = true
@@ -126,10 +126,15 @@ vim.g.c_syntax_for_h = 1
 
 vim.lsp.set_log_level(vim.log.levels.OFF)
 
--- tranparency --
--- vim.api.nvim_set_hl(0, "Normal", { bg = "none" })
--- vim.api.nvim_set_hl(0, "NormalNC", { bg = "none" })
--- vim.api.nvim_set_hl(0, "EndOfBuffer", { bg = "none" })
+local iskeyword = "@,48-57,_,-,192-255"
+vim.go.iskeyword = iskeyword
+vim.bo.iskeyword = iskeyword
+
+vim.api.nvim_create_autocmd("FileType", {
+  callback = function(ev)
+    vim.bo[ev.buf].iskeyword = iskeyword
+  end
+})
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "man",
@@ -147,9 +152,9 @@ require("explorer")
 require("plugins")
 require("mapping")
 
-local notify, window = (function()
+local fs, notify, window = (function()
   local _ = require("_")
-  return _.notify, _.window
+  return _.fs, _.notify, _.window
 end)()
 
 vim.api.nvim_create_user_command("TabToSpaces", function()
@@ -170,7 +175,7 @@ vim.api.nvim_create_user_command("LOC", function()
       if vim.fn.isdirectory(d) == 1 then
         loc(s .. name .. "/")
       else
-        local n = #vim.fn.readfile(d)
+        local n = #fs.readfile(d)
         total = total + n
         table.insert(sb, string.format("%4d", n) .. " :: " .. s .. name)
       end
@@ -195,6 +200,14 @@ vim.api.nvim_create_autocmd({ "TermEnter", "WinEnter", "BufEnter" }, {
   end)
 })
 
+vim.api.nvim_create_autocmd({ "TabEnter", "WinEnter", "BufEnter" }, {
+  callback = function(ev)
+    if vim.fn.match(vim.api.nvim_buf_get_name(ev.buf), "^term://") == 0 then return end
+    if vim.api.nvim_get_hl_ns({ winid = 0 }) ~= term_ns then return end
+    vim.api.nvim_win_set_hl_ns(0, 0)
+  end
+})
+
 vim.api.nvim_create_autocmd("TermOpen", {
   callback = function(ev) vim.api.nvim_buf_call(ev.buf, function()
     vim.wo.number = false
@@ -210,18 +223,12 @@ end)})
 
 vim.api.nvim_create_autocmd("TermClose", {
   callback = vim.schedule_wrap(function(ev)
-    if vim.fn.match(vim.fn.expand("%:p"), "^term://") == -1 then
-      if vim.api.nvim_get_hl_ns({ winid = 0 }) == term_ns then
-        vim.api.nvim_win_set_hl_ns(0, 0)
-      end
-    end
-
     if not vim.api.nvim_buf_is_valid(ev.buf) then return end
     pcall(vim.api.nvim_buf_delete, ev.buf, {})
   end)
 })
 
-local rec = window:new{
+local rec = window{
   on_show = function(self)
     vim.bo.bufhidden  = "hide"
     vim.bo.buftype    = "nofile"
@@ -241,7 +248,6 @@ local rec = window:new{
     height = 1,
   } end,
   focus = false,
-  focusable = false,
   border = "none",
 }
 

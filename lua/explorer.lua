@@ -1,3 +1,8 @@
+local notify, fs, random, window = (function()
+  local _ = require("_")
+  return _.notify, _.fs, _.random, _.window
+end)()
+
 local ffi = require("ffi")
 local C = ffi.C
 
@@ -13,100 +18,22 @@ else
   ]]
 end
 
-local BUFFER_SIZE = 8192
-local buffer = ffi.new("char [?]", BUFFER_SIZE)
-
-local notify, window = (function()
-  local _ = require("_")
-  return _.notify, _.window
-end)()
-
-vim.filetype.add{ pattern = { ["file://.*"] = { "lua-explorer", { priority = 10 } } } }
-
-local fs = {}
-
-fs.mkdir = function(dir)
-  local s, msg = pcall(vim.fn.mkdir, dir, "p")
-  if s then
-    return true
-  else
-    notify.error(msg)
-    return false
-  end
-end
-
-fs.mkfile = function(file)
-  local s, msg = pcall(vim.fn.writefile, {}, file, "b")
-  if s then
-    return true
-  else
-    notify.error(msg)
-    return false
-  end
-end
-
-fs.mklink = vim.fn.has("win32") == 1 and function(_, _)
-  error("Unsupported platform")
-end or
- function(target, link_name)
-  local o = vim.system{"ln", "--symbolic", target, link_name}:wait()
-  if o.code == 0 then
-    return true
-  else
-    notify.error(vim.split(o.stderr, "\n")[1])
-    return false
-  end
-end
-
-fs.copy = vim.fn.has("win32") == 1 and function(src, dest)
-  local o = vim.system{ vim.fn.exepath("powershell"), "Copy-Item", "-recurse", src, "-destination", dest }:wait()
-  if o.code == 0 then
-    return true
-  else
-    notify.error(vim.split(o.stderr, "\r")[1])
-    return false
-  end
-end or function(src, dest)
-  local o = vim.system{ "cp", "--recursive", src, dest }:wait()
-  if o.code == 0 then
-    return true
-  else
-    notify.error(vim.split(o.stderr, "\n")[1])
-    return false
-  end
-end
-
-fs.move = function(src, dest)
-  local r = vim.fn.rename(src, dest) == 0
-  if not r then notify.error("ERROR fs.move: " .. src .." => " .. dest) end
-  return r
-end
-
-fs.remove = function(src)
-  local r = vim.fn.delete(src, "rf") == 0
-  -- if not r then notify.error("ERROR fs.remove: " .. src) end
-  return r
-end
-
--- local DEBUG = true
--- if DEBUG then
---   local log = require("_").log
---   local _fs = fs
---   fs = {}
---   for k, v in pairs(_fs) do
---     fs[k] = function(...)
---       log(k, ...)
---       v(...)
---     end
---   end
--- end
-
+local C_BUFFER_SIZE = 8192
+local C_BUFFER = ffi.new("char [?]", C_BUFFER_SIZE)
 local BUFFERS = {}
 local BUFFERS_BY_PATH = {}
 local PATHS = {}
 local NS = vim.api.nvim_create_namespace("")
 
-local w = window:new{
+vim.filetype.add{ pattern = { ["file://.*"] = { "lua-explorer", { priority = 10 } } } }
+
+local w = window{
+  on_show = function(self)
+    vim.api.nvim_create_autocmd("WinLeave", {
+      callback = function() self:hide() end,
+      once = true
+    })
+  end,
   size = function()
     local width = math.min(vim.o.columns - 8, math.min(80, vim.o.columns))
     local height = vim.o.lines - 8
@@ -120,7 +47,6 @@ local w = window:new{
   end,
   border = "rounded",
   focus = true,
-  focusable = true
 }
 
 local getcwd = (vim.fn.has("win32") == 1) and function()
@@ -301,10 +227,10 @@ local function ls(dir)
     e.is_directory = e.type == "directory"
     if e.is_directory or (e.type ~= "link") then goto continue end
 
-    e.link = ffi.string(buffer, C.readlink(dir..e.name, buffer, BUFFER_SIZE))
+    e.link = ffi.string(C_BUFFER, C.readlink(dir..e.name, C_BUFFER, C_BUFFER_SIZE))
     local link_full = vim.fs.normalize(vim.fn.isabsolutepath(e.link) == 1 and e.link or (dir .. "/" .. e.link))
 
-    e.link_exists = C.stat(link_full, buffer) == 0
+    e.link_exists = C.stat(link_full, C_BUFFER) == 0
     e.is_directory = e.link_exists and vim.fn.isdirectory(link_full) == 1
 
     ::continue::
@@ -403,7 +329,7 @@ fn_BufReadCmd = function()
         name = string.sub(name, 1, #name - 1),
         type = "directory"
       }
-    end, vim.split(ffi.string(buffer, C.GetLogicalDriveStringsA(BUFFER_SIZE, buffer)), "\0", { trimempty = true }))
+    end, vim.split(ffi.string(C_BUFFER, C.GetLogicalDriveStringsA(C_BUFFER_SIZE, C_BUFFER)), "\0", { trimempty = true }))
 
     is_modifiable = false
   else
@@ -594,29 +520,19 @@ fn_BufWriteCmd = function()
   local error, buffers_ls = fn_BufWriteCmd__parse_buffers()
   if error then return end
 
-  local dirname = (vim.fn.has("win32") == 0) and vim.fs.dirname or function(r)
-    r = string.gsub(vim.fs.dirname(r), "/", "\\")
-    return r
-  end
-
-  local basename = (vim.fn.has("win32") == 0) and vim.fs.basename or function(r)
-    r = string.gsub(vim.fs.basename(r), "/", "\\")
-    return r
-  end
-
   for _, b in ipairs(buffers_ls) do
     -- b => { name, new_info, old_info }
     local buffer_name, cached_info = b[1], vim.tbl_extend("force", {}, b[3])
 
     for _, entry in ipairs(b[2]) do
       local entry_path = PATHS[entry.id]
-      local cached_entry = (entry.id and BUFFERS_BY_PATH[dirname(entry_path)][2][basename(entry_path)]) or {}
+      local cached_entry = (entry.id and BUFFERS_BY_PATH[fs.dirname(entry_path)][2][fs.basename(entry_path)]) or {}
       local to_continue =
           cached_entry.id == entry.id and
           cached_entry.name == entry.name and
           cached_entry.link == entry.link and
           (entry.link or (cached_entry.is_directory == entry.is_directory)) and
-          dirname(entry_path) == buffer_name
+          fs.dirname(entry_path) == buffer_name
 
       -- no changes --
       if to_continue then
@@ -647,8 +563,8 @@ fn_BufWriteCmd = function()
       end
 
       -- if entry.id --
-      local src_buffer = BUFFERS_BY_PATH[dirname(PATHS[entry.id])]
-      local src_file = basename(PATHS[entry.id])
+      local src_buffer = BUFFERS_BY_PATH[fs.dirname(PATHS[entry.id])]
+      local src_file = fs.basename(PATHS[entry.id])
       if entry.link then
         if src_buffer[2][src_file].link == entry.link then
           APPENT_TASK{ TASK.COPY, PATHS[entry.id], full_path }
@@ -703,7 +619,7 @@ fn_BufWriteCmd = function()
     else
       local dest = t[#t]
       if vim.uv.fs_stat(dest) then
-        local tmp_path = dest .. ".tmp_" .. math.random(999999,100000) .. ".bak"
+        local tmp_path = dest .. ".tmp_" .. random.string(10) .. ".bak"
         t[#t] = tmp_path
         table.insert(last_move, { tmp_path, dest })
       end
