@@ -27,6 +27,7 @@ https://github.com/bassamsdata/namu.nvim/
 https://github.com/OXY2DEV/ui.nvim/
 https://github.com/kevinhwang91/nvim-hlslens/
 https://github.com/tpope/vim-commentary
+https://github.com/simrat39/symbols-outline.nvim
 
 QuickFix
   https://www.youtube.com/watch?v=AuXZA-xCv04

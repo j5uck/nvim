@@ -1,12 +1,14 @@
-local flags, fs, notify, notify_once, prequire_wrap = (function()
+local cc, flags, fs, notify, notify_once, prequire_wrap = (function()
   local _ = require("_")
-  return _.flags, _.fs, _.notify, _.notify_once, _.prequire_wrap
+  return _.cc, _.flags, _.fs, _.notify, _.notify_once, _.prequire_wrap
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
-  return ({string.gsub(vim.fs.joinpath(...), "[\\/]+", "\\")})[1]
+  local r = string.gsub(vim.fs.joinpath(...), "[\\/]+", "\\")
+  return r
 end or function(...)
-  return ({string.gsub(vim.fs.joinpath(...), "/+", "/")})[1]
+  local r = string.gsub(vim.fs.joinpath(...), "/+", "/")
+  return r
 end
 
 local PLUG_HOME = joinpath(vim.fn.stdpath("data"), "plug")
@@ -80,7 +82,7 @@ PLUG_SYNC.start = function(args)
 
     local untracked = vim.tbl_filter(function(v)
       return PLUGS[string.sub(v,len)] == nil
-    end, vim.fn.globpath(PLUG_HOME, "*", 1, true)) -- dot files are ignored
+    end, vim.fn.globpath(PLUG_HOME, "*", true, true)) -- dot files are ignored
 
     if #untracked == 0 then goto continue end
 
@@ -213,8 +215,7 @@ PLUG_SYNC.fetch = function(name, plug, callback)
   local last_command = { code = 0 }
   local function do_task(i)
     if last_command.code ~= 0 or not tasks[i] then
-      callback(last_command.code == 0)
-      return
+      return callback(last_command.code == 0)
     end
 
     local cmd = type(tasks[i].cmd) == "function" and tasks[i].cmd(last_command) or tasks[i].cmd
@@ -286,7 +287,7 @@ plug{
 plug{
   github("folke/tokyonight.nvim"),
   tag = "stable",
-  build = function() vim.cmd[[silent! colorscheme tokyonight-storm]] end,
+  build = function(_) vim.cmd[[silent! colorscheme tokyonight-storm]] end,
   setup = prequire_wrap("tokyonight", function(tokyonight)
     vim.api.nvim_create_autocmd("ColorScheme", { callback = function()
       if vim.fn.match(vim.g.colors_name, "^tokyonight-.*$") == -1 then return end
@@ -359,13 +360,6 @@ plug{
   setup = prequire_wrap("noice", function(noice)
     local FPS = 20
     noice.setup{
-      -- debug=true,
-      lsp = {
-        override = {
-          -- ["vim.lsp.util.convert_input_to_markdown_lines"] = true,
-          -- ["vim.lsp.util.stylize_markdown"] = true
-        },
-      },
       presets = {
         command_palette = true,
         long_message_to_split = false,
@@ -380,9 +374,15 @@ plug{
 plug{
   github("nvim-telescope/telescope-fzf-native.nvim"),
   build = function(opts)
-    local o  = vim.system({ "make" }, { text = true, cwd = opts.dir, clear_env = true }):wait()
-    if o.code == 0 then return end
-    notify.error("Error compiling fzf:" .. o.stderr)
+    if not cc.c then return notify.error("C compiler not found") end
+
+    fs.mkdir(joinpath(opts.dir, "build"))
+
+    local target = vim.fn.has("win32") == 1 and "libfzf.dll" or "libfzf.so"
+    local cmd = { cc.c, "-O3", "-fpic", "-std=gnu99", "-shared", "src/fzf.c", "-o", "build/"..target }
+
+    local o  = vim.system(cmd, { text = true, cwd = opts.dir }):wait()
+    if o.code ~= 0 then notify.error("Error compiling fzf:" .. o.stderr) end
   end
 }
 
@@ -454,23 +454,29 @@ plug{
   -- github("norcalli/nvim-colorizer.lua"),
   commit = "51cf7c995ed1eb6642aecf19067ee634fa1b6ba2",
   setup = prequire_wrap("colorizer", function(colorizer)
-    colorizer.setup(
-      -- { "css", "javascript", "html" }
-      -- or
-      nil,
-      {
+    colorizer.setup{
+      user_default_options = {
+        names = true,
+        names_opts = {
+          lowercase = true,
+          camelcase = true,
+          uppercase = true,
+          strip_digits = false,
+        },
+
         RGB      = true,
+        RGBA     = true,
         RRGGBB   = true,
-        names    = true,
         RRGGBBAA = true,
-        -- rgb_fn   = false,
-        -- hsl_fn   = false,
-        -- css      = false,
-        -- css_fn   = false,
-        xterm    = true,
-        mode     = "background"
+        AARRGGBB = true,
+
+        css    = true,
+        css_fn = true,
+
+        mode = "background",
+        xterm = true
       }
-    )
+    }
   end)
 }
 
@@ -478,7 +484,7 @@ plug{
 
 plug{
   github("iamcco/markdown-preview.nvim"),
-  build = function()
+  build = function(_)
     vim.fn["mkdp#util#install"]()
   end
 }
@@ -516,7 +522,7 @@ plug{
     ll("undotree", { fn("UNDOTREE"), nil, function()
       local n = vim.api.nvim_buf_get_name(vim.t.undotree.b.target)
       if #n == 0 then return "[No Name]" end
-      return vim.fs.basename(n)
+      return fs.basename(n)
     end }, { nil, PROGRESS, LOCATION })
 
     ll("coc-marketplace", { fn("COC-MARKETPLACE")  }, { nil, PROGRESS, LOCATION })
@@ -676,7 +682,7 @@ local ts_extensions = {
 plug{
   github("nvim-treesitter/nvim-treesitter"),
   tag = "v*",
-  build = function()
+  build = function(_)
     if #vim.fn.getcompletion("TSUpdate", "command") == 0 then
       require("nvim-treesitter.configs").setup{ ensure_installed = ts_extensions }
     else
@@ -703,7 +709,7 @@ plug{ github("rafamadriz/friendly-snippets") }
 plug{
   github("neoclide/coc.nvim"),
   branch = "release",
-  build = function()
+  build = function(_)
     local coc = require("coc")
 
     if #vim.fn.getcompletion("CocUpdate", "command") == 0 then

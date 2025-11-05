@@ -45,6 +45,19 @@ M.prequire_wrap = function(name, fn)
   return function() return M.prequire(name, fn) end
 end
 
+M.cc = {}
+M.cc.c = (function()
+  if vim.env.CC then
+    local cc = vim.fn.exepath(vim.env.CC)
+    if #cc > 0 then return cc end
+  end
+  for _, cc in ipairs{ "cc", "gcc", "clang", "cl", "zig" } do
+    cc = vim.fn.exepath(cc)
+    if #cc > 0 then return cc end
+  end
+  return nil
+end)()
+
 M.random = {}
 
 local CHARS = vim.split("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", "")
@@ -58,7 +71,13 @@ M.random.string = function(len)
   return ffi.string(buffer, len)
 end
 
-M.random.number = function()
+M.random.int = function()
+  local buffer = ffi.new("int32_t [1]")
+  ffi.copy(buffer, vim.uv.random(4), 4)
+  return buffer[0]
+end
+
+M.random.uint = function()
   local buffer = ffi.new("uint32_t [1]")
   ffi.copy(buffer, vim.uv.random(4), 4)
   return buffer[0]
@@ -121,11 +140,7 @@ M.fs.readfile = function(file, type)
   return s and lines or nil
 end
 
-M.fs.basename = IS_WINDOWS and function(file)
-  local r = vim.fs.basename(file)
-  r = string.gsub(r, "/", "\\")
-  return r
-end or vim.fs.basename
+M.fs.basename = vim.fs.basename
 
 M.fs.dirname = IS_WINDOWS and function(file)
   local r = vim.fs.dirname(file)
@@ -188,12 +203,12 @@ local function new(conf)
   } end
 
   self.on_show = { conf.on_show }
-  self.on_resize = { function(_)
-    if not vim.api.nvim_win_is_valid(self.win) then return end
-    local _ = self.size()
-    _.relative = "editor"
-    vim.api.nvim_win_set_config(self.win, _)
-  end }
+  self.on_resize = { conf.on_resize }
+  table.insert(self.on_resize, function(_)
+    local s = self.size()
+    s.relative = "editor"
+    vim.api.nvim_win_set_config(self.win, s)
+  end)
 
   self.buf = -1
   self.win = -1
@@ -217,6 +232,7 @@ local function new(conf)
   end
 
   vim.api.nvim_create_autocmd("VimResized", { callback = function()
+    if not vim.api.nvim_win_is_valid(self.win) then return end
     for _, fn in ipairs(self.on_resize) do fn(self) end
   end})
 

@@ -220,7 +220,9 @@ W.term = window{
     vim.bo.swapfile   = false
     vim.bo.undolevels = -1
 
-    vim.cmd[[silent! norm! 0]]
+    vim.wo.wrap = true
+
+    -- vim.cmd[[silent! norm! 0]]
     vim.cmd.clearjumps()
     vim.cmd[[silent! startinsert]]
 
@@ -517,8 +519,11 @@ local select = function()
 
   local dir = fs.mktmp()
   for name, content in pairs(lang.code) do
-    local full_path = dir .. "/" .. name
-    fs.mkfile(full_path, content, "p")
+    local f = dir .. "/" .. name
+    fs.mkfile(f, content, "p")
+    if (vim.fn.has("win32") == 0) and (vim.fn.match(content[1], "^#!") == 0) then
+      vim.system({ "chmod", "a+x", f }, { cwd = dir }):wait()
+    end
   end
   for _, file in ipairs(lang.init) do
     vim.cmd.e(vim.fn.fnameescape(dir .. "/" .. file))
@@ -704,13 +709,16 @@ LANGS.typescript.code["script.ts"] = {
   "})();"
 }
 
-LANGS.npm.init = { "src/index.ts" }
+LANGS.npm.init = { "src/server.ts" }
 LANGS.npm.code = {}
 LANGS.npm.code["package.json"] = {
   "{",
   "  \"name\": \"demo\",",
   "  \"version\": \"0.0.0\",",
-  "  \"scripts\": { \"dev\": \"bun --watch run ./src/index.ts\" },",
+  "  \"scripts\": { ",
+  "    \"dev\": \"bun --watch run ./src/server.ts\",",
+  "    \"release\": \"node --disable-warning=ExperimentalWarning ./src/server.ts\"",
+  "  },",
   "  \"type\": \"module\",",
   "  \"devDependencies\": {",
   "    \"@types/bun\": \"*\",",
@@ -718,7 +726,7 @@ LANGS.npm.code["package.json"] = {
   "  }",
   "}"
 }
-LANGS.npm.code["src/index.ts"] = {
+LANGS.npm.code["src/server.ts"] = {
   "// npm run dev",
   "// import { example } from \"example-package\";",
   "",

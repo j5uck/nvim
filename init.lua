@@ -17,22 +17,26 @@ end
 
 if vim.fn.has("win32") == 1 then
   -- for WINDOWS --
-  vim.cmd("set shell=" .. vim.fn.exepath("powershell"))
-  -- vim.cmd[[set shell=C:/Users/user/stuff/bin/busybox.exe\ bash]]
-  vim.cmd[[set shellxquote=]]
-  vim.cmd[[set shellcmdflag=-c]]
--- elseif vim.fn.has('mac') == 1 then
---   -- for MAC --
---   vim.cmd("set shell=/bin/bash")
--- else
---   -- for POSIX --
---   vim.cmd("set shell=/bin/bash")
+  vim.cmd[[
+    set shell=powershell
+    set shellcmdflag=
+    set shellquote=
+  ]]
+
+  -- vim.cmd[[
+  --   set shell=C:/Users/user/stuff/bin/busybox.exe\ bash
+  --   set shellcmdflag=-c
+  --   set shellxquote=
+  -- ]]
+elseif vim.fn.has('mac') == 1 then
+  -- for MAC --
+  -- vim.cmd("set shell=/bin/bash")
+else
+  -- for POSIX --
+  -- vim.cmd("set shell=/bin/bash")
 end
 
--- NO sourcing of $VIMRUNTIME/plugin/rrhelper.vim --
 vim.g.loaded_rrhelper = 1
-
--- NO sourcing GUI stuff --
 vim.g.did_install_default_menus = 1
 
 -- vim.g.loaded_node_provider = 0 -- for coc
@@ -43,8 +47,14 @@ vim.g.loaded_ruby_provider = 0
 -- TODO: Send patch???
 for _, line in ipairs(vim.opt.runtimepath:get()) do
   if vim.fn.match(line, "[\\/]nvim[\\/]runtime$") ~= -1 then
-    local p = line .. "/doc/.*%.txt"
-    vim.filetype.add{ pattern = { [p] = { "help" } } }
+    local p = string.gsub(line, "[$()%%.%[%]*+-?]", function(c) return "%" .. c end)
+    p = p  .. "/doc/.*%.txt"
+
+    if vim.fn.has("win32") == 1 then
+      p = string.gsub(p, "\\+", "/")
+    end
+
+    vim.filetype.add{ pattern = { [p] = "help" } }
     break
   end
 end
@@ -191,7 +201,7 @@ vim.api.nvim_create_user_command("LOC", function()
 end, {})
 
 local term_ns = vim.api.nvim_create_namespace("")
-vim.api.nvim_set_hl(term_ns, "Normal", { fg = "#ffffff", bg = "#000000" })
+vim.api.nvim_set_hl(term_ns, "Normal", { fg = "#FFFFFF", bg = "#000000" })
 
 vim.api.nvim_create_autocmd({ "TermEnter", "WinEnter", "BufEnter" }, {
   pattern = "term://*",
@@ -223,7 +233,6 @@ end)})
 
 vim.api.nvim_create_autocmd("TermClose", {
   callback = vim.schedule_wrap(function(ev)
-    if not vim.api.nvim_buf_is_valid(ev.buf) then return end
     pcall(vim.api.nvim_buf_delete, ev.buf, {})
   end)
 })
@@ -235,6 +244,9 @@ local rec = window{
     vim.bo.buflisted  = false
     vim.bo.swapfile   = false
     vim.bo.undolevels = -1
+
+    vim.wo.scrolloff = 0
+    vim.wo.sidescrolloff = 0
 
     vim.api.nvim_buf_set_lines(self.buf, 0, -1, true, {
       " REC @" .. string.upper(vim.fn.reg_recording())
