@@ -45,19 +45,6 @@ M.prequire_wrap = function(name, fn)
   return function() return M.prequire(name, fn) end
 end
 
-M.cc = {}
-M.cc.c = (function()
-  if vim.env.CC then
-    local cc = vim.fn.exepath(vim.env.CC)
-    if #cc > 0 then return cc end
-  end
-  for _, cc in ipairs{ "cc", "gcc", "clang", "cl", "zig" } do
-    cc = vim.fn.exepath(cc)
-    if #cc > 0 then return cc end
-  end
-  return nil
-end)()
-
 M.random = {}
 
 local CHARS = vim.split("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", "")

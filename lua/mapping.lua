@@ -19,7 +19,7 @@ end
 local nope = {
   { "n", { "&", "<CR>", "<c-c>", "<leader>", "<leader><s-q>", "<leader>f", "<leader>s" } },
   { "v", { "<leader>s" } },
-  { { "n", "i", "v" }, { "<MiddleMouse>", "<2-MiddleMouse>", "<3-MiddleMouse>", "<4-MiddleMouse>" } }
+  { { "n", "i", "v" }, { "<c-z>", "<MiddleMouse>", "<2-MiddleMouse>", "<3-MiddleMouse>", "<4-MiddleMouse>" } }
 }
 
 for _, v in ipairs(nope) do map(v[1], v[2], "<Nop>", { desc = "do nothing" }) end

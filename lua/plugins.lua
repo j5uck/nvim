@@ -1,6 +1,6 @@
-local cc, flags, fs, notify, notify_once, prequire_wrap = (function()
+local flags, fs, notify, notify_once, prequire_wrap = (function()
   local _ = require("_")
-  return _.cc, _.flags, _.fs, _.notify, _.notify_once, _.prequire_wrap
+  return _.flags, _.fs, _.notify, _.notify_once, _.prequire_wrap
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
@@ -374,12 +374,13 @@ plug{
 plug{
   github("nvim-telescope/telescope-fzf-native.nvim"),
   build = function(opts)
-    if not cc.c then return notify.error("C compiler not found") end
+    local cc = vim.fn.exepath("gcc")
+    if not cc then return notify.error("GCC not found") end
 
     fs.mkdir(joinpath(opts.dir, "build"))
 
     local target = vim.fn.has("win32") == 1 and "libfzf.dll" or "libfzf.so"
-    local cmd = { cc.c, "-O3", "-fpic", "-std=gnu99", "-shared", "src/fzf.c", "-o", "build/"..target }
+    local cmd = { cc, "-O3", "-fpic", "-std=gnu99", "-shared", "src/fzf.c", "-o", "build/"..target }
 
     local o  = vim.system(cmd, { text = true, cwd = opts.dir }):wait()
     if o.code ~= 0 then notify.error("Error compiling fzf:" .. o.stderr) end
@@ -681,7 +682,8 @@ local ts_extensions = {
 
 plug{
   github("nvim-treesitter/nvim-treesitter"),
-  tag = "v*",
+  -- tag = "v*",
+  branch = "master",
   build = function(_)
     if #vim.fn.getcompletion("TSUpdate", "command") == 0 then
       require("nvim-treesitter.configs").setup{ ensure_installed = ts_extensions }
@@ -689,13 +691,12 @@ plug{
       vim.cmd.TSUpdate()
     end
   end,
-  setup = prequire_wrap("nvim-treesitter", function()
+  setup = prequire_wrap("nvim-treesitter", function(_)
     require("nvim-treesitter.configs").setup{
       --sync_install = true,
         ensure_installed = ts_extensions,
         highlight = {
           enable = true,
-          -- disable = function(lang, buf) return true end,
           additional_vim_regex_highlighting = false
         },
         indent = { enable = true }

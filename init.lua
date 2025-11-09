@@ -28,7 +28,7 @@ if vim.fn.has("win32") == 1 then
   --   set shellcmdflag=-c
   --   set shellxquote=
   -- ]]
-elseif vim.fn.has('mac') == 1 then
+elseif vim.fn.has("mac") == 1 then
   -- for MAC --
   -- vim.cmd("set shell=/bin/bash")
 else
@@ -46,9 +46,12 @@ vim.g.loaded_ruby_provider = 0
 
 -- TODO: Send patch???
 for _, line in ipairs(vim.opt.runtimepath:get()) do
-  if vim.fn.match(line, "[\\/]nvim[\\/]runtime$") ~= -1 then
-    local p = string.gsub(line, "[$()%%.%[%]*+-?]", function(c) return "%" .. c end)
-    p = p  .. "/doc/.*%.txt"
+  if vim.fn.match(line, "[\\/]nvim[\\/]runtime$") > -1 then
+    local magic = vim.split("^$()%.[]*+-?", "")
+
+    local p = string.gsub(line, ".", function(c)
+      return vim.list_contains(magic, c) and ("%" .. c) or c
+    end) .. "/doc/.*%.txt"
 
     if vim.fn.has("win32") == 1 then
       p = string.gsub(p, "\\+", "/")
@@ -143,12 +146,11 @@ vim.bo.iskeyword = iskeyword
 vim.api.nvim_create_autocmd("FileType", {
   callback = function(ev)
     vim.bo[ev.buf].iskeyword = iskeyword
-  end
-})
 
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = "man",
-  callback = function() vim.wo.spell = false end
+    if vim.list_contains({ "help", "man" }, ev.match) then
+      vim.wo.spell = false
+    end
+  end
 })
 
 -- ------------------------- x ------------------------- --
@@ -227,9 +229,11 @@ vim.api.nvim_create_autocmd("TermOpen", {
   end) end
 })
 
-vim.api.nvim_create_autocmd("ColorScheme", { callback = vim.schedule_wrap(function()
-  for i = 0, 16, 1 do vim.g["terminal_color_"..i] = nil end
-end)})
+vim.api.nvim_create_autocmd("ColorScheme", {
+  callback = vim.schedule_wrap(function()
+    for i = 0, 16, 1 do vim.g["terminal_color_"..i] = nil end
+  end)
+})
 
 vim.api.nvim_create_autocmd("TermClose", {
   callback = vim.schedule_wrap(function(ev)
