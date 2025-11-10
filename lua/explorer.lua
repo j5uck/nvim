@@ -9,7 +9,7 @@ local C = ffi.C
 if vim.fn.has("win32") == 1 then
   ffi.cdef[[
     // DWORD GetLogicalDriveStrings(DWORD, LPWSTR);
-    int GetLogicalDriveStringsA(int, char *);
+    int GetLogicalDriveStringsA(int32_t, char *);
   ]]
 else
   ffi.cdef[[

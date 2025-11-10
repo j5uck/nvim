@@ -493,6 +493,7 @@ local LANGS_ORDER = {
   "NPM",
   "Java",
   "Kotlin",
+  "Python",
   "Rust",
   "SH",
   "Markdown"
@@ -507,6 +508,7 @@ LANGS = {
   npm        = { icon = "" },
   java       = { icon = "" },
   kotlin     = { icon = "" },
+  python     = { icon = "" },
   rust       = { icon = "" },
   sh         = { icon = "" },
   markdown   = { icon = "" },
@@ -575,6 +577,7 @@ W.langs = window{
       lua        = "script.lua",
       markdown   = "README.md",
       npm        = "package.json",
+      python     = "__init__.py",
       rust       = "main.rs",
       sh         = "script.sh",
       typescript = "script.ts",
@@ -583,7 +586,9 @@ W.langs = window{
     local status, devicons = pcall(require, "nvim-web-devicons")
     if status then
       for i, l in ipairs(LANGS_ORDER) do
-        local icon, hl = devicons.get_icon(examples[string.lower(l)])
+        local lang = string.lower(l)
+        local icon = LANGS[lang].icon
+        local _, hl = devicons.get_icon(examples[lang])
         vim.api.nvim_buf_set_lines(0, i-1, i-1, true, { " " .. icon .. "  " .. l })
 
         vim.api.nvim_buf_set_extmark(0, NS, i-1, 1, {
@@ -755,6 +760,14 @@ LANGS.kotlin.code["Main.kt"] = {
   "fun main() {",
   "  println(\"" .. MESSAGE .. "\")",
   "}"
+}
+
+LANGS.python.init = { "__init__.py" }
+LANGS.python.code = {}
+LANGS.python.code["__init__.py"] = {
+  "#!/bin/python",
+  "",
+  "print(\"" .. MESSAGE .. "\")"
 }
 
 LANGS.rust.init = { "main.rs" }
