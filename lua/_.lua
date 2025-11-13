@@ -135,6 +135,42 @@ M.fs.dirname = IS_WINDOWS and function(file)
   return r
 end or vim.fs.dirname
 
+M.fs.find = (function()
+  local function find(regex, path)
+    ---@diagnostic disable-next-line: param-type-mismatch
+    local fd = vim.uv.fs_opendir(path, nil, 16384)
+
+    local content = vim.uv.fs_readdir(fd) or {}
+    for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
+      vim.list_extend(content, t)
+    end
+    vim.uv.fs_closedir(fd)
+
+    local r = {}
+
+    for _, e in ipairs(content) do
+      if e.type == "directory" then
+        vim.list_extend(r, find(regex, path .. "/" .. e.name))
+      elseif vim.fn.match(e.name, regex) > -1 then
+        table.insert(r, path .. "/" .. e.name)
+      end
+    end
+
+    return r
+  end
+
+  return function(regex, path)
+    path = path or ""
+    if vim.fn.isabsolutepath(path) == 1 then
+      path = vim.fs.normalize(path)
+    else
+      path = vim.fs.normalize(vim.fn.getcwd() .. "/" .. path)
+    end
+    local pre = #path + 2
+    return vim.tbl_map(function(e) return string.sub(e, pre) end, find(regex, path))
+  end
+end)()
+
 local window = {}
 
 function window:show()

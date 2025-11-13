@@ -685,7 +685,7 @@ plug{
   -- tag = "v*",
   branch = "master",
   build = function(_)
-    if #vim.fn.getcompletion("TSUpdate", "command") == 0 then
+    if vim.fn.exists("TSUpdate") ~= 0 then
       require("nvim-treesitter.configs").setup{ ensure_installed = ts_extensions }
     else
       vim.cmd.TSUpdate()
@@ -713,7 +713,7 @@ plug{
   build = function(_)
     local coc = require("coc")
 
-    if #vim.fn.getcompletion("CocUpdate", "command") == 0 then
+    if vim.fn.exists("CocUpdate") ~= 0 then
       vim.fn["coc#rpc#restart"]()
     end
 

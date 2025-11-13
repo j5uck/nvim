@@ -210,14 +210,11 @@ local function ls(dir)
   ---@diagnostic disable-next-line: param-type-mismatch
   local fd = vim.uv.fs_opendir(vim.fs.normalize(dir), nil, 16384)
 
-  local content = {}
-  if vim.fn.isdirectory(dir) == 1 then
-    content = vim.uv.fs_readdir(fd) or {}
-    for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
-      vim.list_extend(content, t)
-    end
-    vim.uv.fs_closedir(fd)
+  local content = vim.uv.fs_readdir(fd) or {}
+  for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
+    vim.list_extend(content, t)
   end
+  vim.uv.fs_closedir(fd)
 
   if vim.fn.has("win32") == 1 then
     content = vim.tbl_filter(function(e) return e.type ~= "link" end, content)

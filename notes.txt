@@ -19,6 +19,10 @@ git clone timeout
 
 REPLACE TELESCOPE ASAP!!!!!
 
+:h lsp-quickstart
+:h lsp-autocompletion
+:h lsp-attach
+
 https://github.com/Makaze/watch.nvim
 
 replace <space>gd for lua & vim script

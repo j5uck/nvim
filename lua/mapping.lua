@@ -485,6 +485,7 @@ vim.api.nvim_create_autocmd("FileType", {
 })
 
 local LANGS_ORDER = {
+  "NEW",
   "C",
   "Lua",
   "HTML",
@@ -496,23 +497,9 @@ local LANGS_ORDER = {
   "Python",
   "Rust",
   "SH",
-  "Markdown"
 }
 
-LANGS = {
-  c          = { icon = "" },
-  lua        = { icon = "" },
-  html       = { icon = "" },
-  javascript = { icon = "" },
-  typescript = { icon = "" },
-  npm        = { icon = "" },
-  java       = { icon = "" },
-  kotlin     = { icon = "" },
-  python     = { icon = "" },
-  rust       = { icon = "" },
-  sh         = { icon = "" },
-  markdown   = { icon = "" },
-}
+LANGS = require("langs")
 
 local select = function()
   local lnum = vim.api.nvim_win_get_cursor(0)[1]
@@ -556,7 +543,7 @@ W.langs = window{
       buffer = 0,
       callback = function()
         local y, x = unpack(vim.api.nvim_win_get_cursor(0))
-        x = math.max(x, vim.fn.match(vim.api.nvim_get_current_line(), "^ \\S\\+ \\zs") + 1)
+        x = math.max(x, vim.fn.match(vim.api.nvim_get_current_line(), "^ [^ ]* \\+\\zs[^ ]"))
         vim.api.nvim_win_set_cursor(0, { y, x })
       end
     })
@@ -568,39 +555,16 @@ W.langs = window{
 
     vim.bo.modifiable = true
 
-    local examples = {
-      c          = "main.c",
-      html       = "index.html",
-      java       = "Main.java",
-      javascript = "script.js",
-      kotlin     = "Main.kt",
-      lua        = "script.lua",
-      markdown   = "README.md",
-      npm        = "package.json",
-      python     = "__init__.py",
-      rust       = "main.rs",
-      sh         = "script.sh",
-      typescript = "script.ts",
-    }
+    for i, l in ipairs(LANGS_ORDER) do
+      local lang = string.lower(l)
+      local icon = LANGS[lang].icon
+      vim.api.nvim_buf_set_lines(0, i-1, i-1, true, { " " .. icon .. "  " .. l })
 
-    local status, devicons = pcall(require, "nvim-web-devicons")
-    if status then
-      for i, l in ipairs(LANGS_ORDER) do
-        local lang = string.lower(l)
-        local icon = LANGS[lang].icon
-        local _, hl = devicons.get_icon(examples[lang])
-        vim.api.nvim_buf_set_lines(0, i-1, i-1, true, { " " .. icon .. "  " .. l })
-
-        vim.api.nvim_buf_set_extmark(0, NS, i-1, 1, {
-          end_col = #icon + 2,
-          hl_group = hl,
-          strict = false,
-        })
-      end
-    else
-      for i, l in ipairs(LANGS_ORDER) do
-        vim.api.nvim_buf_set_lines(0, i-1, i-1, true, { " " .. LANGS[string.lower(l)] .. "  " .. l })
-      end
+      vim.api.nvim_buf_set_extmark(0, NS, i-1, 1, {
+        end_col = #icon + 2,
+        hl_group = LANGS[lang].hl,
+        strict = false,
+      })
     end
 
     vim.cmd[[norm! G"_ddgg]]
@@ -627,168 +591,3 @@ W.langs = window{
 }
 
 map("n", "<leader>ii", function() W.langs:show() end, { desc = "create example file" })
-
-local MESSAGE = "Hello World!"
-
-LANGS.c.init = { "main.c" }
-LANGS.c.code = {}
-LANGS.c.code["main.c"] = {
-  "// cc -o main ./main.c && ./main",
-  "#include <stdio.h>",
-  "",
-  "int main(int argc, char *argv[]){",
-  "  printf(\"%s\\n\", \"" .. MESSAGE .. "\");",
-  "",
-  "  return 0;",
-  "}"
-}
-
-LANGS.lua.init = { "script.lua" }
-LANGS.lua.code = {}
-LANGS.lua.code["script.lua"] = {
-  "vim.notify(\"" .. MESSAGE .. "\", vim.log.levels.WARN)"
-}
-
-LANGS.html.init = { "script.js", "index.html" }
-LANGS.html.code = {}
-LANGS.html.code["index.html"] = {
-  "<!DOCTYPE html>",
-  "<html lang=\"en\">",
-  "  <head>",
-  "    <meta charset=\"UTF-8\">",
-  "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-  "    <title></title>",
-  "    <link href=\"style.css\" rel=\"stylesheet\">",
-  "  </head>",
-  "  <body>",
-  "    <h1>" .. MESSAGE .. "</h1>",
-  "  </body>",
-  "  <script src=\"script.js\" fetchpriority=\"high\"></script>",
-  "</html>"
-}
-LANGS.html.code["style.css"] = {
-  "* {",
-  "  margin: 0;",
-  "  padding: 0;",
-  "}",
-  "",
-  "html, body {",
-  "  background-color: #3c3c3c;",
-  "  height: 100%;",
-  "  width: 100%;",
-  "}",
-  "",
-  "h1 {",
-  "  color: white;",
-  "  font-size: 5rem;",
-  "  width: 100%;",
-  "  text-align: center;",
-  "}"
-}
-LANGS.html.code["script.js"] = {
-  "\"use strict\";",
-  "",
-  "(async () => {",
-  "  console.log(\"" .. MESSAGE .. "\");",
-  "})();"
-}
-
-LANGS.javascript.init = { "script.js" }
-LANGS.javascript.code = {}
-LANGS.javascript.code["script.js"] = {
-  "#!/bin/bun run",
-  "\"use strict\";",
-  "",
-  "(async () => {",
-  "  console.log(\"" .. MESSAGE .. "\");",
-  "})();"
-}
-
-LANGS.typescript.init = { "script.ts" }
-LANGS.typescript.code = {}
-LANGS.typescript.code["script.ts"] = {
-  "#!/bin/bun run",
-  "",
-  "(async () => {",
-  "  console.log(\"" .. MESSAGE .. "\");",
-  "})();"
-}
-
-LANGS.npm.init = { "src/server.ts" }
-LANGS.npm.code = {}
-LANGS.npm.code["package.json"] = {
-  "{",
-  "  \"name\": \"demo\",",
-  "  \"version\": \"0.0.0\",",
-  "  \"scripts\": { ",
-  "    \"dev\": \"bun --watch run ./src/server.ts\",",
-  "    \"release\": \"node --disable-warning=ExperimentalWarning ./src/server.ts\"",
-  "  },",
-  "  \"type\": \"module\",",
-  "  \"devDependencies\": {",
-  "    \"@types/bun\": \"*\",",
-  "    \"@types/node\": \"*\"",
-  "  }",
-  "}"
-}
-LANGS.npm.code["src/server.ts"] = {
-  "// npm run dev",
-  "// import { example } from \"example-package\";",
-  "",
-  "(async () => {",
-  "  console.log(\"" .. MESSAGE .. "\");",
-  "})();"
-}
-
-LANGS.java.init = { "Main.java" }
-LANGS.java.code = {}
-LANGS.java.code["Main.java"] = {
-  "// javac Main.java *.java && jar -cfe Main.jar Main Main.class *.class && java -jar Main.jar",
-  "",
-  "public class Main{",
-  "  public static void main(String[] args){",
-  "    System.out.println(\"" .. MESSAGE .. "\");",
-  "  }",
-  "}"
-}
-
-LANGS.kotlin.init = { "Main.kt" }
-LANGS.kotlin.code = {}
-LANGS.kotlin.code["Main.kt"] = {
-  "// kotlinc -d Main.jar Main.kt && java -jar ./Main.jar",
-  "",
-  "fun main() {",
-  "  println(\"" .. MESSAGE .. "\")",
-  "}"
-}
-
-LANGS.python.init = { "__init__.py" }
-LANGS.python.code = {}
-LANGS.python.code["__init__.py"] = {
-  "#!/bin/python",
-  "",
-  "print(\"" .. MESSAGE .. "\")"
-}
-
-LANGS.rust.init = { "main.rs" }
-LANGS.rust.code = {}
-LANGS.rust.code["main.rs"] = {
-  "// rustc ./main.rs && ./main",
-  "",
-  "fn main() {",
-  "  println!(\"{}\", \"" .. MESSAGE .. "\");",
-  "}"
-}
-
-LANGS.sh.init = { "script.sh" }
-LANGS.sh.code = {}
-LANGS.sh.code["script.sh"] = {
-  "#!/bin/bash",
-  "echo '" .. MESSAGE .. "'"
-}
-
-LANGS.markdown.init = { "README.md" }
-LANGS.markdown.code = {}
-LANGS.markdown.code["README.md"] = {
-  "## " .. MESSAGE
-}
