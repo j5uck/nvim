@@ -487,16 +487,10 @@ vim.api.nvim_create_autocmd("FileType", {
 local LANGS_ORDER = {
   "NEW",
   "C",
-  "Lua",
-  "HTML",
-  "Javascript",
-  "Typescript",
   "NPM",
   "Java",
   "Kotlin",
-  "Python",
-  "Rust",
-  "SH",
+  "Lua"
 }
 
 LANGS = require("langs")
