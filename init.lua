@@ -107,6 +107,7 @@ vim.opt.scrolloff = 6
 vim.opt.sidescrolloff = 12
 
 vim.opt.helplang = "en,es"
+-- vim.opt.langmap = {}
 
 vim.opt.fillchars = { eob = " " }
 
@@ -139,21 +140,18 @@ vim.g.c_syntax_for_h = 1
 
 vim.lsp.set_log_level(vim.log.levels.OFF)
 
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = { "help", "man" },
+  callback = function() vim.wo.spell = false end
+})
+
 local iskeyword = "@,48-57,_,-,192-255"
 vim.go.iskeyword = iskeyword
 vim.bo.iskeyword = iskeyword
 
 vim.api.nvim_create_autocmd("FileType", {
-  callback = function(ev)
-    vim.bo[ev.buf].iskeyword = iskeyword
-
-    if vim.list_contains({ "help", "man" }, ev.match) then
-      vim.wo.spell = false
-    end
-  end
+  callback = function(ev) vim.bo[ev.buf].iskeyword = iskeyword end
 })
-
--- ------------------------- x ------------------------- --
 
 if vim.g.nvy then
   vim.opt.guifont = { "FiraCode Nerd Font Mono:h12" }
@@ -205,28 +203,26 @@ end, {})
 local term_ns = vim.api.nvim_create_namespace("")
 vim.api.nvim_set_hl(term_ns, "Normal", { fg = "#FFFFFF", bg = "#000000" })
 
-vim.api.nvim_create_autocmd({ "TermEnter", "WinEnter", "BufEnter" }, {
-  pattern = "term://*",
+vim.api.nvim_create_autocmd("WinEnter", {
   callback = vim.schedule_wrap(function()
-    vim.api.nvim_win_set_hl_ns(0, term_ns)
+    local win = vim.api.nvim_get_current_win()
+    local buf = vim.api.nvim_win_get_buf(win)
+
+    if vim.fn.match(vim.api.nvim_buf_get_name(buf), "^term://") == 0 then
+      vim.api.nvim_win_set_hl_ns(win, term_ns)
+    elseif vim.api.nvim_get_hl_ns({ winid = win }) == term_ns then
+      vim.api.nvim_win_set_hl_ns(win, 0)
+    end
   end)
 })
 
-vim.api.nvim_create_autocmd({ "TabEnter", "WinEnter", "BufEnter" }, {
-  callback = function(ev)
-    if vim.fn.match(vim.api.nvim_buf_get_name(ev.buf), "^term://") == 0 then return end
-    if vim.api.nvim_get_hl_ns({ winid = 0 }) ~= term_ns then return end
-    vim.api.nvim_win_set_hl_ns(0, 0)
-  end
-})
-
 vim.api.nvim_create_autocmd("TermOpen", {
-  callback = function(ev) vim.api.nvim_buf_call(ev.buf, function()
+  callback = function()
     vim.wo.number = false
     vim.wo.relativenumber = false
     vim.wo.cursorline = false
     vim.api.nvim_win_set_hl_ns(0, term_ns)
-  end) end
+  end
 })
 
 vim.api.nvim_create_autocmd("ColorScheme", {

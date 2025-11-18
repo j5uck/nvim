@@ -517,7 +517,7 @@ plug{
     end
     local function fn(o) return function() return o end end
 
-    ll("help", { fn("NEOVIM HELP")  }, { nil, PROGRESS, LOCATION })
+    ll("help", { fn("NEOVIM HELP"), { "filename", file_status = false } }, { nil, PROGRESS, LOCATION })
     ll("checkhealth", { fn("CHECK HEALTH") }, { nil, PROGRESS, LOCATION })
     ll("TelescopePrompt", { fn("TELESCOPE") })
     ll("undotree", { fn("UNDOTREE"), nil, function()
@@ -558,6 +558,10 @@ plug{
     }
   end)
 }
+
+-- GIT WRAPPER --
+
+plug{ github("tpope/vim-fugitive") }
 
 -- GIT DECORATION --
 

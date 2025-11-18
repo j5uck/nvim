@@ -135,6 +135,10 @@ M.fs.dirname = IS_WINDOWS and function(file)
   return r
 end or vim.fs.dirname
 
+M.fs.relpath = function(base, target)
+  return vim.fs.relpath(base, target, {})
+end
+
 M.fs.find = (function()
   local function find(regex, path)
     ---@diagnostic disable-next-line: param-type-mismatch

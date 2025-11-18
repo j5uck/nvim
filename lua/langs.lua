@@ -132,6 +132,7 @@ M.npm.code["src/server.ts"] = {
 M.java.init = { "src/Main.java" }
 M.java.code = {}
 M.java.code["src/Main.java"] = {
+  "// nvim -l build.lua",
   "package src;",
   "",
   "public class Main{",
@@ -141,17 +142,13 @@ M.java.code["src/Main.java"] = {
   "}"
 }
 M.java.code["build.lua"] = {
-  "local fs = require(\"_\").fs",
-  "local function p(_, s, _) for i = 1, #s, 1 do print(s[i]) end end",
-  "local function run(cmd, cwd)",
-  "print(\">> \" .. table.concat(cmd, \" \") .. \"\\n\")",
-  "local r = vim.fn.jobwait{ vim.fn.jobstart(cmd, { cwd = cwd, on_stdout = p, on_stderr = p })}",
-  "if r[1] ~= 0 then os.exit(r[1]) end",
-  "end",
+  "local find = require(\"_\").fs.find",
   "",
-  "run(vim.list_extend({ \"javac\", \"-d\", \"build\", \"src/Main.java\" }, vim.tbl_map(function(s) return \"src/\" .. s end, fs.find(\"\\\\.java\", \"src\"))))",
-  "run(vim.list_extend({ \"jar\", \"-cfe\", \"Main.jar\", \"src/Main\" }, fs.find(\"\\\\.class\", \"build\")), \"build\")",
-  "run{ \"java\", \"-jar\", \"build/Main.jar\" }"
+  "require(\"run\"):new()",
+  "  :cmd(vim.list_extend({ \"javac\", \"-d\", \"build\", \"src/Main.java\" }, find(\"\\\\.java\")))",
+  "  :cd(\"build\")",
+  "  :cmd(vim.list_extend({ \"jar\", \"-cfe\", \"Main.jar\", \"src/Main\" }, find(\"\\\\.class\", \"build\")))",
+  "  :cmd{ \"java\", \"-jar\", \"Main.jar\" }"
 }
 
 M.kotlin.init = { "Main.kt" }
