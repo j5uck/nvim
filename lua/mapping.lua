@@ -209,7 +209,14 @@ W.term = window{
     end
 
     if term_buffers[term_buffers_i] ~= vim.api.nvim_get_current_buf() then
-      vim.cmd.term()
+      if vim.fn.has("win32") == 1 then
+        local shell = vim.go.shell
+        vim.go.shell = "powershell"
+        vim.cmd.term()
+        vim.go.shell = shell
+      else
+        vim.cmd.term()
+      end
       self.buf = vim.api.nvim_get_current_buf()
       term_buffers[term_buffers_i] = self.buf
       vim.api.nvim_win_set_buf(self.win, self.buf)
@@ -490,6 +497,7 @@ local LANGS_ORDER = {
   "NPM",
   "Java",
   "Kotlin",
+  -- "C#", -- TODO
   "Lua"
 }
 

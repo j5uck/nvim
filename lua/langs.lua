@@ -1,20 +1,15 @@
-local MESSAGE = "Hello World!"
+require("_").prequire("nvim-web-devicons", function() end)
 
-pcall(require, "nvim-web-devicons")
 local M = {
   new        = { icon = " ", hl = nil },
   c          = { icon = "", hl = "DevIconC" },
-  lua        = { icon = "", hl = "DevIconLua" },
-  html       = { icon = "", hl = "DevIconHtml" },
-  javascript = { icon = "", hl = "DevIconJs" },
-  typescript = { icon = "", hl = "DevIconTypeScript" },
   npm        = { icon = "", hl = "DevIconPackageJson" },
   java       = { icon = "", hl = "DevIconJava" },
   kotlin     = { icon = "", hl = "DevIconKotlin" },
-  python     = { icon = "", hl = "DevIconPy" },
-  rust       = { icon = "", hl = "DevIconRs" },
-  sh         = { icon = "", hl = "DevIconSh" },
+  lua        = { icon = "", hl = "DevIconLua" },
 }
+
+local MESSAGE = "Hello World!"
 
 M.new.init = { "notes.txt" }
 M.new.code = {}
@@ -30,77 +25,6 @@ M.c.code["main.c"] = {
   "",
   "  return 0;",
   "}"
-}
-
-M.lua.init = { "script.lua" }
-M.lua.code = {}
-M.lua.code["script.lua"] = {
-  "vim.notify(\"" .. MESSAGE .. "\", vim.log.levels.WARN)"
-}
-
-M.html.init = { "index.html", "script.js" }
-M.html.code = {}
-M.html.code["index.html"] = {
-  "<!DOCTYPE html>",
-  "<html lang=\"en\">",
-  "  <head>",
-  "    <meta charset=\"UTF-8\">",
-  "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-  "    <title></title>",
-  "    <link href=\"style.css\" rel=\"stylesheet\">",
-  "  </head>",
-  "  <body>",
-  "    <h1>" .. MESSAGE .. "</h1>",
-  "  </body>",
-  "  <script src=\"script.js\" fetchpriority=\"high\"></script>",
-  "</html>"
-}
-M.html.code["style.css"] = {
-  "* {",
-  "  margin: 0;",
-  "  padding: 0;",
-  "  color: white;",
-  "}",
-  "",
-  "html, body {",
-  "  background-color: #3c3c3c;",
-  "  height: 100%;",
-  "  width: 100%;",
-  "}",
-  "",
-  "h1 {",
-  "  font-size: 5rem;",
-  "  width: 100%;",
-  "  text-align: center;",
-  "}"
-}
-M.html.code["script.js"] = {
-  "\"use strict\";",
-  "",
-  "(async () => {",
-  "  console.log(\"" .. MESSAGE .. "\");",
-  "})();"
-}
-
-M.javascript.init = { "script.js" }
-M.javascript.code = {}
-M.javascript.code["script.js"] = {
-  "#!/bin/bun run",
-  "\"use strict\";",
-  "",
-  "(async () => {",
-  "  console.log(\"" .. MESSAGE .. "\");",
-  "})();"
-}
-
-M.typescript.init = { "script.ts" }
-M.typescript.code = {}
-M.typescript.code["script.ts"] = {
-  "#!/bin/bun run",
-  "",
-  "(async () => {",
-  "  console.log(\"" .. MESSAGE .. "\");",
-  "})();"
 }
 
 M.npm.init = { "src/server.ts" }
@@ -161,29 +85,10 @@ M.kotlin.code["Main.kt"] = {
   "}"
 }
 
-M.python.init = { "__init__.py" }
-M.python.code = {}
-M.python.code["__init__.py"] = {
-  "#!/bin/python",
-  "",
-  "print(\"" .. MESSAGE .. "\")"
-}
-
-M.rust.init = { "main.rs" }
-M.rust.code = {}
-M.rust.code["main.rs"] = {
-  "// rustc ./main.rs && ./main",
-  "",
-  "fn main() {",
-  "  println!(\"{}\", \"" .. MESSAGE .. "\");",
-  "}"
-}
-
-M.sh.init = { "script.sh" }
-M.sh.code = {}
-M.sh.code["script.sh"] = {
-  "#!/bin/bash",
-  "echo '" .. MESSAGE .. "'"
+M.lua.init = { "script.lua" }
+M.lua.code = {}
+M.lua.code["script.lua"] = {
+  "vim.notify(\"" .. MESSAGE .. "\", vim.log.levels.WARN)"
 }
 
 return M
