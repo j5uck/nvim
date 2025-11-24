@@ -83,6 +83,12 @@ map("n", "<leader>Q", "<cmd>q!<CR>", { desc = "forced [q]uit" })
 map("n", "<leader>o", "o<esc>0\"_D", { desc = "create new line" })
 map("n", "<leader>O", "O<esc>0\"_D", { desc = "create new line" })
 
+map("n", "<leader>gf", function()
+  local p = vim.api.nvim_buf_get_name(0)
+  if p == "" then return end
+  vim.cmd.edit(vim.fn.fnameescape(fs.dirname(p)))
+end, { desc = "open file parent folder" })
+
 map("n", "<leader>S", function()
   vim.cmd("%s/\\t/" .. string.rep(" ", vim.o.tabstop) .. "/g")
   vim.opt.autoindent = true
