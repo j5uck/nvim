@@ -146,13 +146,6 @@ local fs, notify, window = (function()
   return _.fs, _.notify, _.window
 end)()
 
-vim.api.nvim_create_user_command("TabToSpaces", function()
-  vim.cmd("%s/\\t/" .. string.rep(" ", vim.o.tabstop) .. "/g")
-  vim.opt.autoindent = true
-  vim.opt.expandtab = true
-  vim.opt.smartindent = true
-end, {})
-
 vim.api.nvim_create_user_command("LOC", function()
   local sb = {}
   local config = vim.fn.stdpath("config") .. "/"
@@ -182,16 +175,17 @@ end, {})
 local term_ns = vim.api.nvim_create_namespace("")
 vim.api.nvim_set_hl(term_ns, "Normal", { fg = "#FFFFFF", bg = "#000000" })
 
-vim.api.nvim_create_autocmd("WinEnter", {
-  callback = vim.schedule_wrap(function()
-    local win = vim.api.nvim_get_current_win()
-    local buf = vim.api.nvim_win_get_buf(win)
+vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter" }, {
+  callback = vim.schedule_wrap(function(e)
+    pcall(function()
+      local win = vim.api.nvim_get_current_win()
 
-    if vim.fn.match(vim.api.nvim_buf_get_name(buf), "^term://") == 0 then
-      vim.api.nvim_win_set_hl_ns(win, term_ns)
-    elseif vim.api.nvim_get_hl_ns({ winid = win }) == term_ns then
-      vim.api.nvim_win_set_hl_ns(win, 0)
-    end
+      if vim.fn.match(vim.api.nvim_buf_get_name(e.buf), "^term://") == 0 then
+        vim.api.nvim_win_set_hl_ns(win, term_ns)
+      elseif vim.api.nvim_get_hl_ns({ winid = win }) == term_ns then
+        vim.api.nvim_win_set_hl_ns(win, 0)
+      end
+    end)
   end)
 })
 
@@ -227,9 +221,8 @@ local rec = window{
     vim.wo.scrolloff = 0
     vim.wo.sidescrolloff = 0
 
-    vim.api.nvim_buf_set_lines(self.buf, 0, -1, true, {
-      " REC @" .. string.upper(vim.fn.reg_recording())
-    })
+    local r = string.upper(vim.fn.reg_recording())
+    vim.api.nvim_buf_set_lines(self.buf, 0, -1, true, { " REC @" .. r })
   end,
   hl = function() return { Normal = { link = "ErrorMsg" }} end,
   size = function() return {

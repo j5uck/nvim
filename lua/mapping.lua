@@ -69,19 +69,26 @@ map("x", { "<leader>I", "<leader>A" }, "xgvI", { desc = "replace block" })
 map({"n", "v"}, "<leader>y", "\"+y", { desc = "[y]ank to \"+" })
 
 map({"n", "v"}, "<leader>p", "\"+p", { desc = "[p]aste from \"+" })
-map({"n", "v"}, "<leader>P", "\"+P", { desc = "[p]aste from \"+" })
+map({"n", "v"}, "<leader>P", "\"+P", { desc = "[P]aste from \"+" })
 
 map({"n", "v"}, "<leader>dd", "\"+dd", { desc = "[d]elete and copy to \"+" })
-map({"n", "v"}, "<leader>D",  "\"+D",  { desc = "[d]elete and copy to \"+" })
+map({"n", "v"}, "<leader>D",  "\"+D",  { desc = "[D]elete and copy to \"+" })
 
 map("n", "<leader>w", "<cmd>w<CR>", { desc = "[w]rite" })
 map("n", "<leader>x", "<cmd>x<CR>", { desc = "write & e[x]it" })
 
 map("n", "<leader>q", "<cmd>q<CR>",  { desc = "[q]uit" })
-map("n", "<leader>Q", "<cmd>q!<CR>", { desc = "forced [Q]uit" })
+map("n", "<leader>Q", "<cmd>q!<CR>", { desc = "forced [q]uit" })
 
 map("n", "<leader>o", "o<esc>0\"_D", { desc = "create new line" })
 map("n", "<leader>O", "O<esc>0\"_D", { desc = "create new line" })
+
+map("n", "<leader>S", function()
+  vim.cmd("%s/\\t/" .. string.rep(" ", vim.o.tabstop) .. "/g")
+  vim.opt.autoindent = true
+  vim.opt.expandtab = true
+  vim.opt.smartindent = true
+end, { desc = "tab to [S]paces" })
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "lua",

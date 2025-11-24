@@ -44,11 +44,11 @@ end
 
 PLUG_SYNC.fn = {}
 PLUG_SYNC.fn.run = function(args)
-  PLUG_SYNC.coroutine = coroutine.create(PLUG_SYNC.fn._run)
+  PLUG_SYNC.coroutine = coroutine.create(PLUG_SYNC.fn.run_coroutine)
   coroutine.resume(PLUG_SYNC.coroutine, args)
 end
 
-PLUG_SYNC.fn._run = function(args)
+PLUG_SYNC.fn.run_coroutine = function(args)
   if vim.fn.executable("git") == 0 then
     return notify.error("Git not found\nCannot proceed")
   end
@@ -103,7 +103,7 @@ PLUG_SYNC.fn._run = function(args)
     set_lines()
     PLUG_SYNC.fn.fetch(name, PLUGS[name], function(status)
       success[name] = status
-      if success[name] then
+      if status then
         PLUG_SYNC.text[i] = "- " .. name .. ": Fetching... Done!"
       else
         PLUG_SYNC.text[i] = "x " .. name .. ": Fetching... ERROR!"
