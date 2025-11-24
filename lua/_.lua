@@ -175,6 +175,59 @@ M.fs.find = (function()
   end
 end)()
 
+local GIT_OPTIONS = { text = true, clear_env = true, timeout = 15000 }
+M.git = {}
+M.git.clone = function(o, cb)
+  local cmd = { "git", "clone", "--shallow-submodules", "--depth=1", "--progress", "--", o.url, o.dest }
+  vim.system(cmd, GIT_OPTIONS, function(r)
+    cb(r.code == 0)
+
+    if r.code == 0 then
+      cb(true)
+    else
+      require("_").notify.error("\"" .. o.name .. "\" exit status: " .. r.code .. "\n\n" .. r.stderr)
+      cb(false)
+    end
+  end)
+end
+
+M.git.fetch = function(o, cb)
+  local cmds = {}
+  local function t(cmd) table.insert(cmds, cmd) end
+
+  if o.commit then
+    t(function(_) return { "git", "fetch", "origin", "--depth=1", "--progress", o.commit } end)
+    t(function(_) return { "git", "reset", "--hard", o.commit } end)
+  elseif o.tag then
+    t(function(_) return { "git", "fetch", "origin", "--depth=1", "--progress", "--no-tags", "refs/tags/".. o.tag ..":refs/tags/".. o.tag } end)
+    t(function(_) return { "git", "tag", "--list", o.tag, "--sort", "-version:refname" } end)
+    t(function(r) return { "git", "checkout", "tags/" .. vim.split(r.stdout, "[\r\n]+")[1] } end)
+  elseif o.branch then
+    t(function(_) return { "git", "fetch", "origin", "--depth=1", "--progress", "+refs/heads/".. o.branch ..":refs/remotes/origin/".. o.branch } end)
+    t(function(_) return { "git", "checkout", "origin/"..o.branch } end)
+  else
+    t(function(_) return { "git", "fetch", "origin", "--depth=1", "--progress" } end)
+    t(function(_) return { "git", "ls-remote", "--symref", "origin", "HEAD" } end)
+    t(function(r) return { "git", "switch", ({string.gsub(vim.split(r.stdout, "[ \t]")[2], ".+/(.+)$", "%1")})[1] } end)
+  end
+
+  if vim.fn.filereadable(o.cwd .. "/.gitmodules") then
+    t(function(_) return { "git", "submodule", "update", "--init", "--recursive", "--depth=1", "--jobs=16" } end)
+  end
+
+  local function run(r, i)
+    local cmd = cmds[i]
+    if not cmd then return cb(r.code == 0) end
+    if r.code ~= 0 then
+      require("_").notify.error("\"" .. o.name .. "\" exit status: " .. r.code .. "\n\n" .. r.stderr)
+      return cb(false)
+    end
+
+    vim.system(cmd(r), vim.tbl_extend("force", GIT_OPTIONS, { cwd = o.cwd }), vim.schedule_wrap(function(rr) run(rr, i+1) end))
+  end
+  run({ code = 0 }, 1)
+end
+
 local window = {}
 
 function window:show()

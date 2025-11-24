@@ -1,6 +1,6 @@
-local flags, fs, notify, notify_once, prequire_wrap = (function()
+local flags, fs, git, notify, notify_once, prequire_wrap = (function()
   local _ = require("_")
-  return _.flags, _.fs, _.notify, _.notify_once, _.prequire_wrap
+  return _.flags, _.fs, _.git, _.notify, _.notify_once, _.prequire_wrap
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
@@ -42,11 +42,19 @@ local function runtimepath()
   vim.opt.runtimepath = vim.list_extend(rtp, rtp_after)
 end
 
-PLUG_SYNC.start = function(args)
+PLUG_SYNC.fn = {}
+PLUG_SYNC.fn.run = function(args)
+  PLUG_SYNC.coroutine = coroutine.create(PLUG_SYNC.fn._run)
+  coroutine.resume(PLUG_SYNC.coroutine, args)
+end
+
+PLUG_SYNC.fn._run = function(args)
   if vim.fn.executable("git") == 0 then
-    notify.error("Git not found\nCannot proceed")
-    return
+    return notify.error("Git not found\nCannot proceed")
   end
+
+  local po = vim.fn.sort(#args.fargs > 0 and args.fargs or PLUGS_ORDER, "i")
+  if #po == 0 then return notify.warn("Nothing to do") end
 
   PLUG_SYNC.reltime = vim.fn.reltime()
 
@@ -62,7 +70,7 @@ PLUG_SYNC.start = function(args)
   vim.o.conceallevel  = 3
 
   vim.cmd[[setf lua-plug]]
-  for _, v in ipairs{"<CR>", "x", "X", "d", "dd", "i", "I", "a", "A", "o", "O", "r", "R"} do
+  for _, v in ipairs{ "<CR>", "x", "X", "d", "dd", "i", "I", "a", "A", "o", "O", "r", "R" } do
     vim.keymap.set("n", v, "<Nop>", { buffer = PLUG_SYNC.buf })
   end
   vim.keymap.set("n", "q", "<cmd>q<CR>", { buffer = PLUG_SYNC.buf })
@@ -72,45 +80,9 @@ PLUG_SYNC.start = function(args)
 
   PLUG_SYNC.text = {}
 
-  local po = vim.fn.sort(#args.fargs > 0 and args.fargs or PLUGS_ORDER, "i")
-
   for _ = 1, #po, 1 do table.insert(PLUG_SYNC.text, "") end
 
-  do
-    if #args.fargs > 0 then goto continue end
-    local len = #(joinpath(PLUG_HOME, "/"))+1
-
-    local untracked = vim.tbl_filter(function(v)
-      return PLUGS[string.sub(v,len)] == nil
-    end, vim.fn.globpath(PLUG_HOME, "*", true, true)) -- dot files are ignored
-
-    if #untracked == 0 then goto continue end
-
-    vim.bo[PLUG_SYNC.buf].modifiable = true
-    vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, 0, -1, false, {"","","",""})
-    vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, 4, -1, false,
-      vim.tbl_map(function(v) return "- "..v end, untracked)
-    )
-    vim.bo[PLUG_SYNC.buf].modifiable = false
-    vim.bo[PLUG_SYNC.buf].modified = false
-
-    vim.cmd.redraw()
-    local answer = vim.fn.input("Delete untracked directories? (y/N)")
-
-    if vim.fn.match(answer, "^[yY]") == 0 then
-      untracked = vim.tbl_filter(function(u)
-        local s = vim.fn.delete(u,"rf") ~= 0
-        if s then notify.error("\""..u.."\" couldn't be delete!") end
-        return s
-      end, untracked)
-    end
-
-    local u = vim.fn.sort(vim.tbl_map(function(v) return string.sub(v,#PLUG_HOME+2) end, untracked), "i")
-    for _, name in ipairs(u) do
-      table.insert(PLUG_SYNC.text, "~ " .. name .. ": Untracked")
-    end
-    ::continue::
-  end
+  if #args.fargs > 0 then PLUG_SYNC.fn.clean() end
 
   local function set_lines()
     vim.bo[PLUG_SYNC.buf].modifiable = true
@@ -119,126 +91,124 @@ PLUG_SYNC.start = function(args)
     vim.bo[PLUG_SYNC.buf].modified = false
   end
 
-  if #po == 0 then
-    PLUG_SYNC.finally()
-    return
-  end
-
-  vim.cmd[[hi link PlugSyncDone Function]]
+  vim.api.nvim_buf_call(PLUG_SYNC.buf, function()
+    vim.cmd[[hi link PlugSyncDone Function]]
+  end)
 
   local success = {}
-
   local error = false
   for i = 1, #po, 1 do
     local name = po[i]
     PLUG_SYNC.text[i] = "+ " .. name .. ": Fetching..."
     set_lines()
-    PLUG_SYNC.fetch(name, PLUGS[name], function(status)
+    PLUG_SYNC.fn.fetch(name, PLUGS[name], function(status)
       success[name] = status
       if success[name] then
         PLUG_SYNC.text[i] = "- " .. name .. ": Fetching... Done!"
       else
-        PLUG_SYNC.text[i] = "x " .. name .. ": Fetching... ERROR"
+        PLUG_SYNC.text[i] = "x " .. name .. ": Fetching... ERROR!"
         error = true
       end
       set_lines()
 
       if #vim.tbl_keys(success) < #po then return end
-
-      runtimepath()
-
-      local po_build = vim.tbl_filter(function(v)
-        return PLUGS[v].build and success[v]
-      end, po)
-
-      success = {}
-      if #po_build == 0 then
-        PLUG_SYNC.finally()
-        return
-      end
-      if error then return end
-
-      for _, name_build in ipairs(po_build) do
-        PLUG_SYNC.text[i] = "x " .. name .. ": Building..."
-        set_lines()
-        PLUGS[name_build].build{ dir = joinpath(PLUG_HOME, name_build) }
-        PLUG_SYNC.text[i] = "- " .. name .. ": Building... Done!"
-      end
-      set_lines()
-
-      PLUG_SYNC.finally()
-      for _, n in ipairs(po) do
-        -- vim.cmd.helptags({ joinpath(PLUG_HOME, n, "doc"), mods = { silent = true }})
-        vim.cmd("silent! helptags " .. vim.fn.fnameescape(joinpath(PLUG_HOME, n, "doc")))
-      end
+      vim.schedule_wrap(coroutine.resume)(PLUG_SYNC.coroutine)
     end)
   end
+
   vim.fn.cursor(1, 2)
-end
+  coroutine.yield()
 
-PLUG_SYNC.fetch = function(name, plug, callback)
-  local tasks = (vim.fn.isdirectory(joinpath(PLUG_HOME, name, ".git")) == 1) and {} or
-    {{
-      cmd={ "git", "clone", "--shallow-submodules", "--depth=1", "--progress", plug.uri, joinpath(PLUG_HOME, name) },
-      opts={ text = true, clear_env = true }
-    }}
+  if error then return end
 
-  local function t(cmd)
-    table.insert(tasks, { cmd = cmd, opts={ text = true, cwd = joinpath(PLUG_HOME, name), clear_env = true } })
-  end
+  runtimepath()
 
-  if plug.commit then
-    t{ "git", "fetch", "origin", "--depth=1", "--progress", plug.commit }
-    t{ "git", "reset", "--hard", plug.commit }
-  elseif plug.tag then
-    t{ "git", "fetch", "origin", "--depth=1", "--progress", "--no-tags", "refs/tags/".. plug.tag ..":refs/tags/".. plug.tag}
-    t{ "git", "tag", "--list", plug.tag, "--sort", "-version:refname"}
-    t(function(o)
-      return { "git", "checkout", "tags/" .. vim.fn.split(o.stdout)[1] }
+  for i = 1, #po, 1 do
+    local name = po[i]
+    local build = PLUGS[name].build
+    if not build then goto continue end
+
+    PLUG_SYNC.text[i] = "+ " .. name .. ": Building..."
+    set_lines()
+
+    -- vim.schedule(function()
+    local s, msg = pcall(function()
+      build{ dir = joinpath(PLUG_HOME, name) }
+      PLUG_SYNC.text[i] = "- " .. name .. ": Building... Done!"
     end)
-  elseif plug.branch then
-    t{ "git", "fetch", "origin", "--depth=1", "--progress", "+refs/heads/".. plug.branch ..":refs/remotes/origin/".. plug.branch }
-    t{ "git", "checkout", "origin/"..plug.branch }
-  else
-    t{ "git", "fetch", "origin", "--depth=1", "--progress" }
-    t{ "git", "ls-remote", "--symref", "origin", "HEAD" }
-    t(function(o)
-      local s = string.gsub(vim.fn.split(o.stdout)[2], ".+/(.+)$", "%1")
-      return { "git", "switch", s }
-    end)
-  end
-
-  if vim.fn.filereadable(joinpath(PLUG_HOME, name, ".gitmodules")) then
-    t{ "git", "submodule", "update", "--init", "--recursive", "--depth=1", "--jobs=16" }
-  end
-
-  local last_command = { code = 0 }
-  local function do_task(i)
-    if last_command.code ~= 0 or not tasks[i] then
-      return callback(last_command.code == 0)
+    if not s then
+      error = true
+      PLUG_SYNC.text[i] = "x " .. name .. ": Building... ERROR!"
+      notify.error(msg)
     end
 
-    local cmd = type(tasks[i].cmd) == "function" and tasks[i].cmd(last_command) or tasks[i].cmd
-
-    vim.system(cmd, tasks[i].opts, vim.schedule_wrap(function(o)
-      if o.code ~= 0 then
-        notify.error("\"" .. name .. "\" exit status: " .. o.code .. "\n\n" .. o.stderr)
-      end
-
-      last_command = o
-      do_task(i+1)
-    end))
+    ::continue::
   end
-  do_task(1)
+
+  set_lines()
+  if error then return end
+
+  vim.api.nvim_buf_call(PLUG_SYNC.buf, function()
+    vim.cmd[[hi link PlugSyncDone Label]]
+  end)
+  local seconds = string.format("%.3f", vim.trim(vim.fn.reltimestr(vim.fn.reltime(PLUG_SYNC.reltime))))
+  notify.warn("[LUA-PLUG] Elapsed time: " .. seconds .. " seconds")
+
+  for _, n in ipairs(po) do
+    -- vim.cmd.helptags({ joinpath(PLUG_HOME, n, "doc"), mods = { silent = true }})
+    vim.cmd("silent! helptags " .. vim.fn.fnameescape(joinpath(PLUG_HOME, n, "doc")))
+  end
 end
 
-PLUG_SYNC.finally = function()
-  vim.cmd[[hi link PlugSyncDone Label]]
-  local n = string.format("%.3f", vim.trim(vim.fn.reltimestr(vim.fn.reltime(PLUG_SYNC.reltime))))
-  notify.warn("[LUA-PLUG] Elapsed time: " .. n .. " seconds")
+PLUG_SYNC.fn.clean = function()
+  local len = #(joinpath(PLUG_HOME, "/"))+1
+
+  local untracked = vim.tbl_filter(function(v)
+    return PLUGS[string.sub(v,len)] == nil
+  end, vim.fn.globpath(PLUG_HOME, "*", true, true)) -- dot files are ignored
+
+  if #untracked == 0 then return end
+
+  vim.bo[PLUG_SYNC.buf].modifiable = true
+  vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, 0, -1, false, {"","","",""})
+  vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, 4, -1, false,
+    vim.tbl_map(function(v) return "- "..v end, untracked)
+  )
+  vim.bo[PLUG_SYNC.buf].modifiable = false
+  vim.bo[PLUG_SYNC.buf].modified = false
+
+  vim.cmd.redraw()
+  local answer = vim.fn.input("Delete untracked directories? (y/N)")
+
+  if vim.fn.match(answer, "^[yY]") == 0 then
+    untracked = vim.tbl_filter(function(u)
+      local s = vim.fn.delete(u,"rf") ~= 0
+      if s then notify.error("\""..u.."\" couldn't be delete!") end
+      return s
+    end, untracked)
+  end
+
+  local u = vim.fn.sort(vim.tbl_map(function(v) return string.sub(v,#PLUG_HOME+2) end, untracked), "i")
+  for _, name in ipairs(u) do
+    table.insert(PLUG_SYNC.text, "~ " .. name .. ": Untracked")
+  end
 end
 
-vim.api.nvim_create_user_command("PlugSync", PLUG_SYNC.start, {
+PLUG_SYNC.fn.fetch = function(name, plug, callback)
+  local cwd = joinpath(PLUG_HOME, name)
+  local f_options = { name = name, cwd = cwd, commit = plug.commit, tag = plug.tag, branch = plug.branch }
+
+  if vim.fn.isdirectory(joinpath(cwd, ".git")) == 0 then
+    return git.clone({ name = name, url = plug.uri, dest = cwd }, function(status)
+      if not status then return callback(false) end
+      git.fetch(f_options, callback)
+    end)
+  end
+
+  git.fetch(f_options, callback)
+end
+
+vim.api.nvim_create_user_command("PlugSync", PLUG_SYNC.fn.run, {
   complete = function(search)
     return vim.fn.sort(vim.tbl_filter(function(name)
       return vim.fn.match(name, search) == 0
@@ -271,6 +241,7 @@ local function github(p) return "https://github.com/"..p..".git" end
 
 
 ----- ----- ----- ----- ----- X ----- ----- ----- ----- -----
+
 
 -- THEMES --
 
@@ -750,7 +721,9 @@ plug{
   end)
 }
 
+
 ----- ----- ----- ----- ----- X ----- ----- ----- ----- -----
+
 
 runtimepath()
 

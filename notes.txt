@@ -15,8 +15,6 @@ ripgrep (for telescope) => https://github.com/BurntSushi/ripgrep
 
 TODO:
 
-git clone timeout
-
 REPLACE TELESCOPE ASAP!!!!!
 
 :h lsp-quickstart
