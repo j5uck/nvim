@@ -29,7 +29,10 @@ for _, line in ipairs(vim.opt.runtimepath:get()) do
     local magic = vim.split("^$()%.[]*+-?", "")
 
     local p = string.gsub(line, ".", function(c)
-      return vim.list_contains(magic, c) and ("%" .. c) or c
+      for _, e in ipairs(magic) do
+        if e == c then return "%" .. c end
+      end
+      return c
     end) .. "/doc/.*%.txt"
 
     if vim.fn.has("win32") == 1 then
@@ -49,9 +52,12 @@ vim.cmd[[filetype plugin indent on]]
 
 vim.g.did_load_filetypes = 1
 
-vim.opt.guicursor = { "a:ver25", "n-v-t:block", "o-r-cr:hor20" }
+pcall(function()
+  vim.opt.guicursor = { "a:ver25", "n-v:block", "o-r-cr:hor20" }
+  vim.opt.guicursor = { "a:ver25", "n-v-t:block", "o-r-cr:hor20" }
+end)
 
-vim.opt.mouse = { n = true, v = true }
+vim.opt.mouse = { n = true, v = true, i = true }
 
 vim.cmd[[silent! set maxsearchcount=0]]
 
@@ -141,9 +147,9 @@ require("explorer")
 require("plugins")
 require("mapping")
 
-local fs, notify, window = (function()
+local fs, notify, pcall_wrap, window = (function()
   local _ = require("_")
-  return _.fs, _.notify, _.window
+  return _.fs, _.notify, _.pcall_wrap, _.window
 end)()
 
 vim.api.nvim_create_user_command("LOC", function()
@@ -176,17 +182,15 @@ local term_ns = vim.api.nvim_create_namespace("")
 vim.api.nvim_set_hl(term_ns, "Normal", { fg = "#FFFFFF", bg = "#000000" })
 
 vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter" }, {
-  callback = vim.schedule_wrap(function(e)
-    pcall(function()
-      local win = vim.api.nvim_get_current_win()
+  callback = vim.schedule_wrap(pcall_wrap(function(e)
+    local win = vim.api.nvim_get_current_win()
 
-      if vim.fn.match(vim.api.nvim_buf_get_name(e.buf), "^term://") == 0 then
-        vim.api.nvim_win_set_hl_ns(win, term_ns)
-      elseif vim.api.nvim_get_hl_ns({ winid = win }) == term_ns then
-        vim.api.nvim_win_set_hl_ns(win, 0)
-      end
-    end)
-  end)
+    if vim.fn.match(vim.api.nvim_buf_get_name(e.buf), "^term://") == 0 then
+      vim.api.nvim_win_set_hl_ns(win, term_ns)
+    elseif vim.api.nvim_get_hl_ns({ winid = win }) == term_ns then
+      vim.api.nvim_win_set_hl_ns(win, 0)
+    end
+  end))
 })
 
 vim.api.nvim_create_autocmd("TermOpen", {

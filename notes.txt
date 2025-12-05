@@ -71,6 +71,17 @@ vim.bo.path
 
 
 
+local wrap = function(fn, ...)
+  local t = { ... }
+  local len = select("#", ...)
+
+  return function()
+    return fn(unpack(t, 1, len))
+  end
+end
+
+
+
 M.list = {}
 M.list.sort = function(l, f) return f and table.sort(l,f) or vim.fn.sort(l, "i") end
 M.list.map = vim.tbl_map

@@ -107,7 +107,7 @@ M.parse = function(line)
   local r = {}
   local left, right
 
-  left, right = line:match("^/(%d+).+%%D (.+)$")
+  left, right = line:match("^/(%d+).+%%0 (.+)$")
   if left then
     left = tonumber(left)
     if left ~= 0 then
@@ -115,7 +115,7 @@ M.parse = function(line)
     end
     line = right
   else
-    if string.match(line, "%%D") then return nil end
+    if string.match(line, "%%0") then return nil end
   end
 
   left, right = line:match("^(.+) %%=> (.+)$")
@@ -376,7 +376,7 @@ fn_BufReadCmd = function()
       add(" ")
     end
 
-    add("%D")
+    add("%0")
 
     local name = e.name .. (e.is_directory and "/" or "")
     add(M.encode(name), (vim.startswith(e.name, ".") and HL.HIDDEN) or (e.is_directory and HL.DIRECTORY) or nil)
@@ -688,7 +688,7 @@ vim.api.nvim_create_autocmd({ "CursorMovedI", "CursorMoved", "ModeChanged" }, {
   pattern = PATTERN,
   callback = function(ev)
     local y, x = unpack(vim.api.nvim_win_get_cursor(0))
-    local padding = vim.fn.match(vim.api.nvim_buf_get_lines(ev.buf, y - 1, y, true)[1] or "","%D\\zs\\C") + 1
+    local padding = vim.fn.match(vim.api.nvim_buf_get_lines(ev.buf, y - 1, y, true)[1] or "","%0\\zs\\C") + 1
 
     if x < padding then
       vim.api.nvim_win_set_cursor(0, { y, padding })

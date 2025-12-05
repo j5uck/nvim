@@ -4,10 +4,10 @@ local flags, fs, git, notify, notify_once, prequire_wrap = (function()
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
-  local r = string.gsub(vim.fs.joinpath(...), "[\\/]+", "\\")
+  local r = string.gsub(table.concat({...}, "\\"), "[\\/]+", "\\")
   return r
 end or function(...)
-  local r = string.gsub(vim.fs.joinpath(...), "/+", "/")
+  local r = string.gsub(table.concat({...}, "/"), "/+", "/")
   return r
 end
 
@@ -567,6 +567,14 @@ plug{
     vim.o.winminwidth = 10
     vim.o.equalalways = true
     vim.cmd.WindowsDisableAutowidth()
+    pcall(vim.api.nvim_del_user_command, "WindowsDisableAutowidth")
+    pcall(vim.api.nvim_del_user_command, "WindowsEnableAutowidth")
+    pcall(vim.api.nvim_del_user_command, "WindowsEqualize")
+    pcall(vim.api.nvim_del_user_command, "WindowsMaximize")
+    pcall(vim.api.nvim_del_user_command, "WindowsMaximizeHorizontally")
+    pcall(vim.api.nvim_del_user_command, "WindowsMaximizeVertically")
+    pcall(vim.api.nvim_del_user_command, "WindowsMaximizeVerticaly")
+    pcall(vim.api.nvim_del_user_command, "WindowsToggleAutowidth")
   end)
 }
 

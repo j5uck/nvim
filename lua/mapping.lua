@@ -16,13 +16,9 @@ local function map(mode, lhs, rhs, opts)
   end
 end
 
-local nope = {
-  { "n", { "&", "<CR>", "<c-c>", "<leader>", "<leader><s-q>", "<leader>f", "<leader>s" } },
-  { "v", { "<leader>s" } },
-  { { "n", "i", "v" }, { "<c-z>", "<MiddleMouse>", "<2-MiddleMouse>", "<3-MiddleMouse>", "<4-MiddleMouse>" } }
-}
-
-for _, v in ipairs(nope) do map(v[1], v[2], "<Nop>", { desc = "do nothing" }) end
+map({ "n", "v" }, { "&", "<CR>", "<c-c>", "<leader>", "<leader>s", "<leader><s-q>", "<leader>f" }, "<Nop>", { desc = "do nothing" })
+map({ "i", "n", "t", "v" }, "<c-z>", "<Nop>", { desc = "do nothing" })
+map({ "i", "n", "v" }, { "<MiddleMouse>", "<2-MiddleMouse>" }, "<Nop>", { desc = "do nothing" })
 
 map("i", { "<c-Space>" }, "<esc>", { desc = "escape" })
 map({"i", "t"}, "<M-o>", "<c-\\><c-n>", { desc = "escape" })
@@ -87,7 +83,7 @@ map("n", "<leader>gf", function()
   local p = vim.api.nvim_buf_get_name(0)
   if p == "" then return end
   vim.cmd.edit(vim.fn.fnameescape(fs.dirname(p)))
-end, { desc = "open file parent folder" })
+end, { desc = "[g]o to [f]ile parent folder" })
 
 map("n", "<leader>S", function()
   vim.cmd("%s/\\t/" .. string.rep(" ", vim.o.tabstop) .. "/g")
@@ -99,8 +95,8 @@ end, { desc = "tab to [S]paces" })
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "lua",
   callback = function(ev)
-    map("n", "<leader>s", "<cmd>%lua<CR>", { buffer = ev.buf, desc = "[s]ource" })
-    map("v", "<leader>s", ":lua<CR>",      { buffer = ev.buf, desc = "[s]ource" })
+    map("n", "<leader>s", "<cmd>%lua<CR>", { buffer = ev.buf, desc = "[s]ource file" })
+    map("v", "<leader>s", ":lua<CR>",      { buffer = ev.buf, desc = "[s]ource selection" })
   end
 })
 
@@ -122,7 +118,17 @@ map("n", "Q", "qq", { desc = "record macro on [q] register" })
 map("n", ",", "@q", { desc = "do [q] macro" })
 map("v", ",", "<cmd>norm @q<CR>", { desc = "do [q] macro" })
 
-map("n", "<leader>t", [[<cmd>exe "terminal" | startinsert<CR>]], { desc = "[t]erminal" })
+map("n", "<leader>t", function()
+  if vim.fn.has("win32") == 1 then
+    local shell = vim.go.shell
+    vim.go.shell = "powershell"
+    vim.cmd.term()
+    vim.go.shell = shell
+  else
+    vim.cmd.term()
+  end
+  vim.cmd.startinsert()
+end, { desc = "[t]erminal" })
 
 map("n", "<leader>a", function()
   notify.info(vim.fn.expand("%:p"))
@@ -353,15 +359,17 @@ prequire("windows", function()
     end
   end
 
+  local c = require("windows.commands")
+
   map("n", "<leader>M", function()
     norm_0()
-    vim.cmd[[silent! WindowsEqualize]]
-    vim.cmd[[silent! WindowsMaximize]]
+    pcall(c.equalize)
+    pcall(c.maximize)
   end, { desc = "[M]aximize buffer window" })
 
   map("n", "<leader>N", function()
     norm_0()
-    vim.cmd[[silent! WindowsEqualize]]
+    pcall(c.equalize)
   end, { desc = "equalize buffer window" })
 end)
 

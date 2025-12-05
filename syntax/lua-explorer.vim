@@ -13,4 +13,4 @@ if !has("win32")
 endif
 
 syn match WarningMsg /^\/\d*/ conceal oneline
-syn match WarningMsg /%D / conceal oneline
+syn match WarningMsg /%0 / conceal oneline

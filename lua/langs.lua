@@ -11,7 +11,7 @@ local M = {
 
 local MESSAGE = "Hello World!"
 
-M.new.init = { "notes.txt" }
+M.new.init = { "new.txt" }
 M.new.code = {}
 
 M.c.init = { "main.c" }
@@ -27,15 +27,16 @@ M.c.code["main.c"] = {
   "}"
 }
 
-M.npm.init = { "src/server.ts" }
+M.npm.init = { "src/server.js" }
 M.npm.code = {}
 M.npm.code["package.json"] = {
   "{",
   "  \"name\": \"demo\",",
   "  \"version\": \"0.0.0\",",
   "  \"scripts\": { ",
-  "    \"dev\": \"bun --watch run ./src/server.ts\",",
-  "    \"release\": \"node --disable-warning=ExperimentalWarning ./src/server.ts\"",
+  "    \"dev\": \"bun run ./src/server.js\",",
+  "    \"node\": \"node --disable-warning=ExperimentalWarning ./src/server.js\"",
+  "    \"watch\": \"bun --watch run ./src/server.js\",",
   "  },",
   "  \"type\": \"module\",",
   "  \"devDependencies\": {",
@@ -44,9 +45,8 @@ M.npm.code["package.json"] = {
   "  }",
   "}"
 }
-M.npm.code["src/server.ts"] = {
+M.npm.code["src/server.js"] = {
   "// npm run dev",
-  "// import { example } from \"example-package\";",
   "",
   "(async () => {",
   "  console.log(\"" .. MESSAGE .. "\");",
@@ -69,9 +69,9 @@ M.java.code["build.lua"] = {
   "local find = require(\"_\").fs.find",
   "",
   "require(\"run\"):new()",
-  "  :cmd(vim.list_extend({ \"javac\", \"-d\", \"build\", \"src/Main.java\" }, find(\"\\\\.java\")))",
+  "  :cmd(vim.list_extend({ \"javac\", \"-d\", \"build\", \"src/Main.java\" }, find(\"\\\\.java$\")))",
   "  :cd(\"build\")",
-  "  :cmd(vim.list_extend({ \"jar\", \"-cfe\", \"Main.jar\", \"src/Main\" }, find(\"\\\\.class\", \"build\")))",
+  "  :cmd(vim.list_extend({ \"jar\", \"-cfe\", \"Main.jar\", \"src/Main\" }, find(\"\\\\.class$\", \"build\")))",
   "  :cmd{ \"java\", \"-jar\", \"Main.jar\" }"
 }
 

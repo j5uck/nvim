@@ -45,6 +45,12 @@ M.prequire_wrap = function(name, fn)
   return function() return M.prequire(name, fn) end
 end
 
+M.pcall_wrap = function(fn)
+  return function(...)
+    return pcall(fn, ...)
+  end
+end
+
 M.random = {}
 
 local CHARS = vim.split("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", "")
