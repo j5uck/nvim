@@ -33,11 +33,14 @@ function R:cmd(cmd)
 end
 
 function R:cd(dir)
-  C.fprintf(C.stdout, "%s\n", T_GRAY .. ">>" .. T_RESET .. " cd " .. dir)
+  C.fprintf(stdout, "%s\n", T_GRAY .. ">>" .. T_RESET .. " cd " .. dir)
   if vim.fn.isabsolutepath(dir) == 1 then
     self.cwd = dir
   else
     self.cwd = vim.fs.normalize(self.cwd .. "/" .. dir)
+  end
+  if vim.fn.isdirectory(self.cwd) == 0 then
+    vim.fn.mkdir(dir, "p")
   end
   return self
 end

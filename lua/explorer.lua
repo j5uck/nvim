@@ -9,7 +9,7 @@ local C = ffi.C
 if vim.fn.has("win32") == 1 then
   ffi.cdef[[
     // DWORD GetLogicalDriveStrings(DWORD, LPWSTR);
-    int GetLogicalDriveStringsA(int32_t, char *);
+    int32_t GetLogicalDriveStringsA(int32_t, char *);
   ]]
 else
   ffi.cdef[[
@@ -488,11 +488,11 @@ fn_BufWriteCmd = function()
   local TASKS = {}
 
   local TASK = {
-    MKMDIR = 1, -- [ dest ]
-    MKFILE = 2, -- [ dest ]
-    MKLINK = 3, -- [ dest, link ]
-    COPY   = 4, -- [ src, dest ]
-    REMOVE = 5  -- [ src ]
+    MKMDIR = 1, -- fn( dest )
+    MKFILE = 2, -- fn( dest )
+    MKLINK = 3, -- fn( dest, link )
+    COPY   = 4, -- fn( src, dest )
+    REMOVE = 5  -- fn( src )
   }
 
   local function APPENT_TASK(args)

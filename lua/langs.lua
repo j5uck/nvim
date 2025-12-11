@@ -1,4 +1,13 @@
-require("_").prequire("nvim-web-devicons", function() end)
+local find, prequire = (function()
+  local _ = require("_")
+  return _.find, _.prequire
+end)()
+
+local runner = require("run")
+
+if not _G.arg[0] then -- :help -l
+  prequire("nvim-web-devicons", function() end)
+end
 
 local M = {
   new        = { icon = " ", hl = nil },
@@ -35,7 +44,7 @@ M.npm.code["package.json"] = {
   "  \"version\": \"0.0.0\",",
   "  \"scripts\": { ",
   "    \"dev\": \"bun run ./src/server.js\",",
-  "    \"node\": \"node --disable-warning=ExperimentalWarning ./src/server.js\"",
+  "    \"start\": \"node --disable-warning=ExperimentalWarning ./src/server.js\"",
   "    \"watch\": \"bun --watch run ./src/server.js\",",
   "  },",
   "  \"type\": \"module\",",
@@ -66,24 +75,33 @@ M.java.code["src/Main.java"] = {
   "}"
 }
 M.java.code["build.lua"] = {
-  "local find = require(\"_\").fs.find",
-  "",
-  "require(\"run\"):new()",
-  "  :cmd(vim.list_extend({ \"javac\", \"-d\", \"build\", \"src/Main.java\" }, find(\"\\\\.java$\")))",
-  "  :cd(\"build\")",
-  "  :cmd(vim.list_extend({ \"jar\", \"-cfe\", \"Main.jar\", \"src/Main\" }, find(\"\\\\.class$\", \"build\")))",
-  "  :cmd{ \"java\", \"-jar\", \"Main.jar\" }"
+  "require(\"langs\").java.runner()",
 }
+M.java.runner = function()
+  runner:new()
+    :cmd(vim.list_extend({ vim.fn.exepath("javac"), "-d", "build", "src/Main.java" }, find("\\.java$")))
+    :cd("build")
+    :cmd(vim.list_extend({ vim.fn.exepath("jar"), "-cfe", "Main.jar", "src/Main" }, find("\\.class$", "build")))
+    :cmd{ vim.fn.exepath("java"), "-jar", "Main.jar" }
+end
 
-M.kotlin.init = { "Main.kt" }
+M.kotlin.init = { "src/Main.kt" }
 M.kotlin.code = {}
-M.kotlin.code["Main.kt"] = {
-  "// kotlinc -d Main.jar Main.kt && java -jar ./Main.jar",
+M.kotlin.code["src/Main.kt"] = {
+  "// nvim -l build.lua",
   "",
   "fun main() {",
   "  println(\"" .. MESSAGE .. "\")",
   "}"
 }
+M.kotlin.code["build.lua"] = {
+  "require(\"langs\").kotlin.runner()",
+}
+M.kotlin.runner = function()
+  runner:new()
+    :cmd(vim.list_extend({ vim.fn.exepath("kotlinc"), "-Wextra", "-d", "build/Main.jar", "src/Main.kt" }, find("\\.kt$")))
+    :cmd{ vim.fn.exepath("java"), "-jar", "build/Main.jar" }
+end
 
 M.lua.init = { "script.lua" }
 M.lua.code = {}

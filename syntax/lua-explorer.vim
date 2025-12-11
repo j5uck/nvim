@@ -8,8 +8,10 @@ syn match Error /%$/ oneline
 syn match Error /%=>/ oneline
 
 if !has("win32")
-  syn match Special /%[nprs]/ oneline
-  syn match Comment / %=> / oneline
+  syn match Special /%[%nrs]/ oneline
+  syn match Comment / %=> \@=..\+/ oneline
+else
+  syn match Special /%[%nr]/ oneline
 endif
 
 syn match WarningMsg /^\/\d*/ conceal oneline

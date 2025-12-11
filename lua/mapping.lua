@@ -246,9 +246,6 @@ W.term = window{
     vim.bo.swapfile   = false
     vim.bo.undolevels = -1
 
-    vim.wo.wrap = true
-
-    -- vim.cmd[[silent! norm! 0]]
     vim.cmd.clearjumps()
     vim.cmd[[silent! startinsert]]
 
