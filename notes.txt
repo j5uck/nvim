@@ -27,6 +27,8 @@ replace <space>gd for lua & vim script
 lua explorer hl system
 has("clipboard")
 
+https://vim.fandom.com/wiki/Regex_lookahead_and_lookbehind
+
 https://github.com/bassamsdata/namu.nvim/
 https://github.com/OXY2DEV/ui.nvim/
 https://github.com/kevinhwang91/nvim-hlslens/

@@ -84,12 +84,12 @@ PLUG_SYNC.fn.run_coroutine = function(args)
 
   if #args.fargs > 0 then PLUG_SYNC.fn.clean() end
 
-  local function set_lines()
+  local set_lines = vim.schedule_wrap(function()
     vim.bo[PLUG_SYNC.buf].modifiable = true
     vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, 0, -1, false, PLUG_SYNC.text)
     vim.bo[PLUG_SYNC.buf].modifiable = false
     vim.bo[PLUG_SYNC.buf].modified = false
-  end
+  end)
 
   vim.api.nvim_buf_call(PLUG_SYNC.buf, function()
     vim.cmd[[hi link PlugSyncDone Function]]

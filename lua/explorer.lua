@@ -138,18 +138,20 @@ M.parse = function(line)
   return r
 end
 
-M.go = function(d)
-  M.go = vim.fn.has("win32") == 1 and function(dir)
-    M.dir = string.gsub(dir, "/", "\\")
-    w:show()
-    pcall(vim.cmd.edit, { vim.fn.fnameescape(M.path_to_URL(dir)) })
-  end or function(dir)
-    M.dir = dir
-    w:show()
-    pcall(vim.cmd.edit, { vim.fn.fnameescape(M.path_to_URL(dir)) })
-  end
+-- TODO: remove pcalls
+local _go = vim.fn.has("win32") == 1 and function(dir)
+  M.dir = string.gsub(dir, "/", "\\")
+  w:show()
+  pcall(vim.cmd.edit, { vim.fn.fnameescape(M.path_to_URL(dir)) })
+end or function(dir)
+  M.dir = dir
+  w:show()
+  pcall(vim.cmd.edit, { vim.fn.fnameescape(M.path_to_URL(dir)) })
+end
 
-  M.go(d or getcwd())
+M.go = function(d)
+  M.go = _go
+  _go(d or getcwd())
 end
 
 local select__is_root = (vim.fn.has("win32") == 1) and function(str)
@@ -246,43 +248,6 @@ local function ls(dir)
   return content
 end
 
-local insert_buffer = vim.fn.has("win32") == 1 and function(id)
-  local b = { id, nil }
-  table.insert(BUFFERS, b)
-  if (#M.dir == 0) or string.match(M.dir,"^%w:\\$") then
-    BUFFERS_BY_PATH[M.dir] = b
-  else
-    BUFFERS_BY_PATH[string.sub(M.dir, 1, #M.dir -1)] = b
-  end
-end or function(id)
-  local b = { id, nil }
-  table.insert(BUFFERS, b)
-  if M.dir == "/" then
-    BUFFERS_BY_PATH[M.dir] = b
-  else
-    BUFFERS_BY_PATH[string.sub(M.dir, 1, #M.dir -1)] = b
-  end
-end
-
-local fn_BufReadCmd
-
-vim.api.nvim_create_autocmd("BufReadCmd", {
-  pattern = PATTERN,
-  nested = true,
-  callback = function(ev)
-    if not vim.api.nvim_win_is_valid(w.win) then
-      vim.schedule(function() vim.cmd("doautocmd BufReadCmd") end)
-      return
-    end
-
-    insert_buffer(ev.buf)
-    w.buf = ev.buf
-
-    local s, m = pcall(vim.api.nvim_buf_call, ev.buf, fn_BufReadCmd)
-    if not s then notify.error(m) end
-  end
-})
-
 local HL = {
   DIRECTORY   = "Directory",
   FILE        = "Normal",
@@ -292,7 +257,7 @@ local HL = {
   SOCKET      = "Keyword"
 }
 
-fn_BufReadCmd = function()
+local function fn_BufReadCmd()
   local status, devicons = pcall(require, "nvim-web-devicons")
   if not status then devicons = nil end
 
@@ -412,14 +377,8 @@ fn_BufReadCmd = function()
   end
 
   BUFFERS[#BUFFERS][2] = list_directory
+  vim.cmd.clearjumps()
 end
-
-local fn_BufWriteCmd
-
-vim.api.nvim_create_autocmd("BufWriteCmd", {
-  pattern = PATTERN,
-  callback = function() fn_BufWriteCmd() end
-})
 
 local function fn_BufWriteCmd__parse_buffers()
   local ENTRY_BUFFER
@@ -482,7 +441,7 @@ local function fn_BufWriteCmd__parse_buffers()
   return error, r
 end
 
-fn_BufWriteCmd = function()
+local function fn_BufWriteCmd()
   local slash = vim.fn.has("win32") == 1 and "\\" or "/"
   local TASK_FILES = {} -- { { copy, remove, gone } ... }
   local TASKS = {}
@@ -684,6 +643,11 @@ fn_BufWriteCmd = function()
   vim.schedule_wrap(M.go)(M.dir)
 end
 
+vim.api.nvim_create_autocmd("BufWriteCmd", {
+  pattern = PATTERN,
+  callback = fn_BufWriteCmd
+})
+
 vim.api.nvim_create_autocmd({ "CursorMovedI", "CursorMoved", "ModeChanged" }, {
   pattern = PATTERN,
   callback = function(ev)
@@ -696,29 +660,70 @@ vim.api.nvim_create_autocmd({ "CursorMovedI", "CursorMoved", "ModeChanged" }, {
   end
 })
 
+local insert_buffer = vim.fn.has("win32") == 1 and function(id)
+  local b = { id, nil }
+  table.insert(BUFFERS, b)
+  if (#M.dir == 0) or string.match(M.dir,"^%w:\\$") then
+    BUFFERS_BY_PATH[M.dir] = b
+  else
+    BUFFERS_BY_PATH[string.sub(M.dir, 1, #M.dir -1)] = b
+  end
+end or function(id)
+  local b = { id, nil }
+  table.insert(BUFFERS, b)
+  if M.dir == "/" then
+    BUFFERS_BY_PATH[M.dir] = b
+  else
+    BUFFERS_BY_PATH[string.sub(M.dir, 1, #M.dir -1)] = b
+  end
+end
+
+M.is_timeout = false
 M.history = { CAPACITY = 16, size = 0, index = 0, offset = 0, list = {}, skip = false }
 
-vim.api.nvim_create_autocmd("BufEnter", {
+vim.api.nvim_create_autocmd({ "BufEnter", "BufReadCmd" }, {
   pattern = PATTERN,
   callback = vim.schedule_wrap(function(ev)
-    w.buf = ev.buf
+    if M.is_timeout then
+      return
+    else
+      M.is_timeout = true
+      vim.schedule(function() M.is_timeout = false end)
+    end
 
     if not vim.api.nvim_win_is_valid(w.win) then
-      vim.api.nvim_win_set_buf(0, vim.api.nvim_create_buf(false, true))
-      vim.cmd.clearjumps()
+      -- when :e file://...
+      if vim.bo[ev.buf].filetype ~= "lua-explorer" then
+        vim.cmd[[exe "norm \<c-o>"]]
+        if ev.file == vim.api.nvim_buf_get_name(0) then
+          vim.api.nvim_buf_set_name(0, "")
+        end
+        M.go(M.URL_to_path(ev.file))
+      -- when nvim is closing and there is buffers with changes
+      else
+        vim.cmd.clearjumps()
+        local win = vim.api.nvim_get_current_win()
+        w:show()
+        vim.api.nvim_win_set_buf(w.win, ev.buf)
+        vim.api.nvim_win_set_buf(win, vim.api.nvim_create_buf(false, true))
+      end
 
-      w:show()
-      vim.api.nvim_win_set_buf(w.win, ev.buf)
       return
     end
+
+    w.buf = ev.buf
+
+    local isParsedBuffer = ev.event == "BufEnter"
+    if not isParsedBuffer then insert_buffer(ev.buf) end
 
     vim.api.nvim_win_set_config(w.win, {
       title = " " .. vim.fn.fnamemodify(M.encode(M.dir), ":~") .. " ",
       title_pos = "center"
     })
+
     local h = M.history
     if h.skip or (M.dir == h.list[h.index]) then
-      -- do nothiing --
+      -- do nothing --
     else
       if h.index == h.CAPACITY then
         h.offset = (h.offset + 1) % h.CAPACITY
@@ -729,7 +734,10 @@ vim.api.nvim_create_autocmd("BufEnter", {
     end
     h.skip = false
 
-    vim.cmd.clearjumps()
+    if not isParsedBuffer then
+      local s, m = pcall(vim.api.nvim_buf_call, ev.buf, fn_BufReadCmd)
+      if not s then notify.error(m) end
+    end
   end)
 })
 
@@ -750,6 +758,21 @@ return {
   open = function() M.go(getcwd()) end,
   resume = function() M.go(M.dir) end,
   select = M.select,
+
+  open_on_explorer = vim.fn.has("win32") == 1 and function()
+    vim.uv.spawn(vim.fn.exepath[[explorer]], { args = { M.dir }, detached = true })
+  end or (vim.fn.has("mac") == 1 and function()
+    -- TODO: test it
+    vim.uv.spawn(vim.fn.exepath[[open]], { args = { M.dir }, detached = true })
+  end or function()
+    for _, e in ipairs{ "thunar", "dolphin", "nautilus" } do
+      local ep =  vim.fn.exepath(e)
+      if string.len(ep) > 0 then
+        return vim.uv.spawn(ep, { args = { M.dir }, detached = true })
+      end
+    end
+    notify.error("Explorer not found")
+  end),
 
   buf_get_name = function()
     return M.URL_to_path(vim.api.nvim_buf_get_name(0))

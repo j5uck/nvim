@@ -101,7 +101,7 @@ end
 
 local function url(size, page)
   return {
-    "node",
+    vim.fn.exepath("node"),
     "-e",
     "console.log(" ..
       "await (" ..
@@ -255,8 +255,7 @@ M.marketplace.show = function()
 
   local node = vim.fn.exepath("node")
   if node == "" then
-    notify.error("Node not found\nCannot proceed")
-    return
+    return notify.error("Node not found\nCannot proceed")
   end
 
   local size = 200

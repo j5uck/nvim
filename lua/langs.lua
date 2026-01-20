@@ -43,9 +43,9 @@ M.npm.code["package.json"] = {
   "  \"name\": \"demo\",",
   "  \"version\": \"0.0.0\",",
   "  \"scripts\": { ",
-  "    \"dev\": \"bun run ./src/server.js\",",
-  "    \"start\": \"node --disable-warning=ExperimentalWarning ./src/server.js\"",
-  "    \"watch\": \"bun --watch run ./src/server.js\",",
+  "    \"bun\": \"bun run ./src/server.js\",",
+  "    \"node\": \"node --disable-warning=ExperimentalWarning ./src/server.js\",",
+  "    \"watch\": \"bun --watch run ./src/server.js\"",
   "  },",
   "  \"type\": \"module\",",
   "  \"devDependencies\": {",
@@ -55,7 +55,7 @@ M.npm.code["package.json"] = {
   "}"
 }
 M.npm.code["src/server.js"] = {
-  "// npm run dev",
+  "// npm run bun",
   "",
   "(async () => {",
   "  console.log(\"" .. MESSAGE .. "\");",

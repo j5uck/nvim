@@ -142,11 +142,6 @@ if vim.g.nvy then
   vim.opt.guifont = { "FiraCode Nerd Font Mono:h12" }
 end
 
-require("undotree")
-require("explorer")
-require("plugins")
-require("mapping")
-
 local fs, notify, pcall_wrap, window = (function()
   local _ = require("_")
   return _.fs, _.notify, _.pcall_wrap, _.window
@@ -237,6 +232,16 @@ vim.api.nvim_create_autocmd("TermClose", {
   end)
 })
 
+-- patch for :source
+vim.api.nvim_create_autocmd("BufFilePost", {
+  pattern = { "man://*" },
+  callback = vim.schedule_wrap(function(ev)
+    if vim.bo[ev.buf].filetype ~= "man" then
+      vim.api.nvim_buf_call(ev.buf, vim.cmd.e)
+    end
+  end)
+})
+
 local rec = window{
   on_show = function(self)
     vim.bo.bufhidden  = "hide"
@@ -264,3 +269,8 @@ local rec = window{
 
 vim.api.nvim_create_autocmd("RecordingEnter", { callback = function() rec:show() end })
 vim.api.nvim_create_autocmd("RecordingLeave", { callback = function() rec:hide() end })
+
+vim.schedule_wrap(require)("mapping")
+require("undotree")
+require("explorer")
+require("plugins")

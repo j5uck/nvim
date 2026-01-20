@@ -34,7 +34,7 @@ end
 M.prequire = function(name, fn)
   local status, plugin = pcall(require, name)
 
-  if status then return fn(plugin) end
+  if status then return fn and fn(plugin) end
 
   if M.flags.warn_missing_module then
     M.notify_once.warn("Module '" .. name .. "' not found")
@@ -181,7 +181,7 @@ M.fs.find = (function()
   end
 end)()
 
-local GIT_OPTIONS = { text = true, clear_env = true, timeout = 15000 }
+local GIT_OPTIONS = { text = true, clear_env = true, timeout = (3 * 60 * 1000) }
 M.git = {}
 M.git.clone = function(o, cb)
   local cmd = { "git", "clone", "--shallow-submodules", "--depth=1", "--progress", "--", o.url, o.dest }
@@ -198,6 +198,8 @@ M.git.clone = function(o, cb)
 end
 
 M.git.fetch = function(o, cb)
+  vim.uv.fs_unlink(o.dest .. "/.git/shallow.lock")
+
   local cmds = {}
   local function t(cmd) table.insert(cmds, cmd) end
 

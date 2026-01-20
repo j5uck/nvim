@@ -196,6 +196,8 @@ vim.api.nvim_create_autocmd("FileType", {
     map("n", "<M-k>", explorer.go_up, { buffer = ev.buf })
     map("n", "<M-l>", explorer.go_next, { buffer = ev.buf })
 
+    map("n", "<leader>x", explorer.open_on_explorer, { buffer = ev.buf })
+
     map("n", "<leader>c", function()
       local s = explorer.buf_get_name()
       notify.info(s)
@@ -214,7 +216,7 @@ vim.api.nvim_create_autocmd("FileType", {
 local term_buffers = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }
 local term_buffers_i = 1
 local term_buffers_flag = false
-local term_maximized_flag = false
+local term_maximized_flag = true
 W.term = window{
   on_show = function(self)
     pcall(function()
