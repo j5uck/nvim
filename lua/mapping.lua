@@ -17,8 +17,7 @@ local function map(mode, lhs, rhs, opts)
 end
 
 map({ "n", "v" }, { "&", "<CR>", "<c-c>", "<leader>", "<leader>s", "<leader><s-q>", "<leader>f" }, "<Nop>", { desc = "do nothing" })
-map({ "i", "n", "t", "v" }, "<c-z>", "<Nop>", { desc = "do nothing" })
-map({ "i", "n", "v" }, { "<MiddleMouse>", "<2-MiddleMouse>" }, "<Nop>", { desc = "do nothing" })
+map({ "i", "n", "v" }, { "<c-z>", "<MiddleMouse>", "<2-MiddleMouse>" }, "<Nop>", { desc = "do nothing" })
 
 map("i", { "<c-Space>" }, "<esc>", { desc = "escape" })
 map({"i", "t"}, "<M-o>", "<c-\\><c-n>", { desc = "escape" })
@@ -196,7 +195,7 @@ vim.api.nvim_create_autocmd("FileType", {
     map("n", "<M-k>", explorer.go_up, { buffer = ev.buf })
     map("n", "<M-l>", explorer.go_next, { buffer = ev.buf })
 
-    map("n", "<leader>x", explorer.open_on_explorer, { buffer = ev.buf })
+    map("n", "<leader>e", explorer.open_on_explorer, { buffer = ev.buf })
 
     map("n", "<leader>c", function()
       local s = explorer.buf_get_name()

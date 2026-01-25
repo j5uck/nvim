@@ -29,8 +29,12 @@ vim.filetype.add{ pattern = { ["file://.*"] = { "lua-explorer", { priority = 10 
 
 local w = window{
   on_show = function(self)
+    -- local win = self.win
     vim.api.nvim_create_autocmd("WinLeave", {
-      callback = function() self:hide() end,
+      callback = function()
+        self:hide()
+        -- pcall(vim.api.nvim_win_close, win, true)
+      end,
       once = true
     })
   end,
@@ -678,66 +682,64 @@ end or function(id)
   end
 end
 
-M.is_timeout = false
 M.history = { CAPACITY = 16, size = 0, index = 0, offset = 0, list = {}, skip = false }
 
-vim.api.nvim_create_autocmd({ "BufEnter", "BufReadCmd" }, {
-  pattern = PATTERN,
-  callback = vim.schedule_wrap(function(ev)
-    if M.is_timeout then
-      return
-    else
-      M.is_timeout = true
-      vim.schedule(function() M.is_timeout = false end)
+M.history_push = function()
+  local h = M.history
+  if h.skip or (M.dir == h.list[h.index]) then
+    -- do nothing --
+  else
+    if h.index == h.CAPACITY then
+      h.offset = (h.offset + 1) % h.CAPACITY
     end
+    h.size = math.min(h.CAPACITY, h.index+1)
+    h.index = h.size
+    h.list[(h.index-1 + h.offset) % h.CAPACITY + 1] = M.dir
+  end
+  h.skip = false
+end
 
-    if not vim.api.nvim_win_is_valid(w.win) then
+vim.api.nvim_create_autocmd("BufReadCmd", {
+  pattern = PATTERN,
+  callback = function(ev)
+    w.buf = ev.buf
+
+    if vim.api.nvim_win_is_valid(w.win) then
+      insert_buffer(ev.buf)
+      local s, m = pcall(vim.api.nvim_buf_call, ev.buf, fn_BufReadCmd)
+      if not s then notify.error(m) end
+    else
       -- when :e file://...
       if vim.bo[ev.buf].filetype ~= "lua-explorer" then
         vim.cmd[[exe "norm \<c-o>"]]
         if ev.file == vim.api.nvim_buf_get_name(0) then
           vim.api.nvim_buf_set_name(0, "")
         end
-        M.go(M.URL_to_path(ev.file))
-      -- when nvim is closing and there is buffers with changes
-      else
-        vim.cmd.clearjumps()
-        local win = vim.api.nvim_get_current_win()
-        w:show()
-        vim.api.nvim_win_set_buf(w.win, ev.buf)
-        vim.api.nvim_win_set_buf(win, vim.api.nvim_create_buf(false, true))
+        vim.schedule_wrap(M.go)(M.URL_to_path(ev.file))
       end
-
-      return
     end
+  end
+})
 
+vim.api.nvim_create_autocmd("BufEnter", {
+  pattern = PATTERN,
+  callback = vim.schedule_wrap(function(ev)
     w.buf = ev.buf
 
-    local isParsedBuffer = ev.event == "BufEnter"
-    if not isParsedBuffer then insert_buffer(ev.buf) end
+    if not vim.api.nvim_win_is_valid(w.win) then
+      vim.cmd.clearjumps()
+      local win = vim.api.nvim_get_current_win()
+      w:show()
+      vim.api.nvim_win_set_buf(w.win, ev.buf)
+      vim.api.nvim_win_set_buf(win, vim.api.nvim_create_buf(false, true))
+    end
 
     vim.api.nvim_win_set_config(w.win, {
       title = " " .. vim.fn.fnamemodify(M.encode(M.dir), ":~") .. " ",
       title_pos = "center"
     })
 
-    local h = M.history
-    if h.skip or (M.dir == h.list[h.index]) then
-      -- do nothing --
-    else
-      if h.index == h.CAPACITY then
-        h.offset = (h.offset + 1) % h.CAPACITY
-      end
-      h.size = math.min(h.CAPACITY, h.index+1)
-      h.index = h.size
-      h.list[(h.index-1 + h.offset) % h.CAPACITY + 1] = M.dir
-    end
-    h.skip = false
-
-    if not isParsedBuffer then
-      local s, m = pcall(vim.api.nvim_buf_call, ev.buf, fn_BufReadCmd)
-      if not s then notify.error(m) end
-    end
+    M.history_push()
   end)
 })
 
