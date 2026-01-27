@@ -37,8 +37,10 @@ M.extensions.required = {
 }
 
 M.extensions.missing = function()
-  local extensionStats = {}
-  pcall(function() extensionStats = vim.fn["coc#rpc#request"]("extensionStats", {}) end)
+  local extensionStats = vim.fn["coc#rpc#request"]("extensionStats", {})
+  if (type(extensionStats) == "string") or (#extensionStats == 0) then
+    return M.extensions.required
+  end
 
   local filter = {}
   for _, f in ipairs(vim.tbl_map(function(v) return v.id end, extensionStats)) do

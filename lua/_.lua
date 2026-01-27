@@ -184,21 +184,19 @@ end)()
 local GIT_OPTIONS = { text = true, clear_env = true, timeout = (3 * 60 * 1000) }
 M.git = {}
 M.git.clone = function(o, cb)
-  local cmd = { "git", "clone", "--shallow-submodules", "--depth=1", "--progress", "--", o.url, o.dest }
+  local cmd = { "git", "clone", "--shallow-submodules", "--depth=1", "--progress", "--", o.url, o.cwd }
   vim.system(cmd, GIT_OPTIONS, function(r)
-    cb(r.code == 0)
-
     if r.code == 0 then
       cb(true)
     else
-      require("_").notify.error("\"" .. o.name .. "\" exit status: " .. r.code .. "\n\n" .. r.stderr)
+      M.notify.error("\"" .. o.name .. "\" exit status: " .. r.code .. "\n\n" .. r.stderr)
       cb(false)
     end
   end)
 end
 
 M.git.fetch = function(o, cb)
-  vim.uv.fs_unlink(o.dest .. "/.git/shallow.lock")
+  vim.uv.fs_unlink(o.cwd .. "/.git/shallow.lock")
 
   local cmds = {}
   local function t(cmd) table.insert(cmds, cmd) end
@@ -227,11 +225,11 @@ M.git.fetch = function(o, cb)
     local cmd = cmds[i]
     if not cmd then return cb(r.code == 0) end
     if r.code ~= 0 then
-      require("_").notify.error("\"" .. o.name .. "\" exit status: " .. r.code .. "\n\n" .. r.stderr)
+      M.notify.error("\"" .. o.name .. "\" exit status: " .. r.code .. "\n\n" .. r.stderr)
       return cb(false)
     end
 
-    vim.system(cmd(r), vim.tbl_extend("force", GIT_OPTIONS, { cwd = o.cwd }), vim.schedule_wrap(function(rr) run(rr, i+1) end))
+    vim.system(cmd(r), vim.tbl_extend("force", GIT_OPTIONS, { cwd = o.cwd }), function(rr) run(rr, i+1) end)
   end
   run({ code = 0 }, 1)
 end

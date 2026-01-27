@@ -46,6 +46,8 @@ PLUG_SYNC.fn = {}
 PLUG_SYNC.fn.run = function(args)
   PLUG_SYNC.coroutine = coroutine.create(PLUG_SYNC.fn.run_coroutine)
   coroutine.resume(PLUG_SYNC.coroutine, args)
+  -- TODO: remove it
+  PLUG_SYNC.fn.run = function(_) end
 end
 
 PLUG_SYNC.fn.run_coroutine = function(args)
@@ -78,46 +80,57 @@ PLUG_SYNC.fn.run_coroutine = function(args)
     vim.cmd[[setlocal colorcolumn=]]
   end
 
-  PLUG_SYNC.text = {}
-
-  for _ = 1, #po, 1 do table.insert(PLUG_SYNC.text, "") end
-
   if #args.fargs > 0 then PLUG_SYNC.fn.clean() end
-
-  local set_lines = vim.schedule_wrap(function()
-    vim.bo[PLUG_SYNC.buf].modifiable = true
-    vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, 0, -1, false, PLUG_SYNC.text)
-    vim.bo[PLUG_SYNC.buf].modifiable = false
-    vim.bo[PLUG_SYNC.buf].modified = false
-  end)
 
   vim.api.nvim_buf_call(PLUG_SYNC.buf, function()
     vim.cmd[[hi link PlugSyncDone Function]]
   end)
 
-  local success = {}
+  local not_finished = #po
   local error = false
   for i = 1, #po, 1 do
     local name = po[i]
-    PLUG_SYNC.text[i] = "+ " .. name .. ": Fetching..."
-    set_lines()
-    PLUG_SYNC.fn.fetch(name, PLUGS[name], function(status)
-      success[name] = status
-      if status then
-        PLUG_SYNC.text[i] = "- " .. name .. ": Fetching... Done!"
+    local index = i
+    vim.bo[PLUG_SYNC.buf].modifiable = true
+    vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, index-1, index, false, {
+      "+ " .. name .. ": Fetching..."
+    })
+    vim.bo[PLUG_SYNC.buf].modifiable = false
+
+    local cwd = joinpath(PLUG_HOME, name)
+    local plug = PLUGS[name]
+    local f_options = { name = name, cwd = cwd, commit = plug.commit, tag = plug.tag, branch = plug.branch }
+    local callback = vim.schedule_wrap(function(ok)
+      vim.bo[PLUG_SYNC.buf].modifiable = true
+      if ok then
+        vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, index-1, index, false, {
+          "- " .. name .. ": Fetching... Done!"
+        })
       else
-        PLUG_SYNC.text[i] = "x " .. name .. ": Fetching... ERROR!"
+        vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, index-1, index, false, {
+          "x " .. name .. ": Fetching... ERROR!"
+        })
         error = true
       end
-      set_lines()
-
-      if #vim.tbl_keys(success) < #po then return end
+      not_finished = not_finished - 1
+      vim.bo[PLUG_SYNC.buf].modifiable = false
       vim.schedule_wrap(coroutine.resume)(PLUG_SYNC.coroutine)
     end)
+
+    if vim.fn.isdirectory(joinpath(cwd, ".git")) == 0 then
+      git.clone({ name = name, url = plug.uri, cwd = cwd }, function(ok)
+        if not ok then return callback(false) end
+        git.fetch(f_options, callback)
+      end)
+    else
+      git.fetch(f_options, callback)
+    end
   end
 
   vim.fn.cursor(1, 2)
-  coroutine.yield()
+  while not_finished > 0 do
+    coroutine.yield()
+  end
 
   if error then return end
 
@@ -125,27 +138,37 @@ PLUG_SYNC.fn.run_coroutine = function(args)
 
   for i = 1, #po, 1 do
     local name = po[i]
+    local index = i
     local build = PLUGS[name].build
     if not build then goto continue end
 
-    PLUG_SYNC.text[i] = "+ " .. name .. ": Building..."
-    set_lines()
+    vim.bo[PLUG_SYNC.buf].modifiable = true
+    vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, index-1, index, false, {
+      "+ " .. name .. ": Building..."
+    })
+    vim.bo[PLUG_SYNC.buf].modifiable = false
 
-    -- vim.schedule(function()
     local s, msg = pcall(function()
       build{ dir = joinpath(PLUG_HOME, name) }
-      PLUG_SYNC.text[i] = "- " .. name .. ": Building... Done!"
+      vim.bo[PLUG_SYNC.buf].modifiable = true
+      vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, index-1, index, false, {
+        "- " .. name .. ": Building... Done!"
+      })
+      vim.bo[PLUG_SYNC.buf].modifiable = false
     end)
     if not s then
       error = true
-      PLUG_SYNC.text[i] = "x " .. name .. ": Building... ERROR!"
+      vim.bo[PLUG_SYNC.buf].modifiable = true
+      vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, index-1, index, false, {
+        "x " .. name .. ": Building... ERROR!"
+      })
+      vim.bo[PLUG_SYNC.buf].modifiable = false
       notify.error(msg)
     end
 
     ::continue::
   end
 
-  set_lines()
   if error then return end
 
   vim.api.nvim_buf_call(PLUG_SYNC.buf, function()
@@ -155,7 +178,6 @@ PLUG_SYNC.fn.run_coroutine = function(args)
   notify.warn("[LUA-PLUG] Elapsed time: " .. seconds .. " seconds")
 
   for _, n in ipairs(po) do
-    -- vim.cmd.helptags({ joinpath(PLUG_HOME, n, "doc"), mods = { silent = true }})
     vim.cmd("silent! helptags " .. vim.fn.fnameescape(joinpath(PLUG_HOME, n, "doc")))
   end
 end
@@ -192,20 +214,6 @@ PLUG_SYNC.fn.clean = function()
   for _, name in ipairs(u) do
     table.insert(PLUG_SYNC.text, "~ " .. name .. ": Untracked")
   end
-end
-
-PLUG_SYNC.fn.fetch = function(name, plug, callback)
-  local cwd = joinpath(PLUG_HOME, name)
-  local f_options = { name = name, cwd = cwd, commit = plug.commit, tag = plug.tag, branch = plug.branch }
-
-  if vim.fn.isdirectory(joinpath(cwd, ".git")) == 0 then
-    return git.clone({ name = name, url = plug.uri, dest = cwd }, function(status)
-      if not status then return callback(false) end
-      git.fetch(f_options, callback)
-    end)
-  end
-
-  git.fetch(f_options, callback)
 end
 
 vim.api.nvim_create_user_command("PlugSync", PLUG_SYNC.fn.run, {
