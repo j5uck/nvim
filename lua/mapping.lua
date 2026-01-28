@@ -22,8 +22,10 @@ map({ "i", "n", "v" }, { "<c-z>", "<MiddleMouse>", "<2-MiddleMouse>" }, "<Nop>",
 map("i", { "<c-Space>" }, "<esc>", { desc = "escape" })
 map({"i", "t"}, "<M-o>", "<c-\\><c-n>", { desc = "escape" })
 
-map("n", "k", "v:count == 0 ? 'gk' : 'k'", { expr = true, silent = true, desc = "move up" })
-map("n", "j", "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = true, desc = "move down" })
+-- map("n", "k", "v:count == 0 ? 'gk' : 'k'", { expr = true, silent = true, desc = "move up" })
+-- map("n", "j", "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = true, desc = "move down" })
+map("n", "k", "gk", { desc = "move up" })
+map("n", "j", "gj", { desc = "move down" })
 
 map("n", "U", "<C-r>", { desc = "redo" })
 
@@ -289,6 +291,12 @@ W.term = window{
 }
 
 map({"n", "v", "t"}, "<c-Space>", function() W.term:toggle() end, { desc = "toggle floating terminal" })
+
+if vim.g.nvy then
+  map("n", "<leader><CR>", function()
+    vim.system({ vim.fn.exepath("nvy") }, { detach = true })
+  end, { desc = "open nvy instance" })
+end
 
 map("n", "<leader>ic", function()
   vim.cmd.cd{vim.fn.stdpath("config"), mods = { silent = true }}
