@@ -197,24 +197,30 @@ vim.api.nvim_create_autocmd("TermOpen", {
 
     local buffer = vim.api.nvim_get_current_buf();
     vim.wo.wrap = true
-    -- vim.cmd[[setlocal scrolloff=0]]
-    -- vim.cmd[[setlocal sidescrolloff=0]]
 
     vim.api.nvim_create_autocmd("BufLeave", {
       buffer = buffer,
-      callback = function()
+      callback = pcall_wrap(function()
         vim.wo.wrap = false
-        -- vim.cmd[[setlocal scrolloff<]]
-        -- vim.cmd[[setlocal sidescrolloff<]]
-      end
+
+        local w = vim.api.nvim_get_current_win()
+
+        local scrolloff = vim.wo[w].scrolloff
+        local sidescrolloff = vim.wo[w].sidescrolloff
+        vim.wo[w].scrolloff = 0
+        vim.wo[w].sidescrolloff = 0
+
+        vim.schedule(pcall_wrap(function()
+          vim.wo[w].scrolloff = scrolloff
+          vim.wo[w].sidescrolloff = sidescrolloff
+        end))
+      end)
     })
 
     vim.api.nvim_create_autocmd("BufEnter", {
       buffer = buffer,
       callback = function()
         vim.wo.wrap = true
-        -- vim.cmd[[setlocal scrolloff=0]]
-        -- vim.cmd[[setlocal sidescrolloff=0]]
       end
     })
   end
