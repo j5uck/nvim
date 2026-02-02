@@ -43,11 +43,17 @@ local function runtimepath()
 end
 
 PLUG_SYNC.fn = {}
+PLUG_SYNC.fn.run_lock = false
 PLUG_SYNC.fn.run = function(args)
-  PLUG_SYNC.coroutine = coroutine.create(PLUG_SYNC.fn.run_coroutine)
+  if PLUG_SYNC.fn.run_lock then return end
+
+  PLUG_SYNC.coroutine = coroutine.create(function()
+    PLUG_SYNC.fn.run_lock = true
+    PLUG_SYNC.fn.run_coroutine()
+    PLUG_SYNC.fn.run_lock = false
+  end)
+
   coroutine.resume(PLUG_SYNC.coroutine, args)
-  -- TODO: remove it
-  PLUG_SYNC.fn.run = function(_) end
 end
 
 PLUG_SYNC.fn.run_coroutine = function(args)

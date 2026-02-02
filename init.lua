@@ -130,6 +130,13 @@ vim.api.nvim_create_autocmd("FileType", {
   callback = function() vim.wo.spell = false end
 })
 
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = { "svelte" },
+  callback = vim.schedule_wrap(function(ev)
+    vim.bo[ev.buf].syntax = "html"
+  end)
+})
+
 local iskeyword = "@,48-57,_,-,192-255"
 vim.go.iskeyword = iskeyword
 vim.bo.iskeyword = iskeyword
