@@ -15,7 +15,9 @@ ripgrep (for telescope) => https://github.com/BurntSushi/ripgrep
 
 TODO:
 
-REPLACE TELESCOPE ASAP!!!!!
+EXPLORER PREVIEW CHANGES !!!!!
+
+REPLACE TELESCOPE ASAP !!!!!
 
 :h lsp-quickstart
 :h lsp-autocompletion

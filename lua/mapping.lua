@@ -518,21 +518,11 @@ vim.api.nvim_create_autocmd("FileType", {
   end
 })
 
-local LANGS_ORDER = {
-  "NEW",
-  "C",
-  "NPM",
-  "Java",
-  "Kotlin",
-  -- "C#", -- TODO
-  "Lua"
-}
-
 LANGS = require("langs")
 
 local select = function()
   local lnum = vim.api.nvim_win_get_cursor(0)[1]
-  local lang = LANGS[string.lower(LANGS_ORDER[lnum])]
+  local lang = LANGS[lnum]
   vim.cmd.q()
 
   local dir = fs.mktmp()
@@ -584,14 +574,14 @@ W.langs = window{
 
     vim.bo.modifiable = true
 
-    for i, l in ipairs(LANGS_ORDER) do
-      local lang = string.lower(l)
-      local icon = LANGS[lang].icon
-      vim.api.nvim_buf_set_lines(0, i-1, i-1, true, { " " .. icon .. "  " .. l })
+    for i, lang in ipairs(LANGS) do
+      vim.api.nvim_buf_set_lines(0, i-1, i-1, true, {
+        " " .. lang.icon .. "  " .. lang.name
+      })
 
       vim.api.nvim_buf_set_extmark(0, NS, i-1, 1, {
-        end_col = #icon + 2,
-        hl_group = LANGS[lang].hl,
+        end_col = #lang.icon + 2,
+        hl_group = lang.hl,
         strict = false,
       })
     end
@@ -606,7 +596,7 @@ W.langs = window{
   end,
   size = function()
     local width = 16
-    local height = math.min(vim.o.lines - 10, #LANGS_ORDER)
+    local height = math.min(vim.o.lines - 10, #LANGS)
 
     return {
       col    = math.ceil(vim.o.columns - width) * 0.5 - 1,
