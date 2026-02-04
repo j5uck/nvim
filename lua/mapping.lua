@@ -158,7 +158,7 @@ map("n", "<leader>0", "<cmd>only<CR> ", { desc = "[0]nly" })
 map("n", "<leader>W", function()
   local o = not vim.wo.wrap
   vim.wo.wrap = o
-  vim.wo.linebreak = o
+  -- vim.wo.linebreak = o
   notify.warn(o and ":set wrap" or ":set nowrap")
 end, { desc = "toggle [W]rap" })
 
@@ -170,7 +170,15 @@ map("n", "<leader>n", function()
     vim.wo.number = true
     vim.wo.signcolumn = "number"
   end
-end, { desc = "toggle [n]umber" })
+end, { desc = "toggle line [n]umbers" })
+
+map("n", "<leader>b", function()
+  if vim.wo.signcolumn == "no" then
+    vim.wo.signcolumn = "number"
+  else
+    vim.wo.signcolumn = "no"
+  end
+end, { desc = "toggle line number signs" })
 
 map("n", "<leader>m", "<cmd>nohlsearch<CR>", { desc = "[m]ute search" })
 

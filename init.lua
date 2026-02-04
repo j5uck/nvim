@@ -44,7 +44,7 @@ for _, line in ipairs(vim.opt.runtimepath:get()) do
   end
 end
 
-vim.cmd[[set shortmess+=AacCIqs]]
+vim.go.shortmess = "AacCFIoOqstT"
 
 vim.cmd[[set nocompatible]]
 

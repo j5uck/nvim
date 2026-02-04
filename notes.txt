@@ -15,6 +15,7 @@ ripgrep (for telescope) => https://github.com/BurntSushi/ripgrep
 
 TODO:
 
+repair explorer history
 EXPLORER PREVIEW CHANGES !!!!!
 
 REPLACE TELESCOPE ASAP !!!!!
