@@ -757,6 +757,7 @@ vim.api.nvim_create_autocmd("BufEnter", {
 })
 
 return {
+  go = function(dir) M.go(dir) end,
   open = function() M.go(getcwd()) end,
   resume = function() M.go(M.dir) end,
   select = M.select,

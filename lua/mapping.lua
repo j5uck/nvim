@@ -185,6 +185,22 @@ map("n", "<leader>m", "<cmd>nohlsearch<CR>", { desc = "[m]ute search" })
 map("n", "<leader>E", explorer.open, { desc = "open file tre[e]" })
 map("n", "<leader>e", explorer.resume, { desc = "resume file tre[e]" })
 
+local function goToTabpageWrap(i)
+  return function()
+    local tabpages = vim.api.nvim_list_tabpages()
+    local tabpage = vim.api.nvim_get_current_tabpage()
+    local target = tabpages[i]
+    if target and tabpage ~= target then
+      vim.api.nvim_set_current_tabpage(target)
+    end
+  end
+end
+
+for i=1, 9, 1 do
+  map({ "n", "t" }, "<M-" .. i .. ">", goToTabpageWrap(i))
+end
+map({ "n", "t" }, "<M-0>", goToTabpageWrap(10))
+
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "lua-explorer" },
   callback = function(ev)
@@ -300,11 +316,12 @@ W.term = window{
 
 map({"n", "v", "t"}, "<c-Space>", function() W.term:toggle() end, { desc = "toggle floating terminal" })
 
-if vim.g.nvy then
-  map("n", "<leader><CR>", function()
-    vim.system({ vim.fn.exepath("nvy") }, { detach = true })
-  end, { desc = "open nvy instance" })
-end
+-- if vim.g.nvy then
+--   map("n", "<leader><CR>", function()
+--     -- vim.system({ vim.fn.exepath("nvy") }, { detach = true })
+--     vim.fn.jobstart({ vim.fn.exepath("nvy") }, { detach = true })
+--   end, { desc = "open nvy instance" })
+-- end
 
 map("n", "<leader>ic", function()
   vim.cmd.cd{vim.fn.stdpath("config"), mods = { silent = true }}
@@ -525,6 +542,12 @@ vim.api.nvim_create_autocmd("FileType", {
     map("n", "<CR>", coc.marketplace.run, { buffer = ev.buf })
   end
 })
+
+map("n", "<leader>in", function()
+  vim.cmd.cd(fs.mktmp())
+  vim.cmd.e("new.txt")
+  explorer.go(fs.mktmp())
+end, { desc = "create tmp folder" })
 
 LANGS = require("langs")
 

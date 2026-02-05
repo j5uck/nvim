@@ -594,13 +594,13 @@ plug{
 
 -- AUTO CLOSE TAGS --
 
-plug{
-  github("alvan/vim-closetag"),
-  setup = function()
-    vim.g.closetag_filenames = "*.html,*.xhtml,*.phtml"
-    vim.g.closetag_xhtml_filenames = "*.xhtml,*.jsx"
-  end
-}
+-- plug{
+--   github("alvan/vim-closetag"),
+--   setup = function()
+--     vim.g.closetag_filenames = "*.html,*.xhtml,*.phtml"
+--     vim.g.closetag_xhtml_filenames = "*.xhtml,*.jsx"
+--   end
+-- }
 
 -- CTAGS BAR --
 

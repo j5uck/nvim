@@ -10,7 +10,6 @@ if not _G.arg[0] then -- :help -l
 end
 
 local M = {
-  new    = { name = "NEW",    icon = " ", hl = nil },
   c      = { name = "C",      icon = "", hl = "DevIconC" },
   npm    = { name = "NPM",    icon = "", hl = "DevIconPackageJson" },
   react  = { name = "React",  icon = "", hl = "DevIconTsx" },
@@ -20,13 +19,12 @@ local M = {
 }
 
 local function sort()
-  M[1] = M["new"]
-  M[2] = M["c"]
-  M[3] = M["npm"]
-  M[4] = M["react"]
-  M[5] = M["java"]
-  M[6] = M["kotlin"]
-  M[7] = M["lua"]
+  M[1] = M["c"]
+  M[2] = M["npm"]
+  M[3] = M["react"]
+  M[4] = M["java"]
+  M[5] = M["kotlin"]
+  M[6] = M["lua"]
 end
 
 local MESSAGE = "Hello World!"
@@ -37,18 +35,18 @@ local gitignore = {
   "**/build/",
   "**/logs/",
   "**/.idea/",
+  "**/.vim/",
   "**/.vscode/",
   "",
   "**/package-lock.json",
   "**/*.lock",
+  "**/.~lock.*",
   "**/*.log",
   "**/out",
+  "**/desktop.ini",
   "**/.DS_Store",
   "**/._*",
 }
-
-M.new.init = { "new.txt" }
-M.new.code = {}
 
 M.c.init = { "main.c" }
 M.c.code = {}
