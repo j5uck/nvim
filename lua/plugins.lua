@@ -49,7 +49,7 @@ PLUG_SYNC.fn.run = function(args)
 
   PLUG_SYNC.coroutine = coroutine.create(function()
     PLUG_SYNC.fn.run_lock = true
-    PLUG_SYNC.fn.run_coroutine()
+    PLUG_SYNC.fn.run_coroutine(args)
     PLUG_SYNC.fn.run_lock = false
   end)
 
