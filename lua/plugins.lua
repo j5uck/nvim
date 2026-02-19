@@ -472,6 +472,27 @@ plug{
   github("iamcco/markdown-preview.nvim"),
   build = function(_)
     vim.fn["mkdp#util#install"]()
+  end,
+  setup = function()
+    vim.g.mkdp_auto_close = 0
+    vim.g.mkdp_page_title = "${name}"
+    vim.g.mkdp_theme = "dark"
+    -- vim.g.mkdp_preview_options = {
+    --   content_editable = false,
+    --   disable_filename = 0,
+    --   disable_sync_scroll = 0,
+    --   flowchart_diagrams = vim.empty_dict(),
+    --   hide_yaml_meta = 1,
+    --   katex = vim.empty_dict(),
+    --   maid = vim.empty_dict(),
+    --   mkit = vim.empty_dict(),
+    --   sequence_diagrams = vim.empty_dict(),
+    --   sync_scroll_type = "middle",
+    --   toc = vim.empty_dict(),
+    --   uml = vim.empty_dict()
+    -- }
+
+    -- TODO: to html/pdf
   end
 }
 
@@ -506,9 +527,12 @@ plug{
     ll("checkhealth", { fn("CHECK HEALTH") }, { nil, PROGRESS, LOCATION })
     ll("TelescopePrompt", { fn("TELESCOPE") })
     ll("undotree", { fn("UNDOTREE"), nil, function()
-      local n = vim.api.nvim_buf_get_name(vim.t.undotree.b.target)
-      if #n == 0 then return "[No Name]" end
-      return fs.basename(n)
+      local target = vim.t.undotree.b.target
+      local n = vim.api.nvim_buf_get_name(target)
+      local a = (vim.bo[target].modified and "[+]" or "") ..
+                (vim.bo[target].readonly and "[-]" or "")
+      return ((#n == 0) and "[No Name]" or fs.basename(n)) ..
+             ((#a == 0) and "" or " ") .. a
     end }, { nil, PROGRESS, LOCATION })
 
     ll("coc-marketplace", { fn("COC-MARKETPLACE")  }, { nil, PROGRESS, LOCATION })

@@ -1,6 +1,6 @@
-local find, prequire = (function()
+local fs, prequire = (function()
   local _ = require("_")
-  return _.find, _.prequire
+  return _.fs, _.prequire
 end)()
 
 local runner = require("run")
@@ -11,20 +11,24 @@ end
 
 local M = {
   c      = { name = "C",      icon = "", hl = "DevIconC" },
-  npm    = { name = "NPM",    icon = "", hl = "DevIconPackageJson" },
+  bun    = { name = "bun",    icon = "", hl = "DevIconBunLockfile" },
   react  = { name = "React",  icon = "", hl = "DevIconTsx" },
   java   = { name = "Java",   icon = "", hl = "DevIconJava" },
   kotlin = { name = "Kotlin", icon = "", hl = "DevIconKotlin" },
   lua    = { name = "Lua",    icon = "", hl = "DevIconLua" },
 }
 
-local function sort()
-  M[1] = M["c"]
-  M[2] = M["npm"]
-  M[3] = M["react"]
-  M[4] = M["java"]
-  M[5] = M["kotlin"]
-  M[6] = M["lua"]
+local order = {
+  "c",
+  "bun",
+  -- "react",
+  "java",
+  "kotlin",
+  "lua"
+}
+
+for i, l in ipairs(order) do
+  M[i] = M[l]
 end
 
 local MESSAGE = "Hello World!"
@@ -44,14 +48,15 @@ local gitignore = {
   "**/*.log",
   "**/out",
   "**/desktop.ini",
+  "**/Thumbs.db",
   "**/.DS_Store",
   "**/._*",
 }
 
-M.c.init = { "main.c" }
+M.c.init = { "src/main.c" }
 M.c.code = {}
-M.c.code["main.c"] = {
-  "// cc -o main ./main.c && ./main",
+M.c.code["src/main.c"] = {
+  "// nvim -l build.lua",
   "#include <stdio.h>",
   "",
   "int main(int argc, char *argv[]){",
@@ -60,17 +65,25 @@ M.c.code["main.c"] = {
   "  return 0;",
   "}"
 }
+M.c.code["build.lua"] = {
+  "require(\"langs\").c.runner()",
+}
+M.c.runner = function()
+  runner:new()
+    :cmd({ vim.fn.exepath("cc"), "-o", "main", "src/main.c" })
+    :cmd{ "./main" }
+end
 
-M.npm.init = { "src/server.js" }
-M.npm.code = {}
-M.npm.code["package.json"] = {
+M.bun.init = { "src/server.js" }
+M.bun.code = {}
+M.bun.code["package.json"] = {
   "{",
   "  \"name\": \"demo\",",
   "  \"type\": \"module\",",
   "  \"scripts\": { ",
-  "    \"bun\": \"bun run ./src/server.js\",",
-  "    \"node\": \"node --disable-warning=ExperimentalWarning ./src/server.js\",",
-  "    \"watch\": \"bun --watch run ./src/server.js\"",
+  "    \"dev\": \"bun ./src/server.js\",",
+--"    \"node\": \"node --disable-warning=ExperimentalWarning ./src/server.js\",",
+  "    \"watch\": \"bun --watch ./src/server.js\"",
   "  },",
   "  \"devDependencies\": {",
   "    \"@types/bun\": \"*\",",
@@ -78,14 +91,14 @@ M.npm.code["package.json"] = {
   "  }",
   "}"
 }
-M.npm.code["src/server.js"] = {
-  "// npm run bun",
+M.bun.code["src/server.js"] = {
+  "// bun run dev",
   "",
   "(async () => {",
   "  console.log(\"" .. MESSAGE .. "\");",
   "})();"
 }
-M.npm.code[".gitignore"] = gitignore
+M.bun.code[".gitignore"] = gitignore
 
 M.react.init = { "src/script.tsx" }
 M.react.code = {}
@@ -199,9 +212,9 @@ M.java.code["build.lua"] = {
 }
 M.java.runner = function()
   runner:new()
-    :cmd(vim.list_extend({ vim.fn.exepath("javac"), "-d", "build", "src/Main.java" }, find("\\.java$")))
+    :cmd(vim.list_extend({ vim.fn.exepath("javac"), "-d", "build", "src/Main.java" }, fs.find("\\.java$")))
     :cd("build")
-    :cmd(vim.list_extend({ vim.fn.exepath("jar"), "-cfe", "Main.jar", "src/Main" }, find("\\.class$", "build")))
+    :cmd(vim.list_extend({ vim.fn.exepath("jar"), "-cfe", "Main.jar", "src/Main" }, fs.find("\\.class$", "build")))
     :cmd{ vim.fn.exepath("java"), "-jar", "Main.jar" }
 end
 
@@ -219,7 +232,7 @@ M.kotlin.code["build.lua"] = {
 }
 M.kotlin.runner = function()
   runner:new()
-    :cmd(vim.list_extend({ vim.fn.exepath("kotlinc"), "-Wextra", "-d", "build/Main.jar", "src/Main.kt" }, find("\\.kt$")))
+    :cmd(vim.list_extend({ vim.fn.exepath("kotlinc"), "-Wextra", "-d", "build/Main.jar", "src/Main.kt" }, fs.find("\\.kt$")))
     :cmd{ vim.fn.exepath("java"), "-jar", "build/Main.jar" }
 end
 
@@ -228,7 +241,5 @@ M.lua.code = {}
 M.lua.code["script.lua"] = {
   "vim.notify(\"" .. MESSAGE .. "\", vim.log.levels.WARN)"
 }
-
-sort()
 
 return M

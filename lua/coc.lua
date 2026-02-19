@@ -26,7 +26,7 @@ M.extensions.required = {
   "coc-snippets",
   "coc-sql",
   "coc-sumneko-lua",
-  -- "coc-svelte",
+  "coc-svelte",
   -- "coc-svg",
   "coc-tsserver",
   "coc-typos",

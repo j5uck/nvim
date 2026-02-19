@@ -8,18 +8,26 @@ local W = {}
 
 vim.g.mapleader = " "
 
-local function map(mode, lhs, rhs, opts)
+local function unmap(modes, lhs, opts)
   opts = vim.tbl_extend("force", { noremap = true, silent = true }, opts or {})
 
   for _, l in ipairs(type(lhs) == "string" and { lhs } or lhs) do
-    vim.keymap.set(mode, l, rhs, opts)
+    vim.keymap.set(modes, l, l, opts)
+  end
+end
+
+local function map(modes, lhs, rhs, opts)
+  opts = vim.tbl_extend("force", { noremap = true, silent = true }, opts or {})
+
+  for _, l in ipairs(type(lhs) == "string" and { lhs } or lhs) do
+    vim.keymap.set(modes, l, rhs, opts)
   end
 end
 
 map({ "n", "v" }, { "&", "<CR>", "<c-c>", "<leader>", "<leader>s", "<leader><s-q>", "<leader>f" }, "<Nop>", { desc = "do nothing" })
 map({ "i", "n", "v" }, { "<c-z>", "<MiddleMouse>", "<2-MiddleMouse>" }, "<Nop>", { desc = "do nothing" })
 
-map("i", { "<c-Space>" }, "<esc>", { desc = "escape" })
+map("i", { "<c-Space>" }, "<c-\\><c-n>", { desc = "escape" })
 map({"i", "t"}, "<M-o>", "<c-\\><c-n>", { desc = "escape" })
 
 -- map("n", "k", "v:count == 0 ? 'gk' : 'k'", { expr = true, silent = true, desc = "move up" })
@@ -42,9 +50,9 @@ map("v", ">", ">gv", { desc = "un-tab" })
 map("v", "<c-a>", "<c-a>gv", { desc = "increase" })
 map("v", "<c-x>", "<c-x>gv", { desc = "decrease" })
 
-map("i", "<tab>",   "<tab>", { desc = "tab" })
+unmap("i", "<tab>", { desc = "tab" })
 map("i", "<s-tab>", "<c-h>", { desc = "un-tab" })
-map("i", "<cr>",    "<cr>",  { desc = "enter" })
+unmap("i", "<cr>",  { desc = "enter" })
 
 map("n", "<M-h>", "<c-w>h", { desc = "move to split [h] left" })
 map("n", "<M-j>", "<c-w>j", { desc = "move to split [j] down" })
@@ -204,10 +212,10 @@ map({ "n", "t" }, "<M-0>", goToTabpageWrap(10))
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "lua-explorer" },
   callback = function(ev)
-    map("n", "<s-k>", "<Nop>", { buffer = ev.buf })
-    map("n", "<s-j>", "<Nop>", { buffer = ev.buf })
+    unmap("n", { "H", "J", "K", "L" }, { buffer = ev.buf })
 
-    map("n", "<esc>", "<cmd>q<CR>", { buffer = ev.buf })
+    -- map("n", "<esc>", "<cmd>q<CR>", { buffer = ev.buf })
+    map("n", "<c-Space>", "<cmd>q<CR>", { buffer = ev.buf })
 
     map("n", "<2-LeftMouse>", explorer.select, { buffer = ev.buf })
     map("n", "<CR>", explorer.select, { buffer = ev.buf })
@@ -241,7 +249,6 @@ vim.api.nvim_create_autocmd("FileType", {
 local term_buffers = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }
 local term_buffers_i = 1
 local term_buffers_flag = false
-local term_maximized_flag = true
 W.term = window{
   on_show = function(self)
     pcall(function()
@@ -288,10 +295,7 @@ W.term = window{
     end
     map({ "n", "t" }, "<M-0>", go_wrap(10), { buffer = self.buf })
 
-    map("n", "<leader>t", function()
-      term_maximized_flag = not term_maximized_flag
-      for _, fn in ipairs(self.on_resize) do fn(self) end
-    end, { buffer = self.buf, desc = "Toggle [t]erminal size" })
+    map("n", "<leader>t", "<Nop>", { buffer = self.buf, desc = "do nothing" })
 
     vim.api.nvim_create_autocmd("WinLeave", {
       callback = function() self:hide() end,
@@ -299,8 +303,7 @@ W.term = window{
     })
   end,
   size = function()
-    local width = term_maximized_flag and vim.o.columns or
-        math.ceil(math.min(vim.o.columns, math.max(80, vim.o.columns - 20)))
+    local width = vim.o.columns - 2
     local height = math.ceil(math.min(vim.o.lines, math.max(20, vim.o.lines - 10)))
 
     return {
@@ -546,7 +549,7 @@ vim.api.nvim_create_autocmd("FileType", {
 map("n", "<leader>in", function()
   vim.cmd.cd(fs.mktmp())
   vim.cmd.e("new.txt")
-  explorer.go(fs.mktmp())
+  explorer.open()
 end, { desc = "create tmp folder" })
 
 LANGS = require("langs")

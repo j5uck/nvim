@@ -196,7 +196,7 @@ M.git.clone = function(o, cb)
 end
 
 M.git.fetch = function(o, cb)
-  vim.uv.fs_unlink(o.cwd .. "/.git/shallow.lock")
+  -- vim.uv.fs_unlink(o.cwd .. "/.git/shallow.lock")
 
   local cmds = {}
   local function t(cmd) table.insert(cmds, cmd) end
@@ -217,7 +217,7 @@ M.git.fetch = function(o, cb)
     t(function(r) return { "git", "switch", ({string.gsub(vim.split(r.stdout, "[ \t]")[2], ".+/(.+)$", "%1")})[1] } end)
   end
 
-  if vim.fn.filereadable(o.cwd .. "/.gitmodules") then
+  if vim.fn.filereadable(o.cwd .. "/.gitmodules") == 1 then
     t(function(_) return { "git", "submodule", "update", "--init", "--recursive", "--depth=1", "--jobs=16" } end)
   end
 

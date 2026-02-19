@@ -39,7 +39,7 @@ local w = window{
     })
   end,
   size = function()
-    local width = math.min(vim.o.columns - 8, math.min(80, vim.o.columns))
+    local width = math.min(vim.o.columns - 4, math.min(80, vim.o.columns))
     local height = vim.o.lines - 8
 
     return {
@@ -256,6 +256,8 @@ local HL = {
   DIRECTORY   = "Directory",
   FILE        = "Normal",
   HIDDEN      = "Comment",
+  LINK_ARROW  = "Comment",
+  LINK        = "Comment",
   -- LINK        = "Special", -- "Function",  "DiagnosticOk"
   LINK_ORPHAN = "DiagnosticError",
   SOCKET      = "Keyword"
@@ -351,8 +353,8 @@ local function fn_BufReadCmd()
     add(M.encode(name), (vim.startswith(e.name, ".") and HL.HIDDEN) or (e.is_directory and HL.DIRECTORY) or nil)
 
     if is_link then
-      add("%=>", HL.HIDDEN)
-      add(e.link, e.link_exists and HL.HIDDEN or HL.LINK_ORPHAN)
+      add("%=>", HL.LINK_ARROW)
+      add(e.link, e.link_exists and HL.LINK or HL.LINK_ORPHAN)
     end
 
     table.insert(text, table.concat(line, " "))
@@ -757,7 +759,7 @@ vim.api.nvim_create_autocmd("BufEnter", {
 })
 
 return {
-  go = function(dir) M.go(dir) end,
+  -- go = function(dir) M.go(vim.fs.normalize(dir) .. "/") end,
   open = function() M.go(getcwd()) end,
   resume = function() M.go(M.dir) end,
   select = M.select,
