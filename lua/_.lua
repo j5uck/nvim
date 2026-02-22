@@ -97,7 +97,7 @@ end
 
 M.fs.mkfile = function(file, content, flags)
   flags = flags or ""
-  if vim.fn.match(flags, "p") then M.fs.mkdir(vim.fs.dirname(file)) end
+  M.fs.mkdir(vim.fs.dirname(file))
   local s, _ = pcall(vim.fn.writefile, content or {}, file, flags)
   return not s
 end

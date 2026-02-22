@@ -215,7 +215,6 @@ vim.api.nvim_create_autocmd("FileType", {
     unmap("n", { "H", "J", "K", "L" }, { buffer = ev.buf })
 
     -- map("n", "<esc>", "<cmd>q<CR>", { buffer = ev.buf })
-    map("n", "<c-Space>", "<cmd>q<CR>", { buffer = ev.buf })
 
     map("n", "<2-LeftMouse>", explorer.select, { buffer = ev.buf })
     map("n", "<CR>", explorer.select, { buffer = ev.buf })
@@ -378,6 +377,7 @@ vim.api.nvim_create_autocmd("FileType", {
     map("n", { "<CR>", "<2-LeftMouse>" }, undotree.select, { buffer = ev.buf, desc = "Select state" })
     map("n", "u", undotree.undo, { buffer = ev.buf, desc = "Undo" })
     map("n", { "U", "<c-r>" }, undotree.redo, { buffer = ev.buf, desc = "Redo" })
+    map("n", "<leader>w", undotree.write, { buffer = ev.buf, desc = "Write" })
   end
 })
 
@@ -562,10 +562,18 @@ local select = function()
   local dir = fs.mktmp()
   for name, content in pairs(lang.code) do
     local f = dir .. "/" .. name
-    fs.mkfile(f, content, "p")
+    fs.mkfile(f, content)
     if (vim.fn.has("win32") == 0) and (vim.fn.match(content[1], "^#!") == 0) then
       vim.system({ "chmod", "a+x", f }, { cwd = dir }):wait()
     end
+  end
+  if lang.runner then
+    local build = fs.readfile(vim.fn.stdpath("config") .. "/lua/run.lua")
+    ---@diagnostic disable-next-line: param-type-mismatch
+    vim.list_extend(build, { "" })
+    ---@diagnostic disable-next-line: param-type-mismatch
+    vim.list_extend(build, lang.runner)
+    fs.mkfile(dir .. "/build.lua", build)
   end
   for _, file in ipairs(lang.init) do
     vim.cmd.e(vim.fn.fnameescape(dir .. "/" .. file))
@@ -623,9 +631,9 @@ W.langs = window{
     vim.cmd[[norm! G"_ddgg]]
     vim.bo.modifiable = false
 
-    vim.api.nvim_create_autocmd("WinLeave", {
-      callback = function() self:hide() end,
-      once = true
+    vim.api.nvim_create_autocmd("BufLeave", {
+      buffer = self.buf,
+      callback = function() self:hide() end
     })
   end,
   size = function()

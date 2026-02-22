@@ -20,6 +20,10 @@
     "/usr/local/share/nvim/runtime/lua/vim/treesitter"
   ],
 
+  "html.format.wrapLineLength": 0,
+  "html.autoClosingTags": false,
+  "html.autoCreateQuotes": false,
+
   "javascript.suggestionActions.enabled": true,
   "typescript.suggestionActions.enabled": true,
 

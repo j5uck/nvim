@@ -1,3 +1,4 @@
+local fs = require("_").fs
 local ffi = require("ffi")
 local C = ffi.C
 
@@ -16,9 +17,9 @@ end)()
 local T_GRAY  = "\x1b[1;30m"
 local T_RESET = "\x1b[0m"
 
-local R = {}
+local runner = { cwd = vim.fn.getcwd() }
 
-function R:cmd(cmd)
+function runner:cmd(cmd)
   C.fprintf(stdout, "%s\n", T_GRAY .. ">>" .. T_RESET .. " "  .. table.concat(cmd, " "))
 
   local job = vim.fn.jobstart(cmd, { cwd = self.cwd, on_stdout = function(_, strings, _)
@@ -32,7 +33,7 @@ function R:cmd(cmd)
   return vim.fn.jobwait{job}[1] == 0 and self or os.exit(1)
 end
 
-function R:cd(dir)
+function runner:cd(dir)
   C.fprintf(stdout, "%s\n", T_GRAY .. ">>" .. T_RESET .. " cd " .. dir)
   if vim.fn.isabsolutepath(dir) == 1 then
     self.cwd = dir
@@ -44,9 +45,3 @@ function R:cd(dir)
   end
   return self
 end
-
-return {
-  new = function()
-    return setmetatable({ cwd = vim.fn.getcwd() }, { __index = R })
-  end
-}

@@ -18,9 +18,10 @@ M.extensions.required = {
   -- "coc-go",
   "coc-html",
   "coc-java",
+  "coc-java-lombok",
   -- "coc-jedi",
   "coc-json",
-  "coc-kotlin",
+  -- "coc-kotlin",
   "coc-rust-analyzer",
   "coc-sh",
   "coc-snippets",
@@ -243,6 +244,7 @@ M.marketplace.run = function()
     M.extensions.install(to_install)
   end)
 
+  -- TODO: check if there is only 1 window left
   vim.defer_fn(vim.schedule_wrap(function()
     pcall(vim.api.nvim_win_call, empty_window, vim.cmd.q)
   end), 500)

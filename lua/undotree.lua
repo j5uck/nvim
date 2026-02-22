@@ -449,6 +449,7 @@ return {
   redo = do_cmd_wrap("redo"),
   prev = do_cmd_wrap("earlier"),
   next = do_cmd_wrap("later"),
+  write = do_cmd_wrap("write"),
   prev_save = do_cmd_wrap("earlier 1f"),
   next_save = do_cmd_wrap("later 1f"),
   select = function()

@@ -492,7 +492,7 @@ plug{
     --   uml = vim.empty_dict()
     -- }
 
-    -- TODO: to html/pdf
+    -- TODO: to html & pdf
   end
 }
 
@@ -521,31 +521,35 @@ plug{
         filetypes = { filetype }
       })
     end
-    local function fn(o) return function() return o end end
+    local function fn(o)
+      return function() return o end
+    end
+
+    local function undotree()
+      local target = vim.t.undotree.b.target
+      local n = vim.api.nvim_buf_get_name(target)
+      local a = (vim.bo[target].modified and "[+]" or "") ..
+          (((not vim.bo[target].modifiable) or vim.bo[target].readonly) and "[-]" or "")
+      return ((#n == 0) and "[No Name]" or fs.basename(n)) ..
+             ((#a == 0) and "" or (" " .. a))
+    end
+
+    local function lua_explorer()
+      local url = string.gsub(vim.api.nvim_buf_get_name(0), "%%", "%%%%")
+      local a = (vim.bo.modified and "[+]" or "") ..
+          (((not vim.bo.modifiable) or vim.bo.readonly) and "[-]" or "")
+      return url .. ((#a == 0) and "" or (" " .. a))
+    end
 
     ll("help", { fn("NEOVIM HELP"), { "filename", file_status = false } }, { nil, PROGRESS, LOCATION })
     ll("checkhealth", { fn("CHECK HEALTH") }, { nil, PROGRESS, LOCATION })
     ll("TelescopePrompt", { fn("TELESCOPE") })
-    ll("undotree", { fn("UNDOTREE"), nil, function()
-      local target = vim.t.undotree.b.target
-      local n = vim.api.nvim_buf_get_name(target)
-      local a = (vim.bo[target].modified and "[+]" or "") ..
-                (vim.bo[target].readonly and "[-]" or "")
-      return ((#n == 0) and "[No Name]" or fs.basename(n)) ..
-             ((#a == 0) and "" or " ") .. a
-    end }, { nil, PROGRESS, LOCATION })
+    ll("undotree", { fn("UNDOTREE"), nil, undotree }, { nil, PROGRESS, LOCATION })
 
     ll("coc-marketplace", { fn("COC-MARKETPLACE")  }, { nil, PROGRESS, LOCATION })
     ll("coc-nvim", { fn("COC-NVIM") }, { nil, PROGRESS, LOCATION })
     ll("lua-plug", { fn("LUA-PLUG") })
-    ll("lua-explorer", {
-      fn("LUA-EXPLORER"),
-      nil,
-      function()
-        local url = string.gsub(vim.api.nvim_buf_get_name(0), "%%", "%%%%")
-        return vim.o.modified and (url .. " [+]") or url
-      end
-    })
+    ll("lua-explorer", { fn("LUA-EXPLORER"), nil, lua_explorer })
 
     local o = { icons_enabled = true, theme = "auto" }
 

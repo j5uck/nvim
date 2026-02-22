@@ -1,9 +1,7 @@
-local fs, prequire = (function()
+local prequire = (function()
   local _ = require("_")
-  return _.fs, _.prequire
+  return _.prequire
 end)()
-
-local runner = require("run")
 
 if not _G.arg[0] then -- :help -l
   prequire("nvim-web-devicons", function() end)
@@ -11,7 +9,7 @@ end
 
 local M = {
   c      = { name = "C",      icon = "", hl = "DevIconC" },
-  bun    = { name = "bun",    icon = "", hl = "DevIconBunLockfile" },
+  bun    = { name = "Bun",    icon = "", hl = "DevIconBunLockfile" },
   react  = { name = "React",  icon = "", hl = "DevIconTsx" },
   java   = { name = "Java",   icon = "", hl = "DevIconJava" },
   kotlin = { name = "Kotlin", icon = "", hl = "DevIconKotlin" },
@@ -65,14 +63,11 @@ M.c.code["src/main.c"] = {
   "  return 0;",
   "}"
 }
-M.c.code["build.lua"] = {
-  "require(\"langs\").c.runner()",
+M.c.runner = {
+  "runner",
+  "  :cmd({ vim.fn.exepath(\"cc\"), \"-o\", \"main\", \"src/main.c\" })",
+  "  :cmd{ \"./main\" }"
 }
-M.c.runner = function()
-  runner:new()
-    :cmd({ vim.fn.exepath("cc"), "-o", "main", "src/main.c" })
-    :cmd{ "./main" }
-end
 
 M.bun.init = { "src/server.js" }
 M.bun.code = {}
@@ -100,6 +95,7 @@ M.bun.code["src/server.js"] = {
 }
 M.bun.code[".gitignore"] = gitignore
 
+--[[
 M.react.init = { "src/script.tsx" }
 M.react.code = {}
 M.react.code["src/script.tsx"] = {
@@ -194,6 +190,7 @@ M.react.code["package.json"] = {
   "}"
 }
 M.react.code[".gitignore"] = gitignore
+]]--
 
 M.java.init = { "src/Main.java" }
 M.java.code = {}
@@ -207,16 +204,13 @@ M.java.code["src/Main.java"] = {
   "  }",
   "}"
 }
-M.java.code["build.lua"] = {
-  "require(\"langs\").java.runner()",
+M.java.runner = {
+  "runner",
+  "  :cmd(vim.list_extend({ vim.fn.exepath(\"javac\"), \"-d\", \"build\", \"src/Main.java\" }, fs.find(\"\\\\.java$\")))",
+  "  :cd(\"build\")",
+  "  :cmd(vim.list_extend({ vim.fn.exepath(\"jar\"), \"-cfe\", \"Main.jar\", \"src/Main\" }, fs.find(\"\\\\.class$\", \"build\")))",
+  "  :cmd{ vim.fn.exepath(\"java\"), \"-jar\", \"Main.jar\" }"
 }
-M.java.runner = function()
-  runner:new()
-    :cmd(vim.list_extend({ vim.fn.exepath("javac"), "-d", "build", "src/Main.java" }, fs.find("\\.java$")))
-    :cd("build")
-    :cmd(vim.list_extend({ vim.fn.exepath("jar"), "-cfe", "Main.jar", "src/Main" }, fs.find("\\.class$", "build")))
-    :cmd{ vim.fn.exepath("java"), "-jar", "Main.jar" }
-end
 
 M.kotlin.init = { "src/Main.kt" }
 M.kotlin.code = {}
@@ -227,14 +221,11 @@ M.kotlin.code["src/Main.kt"] = {
   "  println(\"" .. MESSAGE .. "\")",
   "}"
 }
-M.kotlin.code["build.lua"] = {
-  "require(\"langs\").kotlin.runner()",
+M.kotlin.runner = {
+  "runner",
+  "  :cmd(vim.list_extend({ vim.fn.exepath(\"kotlinc\"), \"-Wextra\", \"-d\", \"build/Main.jar\", \"src/Main.kt\" }, fs.find(\"\\\\.kt$\")))",
+  "  :cmd{ vim.fn.exepath(\"java\"), \"-jar\", \"build/Main.jar\" }"
 }
-M.kotlin.runner = function()
-  runner:new()
-    :cmd(vim.list_extend({ vim.fn.exepath("kotlinc"), "-Wextra", "-d", "build/Main.jar", "src/Main.kt" }, fs.find("\\.kt$")))
-    :cmd{ vim.fn.exepath("java"), "-jar", "build/Main.jar" }
-end
 
 M.lua.init = { "script.lua" }
 M.lua.code = {}
