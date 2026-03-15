@@ -11,3 +11,6 @@ syn match Comment /^\~.*/ oneline
 syn match Special /^-/ oneline
 syn match PlugSyncDone /\(^- \)\@<=.*:/ oneline
 syn match Error /^x.*:/ oneline
+
+" hi link PlugSyncDone Function
+" hi link PlugSyncDone Label

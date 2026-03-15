@@ -1,6 +1,6 @@
-local notify, notify_once, flags, fs, prequire, window = (function()
+local async, async_wrap, await, notify, notify_once, flags, fs, prequire, window = (function()
   local _ = require("_")
-  return _.notify, _.notify_once, _.flags, _.fs, _.prequire, _.window
+  return _.async, _.async_wrap, _.await, _.notify, _.notify_once, _.flags, _.fs, _.prequire, _.window
 end)()
 local explorer = require("explorer")
 
@@ -59,15 +59,15 @@ map("n", "<M-j>", "<c-w>j", { desc = "move to split [j] down" })
 map("n", "<M-k>", "<c-w>k", { desc = "move to split [k] up" })
 map("n", "<M-l>", "<c-w>l", { desc = "move to split [l] right" })
 
-map("n", "<s-h>", "<cmd>vsplit<cr>",            { desc = "split [S]plit [h] left" })
-map("n", "<s-j>", "<cmd>belowright split<CR>",  { desc = "split [S]plit [j] down" })
-map("n", "<s-k>", "<cmd>split<CR>",             { desc = "split [S]plit [k] up" })
-map("n", "<s-l>", "<cmd>belowright vsplit<CR>", { desc = "split [S]plit [l] right" })
+map("n", "<s-h>", "<cmd>vsplit<cr>",            { desc = "[s]plit (h) left" })
+map("n", "<s-j>", "<cmd>belowright split<CR>",  { desc = "[s]plit (j) down" })
+map("n", "<s-k>", "<cmd>split<CR>",             { desc = "[s]plit (k) up" })
+map("n", "<s-l>", "<cmd>belowright vsplit<CR>", { desc = "[s]plit (l) right" })
 
-map("n", "<leader><s-h>", "<cmd>vnew<cr>",            { desc = "empty [S]plit [h] left" })
-map("n", "<leader><s-j>", "<cmd>belowright new<CR>",  { desc = "empty [S]plit [j] down" })
-map("n", "<leader><s-k>", "<cmd>new<CR>",             { desc = "empty [S]plit [k] up" })
-map("n", "<leader><s-l>", "<cmd>belowright vnew<CR>", { desc = "empty [S]plit [l] right" })
+map("n", "<leader><s-h>", "<cmd>vnew<cr>",            { desc = "empty [s]plit (h) left" })
+map("n", "<leader><s-j>", "<cmd>belowright new<CR>",  { desc = "empty [s]plit (j) down" })
+map("n", "<leader><s-k>", "<cmd>new<CR>",             { desc = "empty [s]plit (k) up" })
+map("n", "<leader><s-l>", "<cmd>belowright vnew<CR>", { desc = "empty [s]plit (l) right" })
 
 map("x", { "<leader>I", "<leader>A" }, "xgvI", { desc = "replace block" })
 
@@ -208,6 +208,15 @@ for i=1, 9, 1 do
   map({ "n", "t" }, "<M-" .. i .. ">", goToTabpageWrap(i))
 end
 map({ "n", "t" }, "<M-0>", goToTabpageWrap(10))
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = { "lua-plug" },
+  callback = function(ev)
+    for _, v in ipairs{ "<CR>", "x", "X", "d", "dd", "i", "I", "a", "A", "o", "O", "r", "R" } do
+      map("n", v, "<Nop>", { buffer = ev.buf })
+    end
+  end
+})
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "lua-explorer" },
@@ -547,33 +556,35 @@ vim.api.nvim_create_autocmd("FileType", {
 })
 
 map("n", "<leader>in", function()
-  vim.cmd.cd(fs.mktmp())
-  vim.cmd.e("new.txt")
-  explorer.open()
+  async(function(_)
+    vim.cmd.cd(await(fs.mktmp()).unwrap())
+    vim.cmd.e("new.txt")
+    explorer.open()
+  end)
 end, { desc = "create tmp folder" })
 
 LANGS = require("langs")
 
-local select = function()
+local select = async_wrap(function(promise)
   local lnum = vim.api.nvim_win_get_cursor(0)[1]
   local lang = LANGS[lnum]
   vim.cmd.q()
 
-  local dir = fs.mktmp()
+  local dir = await(fs.mktmp()).unwrap()
   for name, content in pairs(lang.code) do
     local f = dir .. "/" .. name
-    fs.mkfile(f, content)
+    await(fs.mkfile(f, content)).unwrap()
     if (vim.fn.has("win32") == 0) and (vim.fn.match(content[1], "^#!") == 0) then
       vim.system({ "chmod", "a+x", f }, { cwd = dir }):wait()
     end
   end
   if lang.runner then
-    local build = fs.readfile(vim.fn.stdpath("config") .. "/lua/run.lua")
+    local build = await(fs.readfile(vim.fn.stdpath("config") .. "/lua/run.lua")).unwrap()
     ---@diagnostic disable-next-line: param-type-mismatch
     vim.list_extend(build, { "" })
     ---@diagnostic disable-next-line: param-type-mismatch
     vim.list_extend(build, lang.runner)
-    fs.mkfile(dir .. "/build.lua", build)
+    await(fs.mkfile(dir .. "/build.lua", build)).unwrap()
   end
   for _, file in ipairs(lang.init) do
     vim.cmd.e(vim.fn.fnameescape(dir .. "/" .. file))
@@ -581,7 +592,9 @@ local select = function()
   end
   vim.cmd.q()
   vim.cmd.cd(dir)
-end
+
+  return promise.resolve()
+end)
 
 W.langs = window{
   on_show = function(self)
@@ -612,7 +625,7 @@ W.langs = window{
     map("n", { "A", "I", "D", "R", "a", "i", "d", "r" }, "<Nop>", { buffer = self.buf })
 
     map("n", { "q", "<esc>" }, vim.cmd.q, { buffer = self.buf, desc = "quit" })
-    map("n", "<CR>",  select, { buffer = self.buf, desc = "select" })
+    map("n", "<CR>", function() select() end, { buffer = self.buf, desc = "select" })
 
     vim.bo.modifiable = true
 

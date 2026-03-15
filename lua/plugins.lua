@@ -1,6 +1,6 @@
-local flags, fs, git, notify, notify_once, prequire_wrap = (function()
+local async_wrap, await, flags, fs, git, notify, notify_once, prequire_wrap = (function()
   local _ = require("_")
-  return _.flags, _.fs, _.git, _.notify, _.notify_once, _.prequire_wrap
+  return _.async_wrap, _.await, _.flags, _.fs, _.git, _.notify, _.notify_once, _.prequire_wrap
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
@@ -44,182 +44,253 @@ end
 
 PLUG_SYNC.fn = {}
 PLUG_SYNC.fn.run_lock = false
-PLUG_SYNC.fn.run = function(args)
-  if PLUG_SYNC.fn.run_lock then return end
 
-  PLUG_SYNC.coroutine = coroutine.create(function()
-    PLUG_SYNC.fn.run_lock = true
-    PLUG_SYNC.fn.run_coroutine(args)
-    PLUG_SYNC.fn.run_lock = false
-  end)
+local _run = async_wrap(function(promise, args)
+  local reltime = vim.fn.reltime()
 
-  coroutine.resume(PLUG_SYNC.coroutine, args)
-end
+  if PLUG_SYNC.fn.run_lock then
+    return promise.reject("Plug sync is still running")
+  end
+  PLUG_SYNC.fn.run_lock = true
 
-PLUG_SYNC.fn.run_coroutine = function(args)
   if vim.fn.executable("git") == 0 then
-    return notify.error("Git not found\nCannot proceed")
+    return promise.reject("Git not found")
   end
 
-  local po = vim.fn.sort(#args.fargs > 0 and args.fargs or PLUGS_ORDER, "i")
-  if #po == 0 then return notify.warn("Nothing to do") end
+  local function set_lines(start, _end, lines)
+    vim.bo[PLUG_SYNC.buf].modifiable = true
+    vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, start, _end, false, lines)
+    vim.bo[PLUG_SYNC.buf].modifiable = false
+    vim.bo[PLUG_SYNC.buf].modified = false
+  end
 
-  PLUG_SYNC.reltime = vim.fn.reltime()
+  -- INIT --
+
+  local todo = { errors = false }
+  if #args.fargs == 0 then
+    todo.plugs = vim.list_slice(PLUGS_ORDER, 1, #PLUGS_ORDER)
+  else
+    local missing = {}
+    for _, name in ipairs(args.fargs) do
+      if not PLUGS[name] then
+        table.insert(missing, name)
+      end
+    end
+    if #missing > 0 then
+      return promise.reject("Plugin" .. (#missing == 1 and "" or "s") .. " not configured:\n  >>" .. table.concat(missing, "\n  >>"))
+    end
+
+    todo.plugs = args.fargs
+  end
+
+  if #todo.plugs == 0 then
+    notify.warn("Nothing to do")
+    return promise.resolve()
+  end
 
   vim.cmd[[tabnew]]
   PLUG_SYNC.buf = vim.api.nvim_get_current_buf()
+  PLUG_SYNC.win = vim.api.nvim_get_current_win()
 
-  vim.bo.bufhidden    = "hide"
-  vim.bo.buflisted    = false
-  vim.bo.buftype      = "nofile"
-  vim.bo.swapfile     = false
-  vim.bo.undolevels   = -1
-  vim.o.concealcursor = "nvic"
-  vim.o.conceallevel  = 3
+  vim.bo[PLUG_SYNC.buf].filetype   = "lua-plug"
+  vim.bo[PLUG_SYNC.buf].bufhidden  = "hide"
+  vim.bo[PLUG_SYNC.buf].buflisted  = false
+  vim.bo[PLUG_SYNC.buf].buftype    = "nofile"
+  vim.bo[PLUG_SYNC.buf].swapfile   = false
+  vim.bo[PLUG_SYNC.buf].undolevels = -1
 
-  vim.cmd[[setf lua-plug]]
-  for _, v in ipairs{ "<CR>", "x", "X", "d", "dd", "i", "I", "a", "A", "o", "O", "r", "R" } do
-    vim.keymap.set("n", v, "<Nop>", { buffer = PLUG_SYNC.buf })
+  vim.wo[PLUG_SYNC.win].concealcursor = "nvic"
+  vim.wo[PLUG_SYNC.win].conceallevel  = 3
+
+  -- CLEAN UP --
+
+  todo.untracked = (function()
+    local l = await(fs.ls(PLUG_HOME)).unwrap()
+
+    local u = vim.tbl_map(function(e)
+      return e.name
+    end, l)
+
+    return vim.tbl_filter(function(name)
+      return PLUGS[name] == nil
+    end, u)
+  end)()
+
+  if (#args.fargs == 0) and (#todo.untracked > 0) then
+    set_lines(0, -1, { "", "", "", "", "" })
+    set_lines(5, -1, vim.tbl_map(function(v) return "- "..v end, todo.untracked))
+
+    vim.cmd.redraw()
+    local answer = vim.fn.input("Delete untracked plugins? (y/N)")
+
+    if vim.fn.match(answer, "^[yY]\\([eE][sS]\\)\\?$") == 0 then
+      local promises = {}
+      for _, u in ipairs(todo.untracked) do
+        local p = fs.remove(u)
+        p.meta = { untracked = u }
+        table.insert(promises, p)
+      end
+      for _, p in ipairs(promises) do
+        if await(p).code ~= 0 then
+          notify.error("\"".. p.meta.untracked .."\" couldn't be deleted!")
+        end
+      end
+    end
   end
-  vim.keymap.set("n", "q", "<cmd>q<CR>", { buffer = PLUG_SYNC.buf })
-  if vim.fn.exists('+colorcolumn') == 1 then
-    vim.cmd[[setlocal colorcolumn=]]
-  end
 
-  if #args.fargs > 0 then PLUG_SYNC.fn.clean() end
+  todo.untracked = (#args.fargs > 0) and {} or (function()
+    local l = await(fs.ls(PLUG_HOME)).unwrap()
+
+    local u = vim.tbl_map(function(e)
+      return e.name
+    end, l)
+
+    return vim.tbl_filter(function(name)
+      return PLUGS[name] == nil
+    end, u)
+  end)()
+  todo.plugs = vim.fn.sort(vim.list_extend(todo.plugs, todo.untracked), "i")
+  todo.untracked = nil
 
   vim.api.nvim_buf_call(PLUG_SYNC.buf, function()
     vim.cmd[[hi link PlugSyncDone Function]]
   end)
 
-  local not_finished = #po
-  local error = false
-  for i = 1, #po, 1 do
-    local name = po[i]
-    local index = i
-    vim.bo[PLUG_SYNC.buf].modifiable = true
-    vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, index-1, index, false, {
-      "+ " .. name .. ": Fetching..."
-    })
-    vim.bo[PLUG_SYNC.buf].modifiable = false
+  set_lines(0, -1, {})
+
+  -- CLONE --
+
+  todo.promises = {}
+  for i, name in ipairs(todo.plugs) do
+    local plug = PLUGS[name]
+    if not plug then
+      set_lines(i-1, i, { "~ " .. name .. ": Untracked" })
+      goto continue
+    end
 
     local cwd = joinpath(PLUG_HOME, name)
-    local plug = PLUGS[name]
-    local f_options = { name = name, cwd = cwd, commit = plug.commit, tag = plug.tag, branch = plug.branch }
-    local callback = vim.schedule_wrap(function(ok)
-      vim.bo[PLUG_SYNC.buf].modifiable = true
-      if ok then
-        vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, index-1, index, false, {
-          "- " .. name .. ": Fetching... Done!"
-        })
-      else
-        vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, index-1, index, false, {
-          "x " .. name .. ": Fetching... ERROR!"
-        })
-        error = true
-      end
-      not_finished = not_finished - 1
-      vim.bo[PLUG_SYNC.buf].modifiable = false
-      vim.schedule_wrap(coroutine.resume)(PLUG_SYNC.coroutine)
-    end)
-
-    if vim.fn.isdirectory(joinpath(cwd, ".git")) == 0 then
-      git.clone({ name = name, url = plug.uri, cwd = cwd }, function(ok)
-        if not ok then return callback(false) end
-        git.fetch(f_options, callback)
-      end)
+    if vim.fn.isdirectory(joinpath(cwd, ".git")) == 1 then
+      set_lines(i-1, i, { "- " .. name .. ": Cloning... Done!" })
+      goto continue
     else
-      git.fetch(f_options, callback)
+      set_lines(i-1, i, { "+ " .. name .. ": Cloning..." })
     end
-  end
 
-  vim.fn.cursor(1, 2)
-  while not_finished > 0 do
-    coroutine.yield()
-  end
-
-  if error then return end
-
-  runtimepath()
-
-  for i = 1, #po, 1 do
-    local name = po[i]
-    local index = i
-    local build = PLUGS[name].build
-    if not build then goto continue end
-
-    vim.bo[PLUG_SYNC.buf].modifiable = true
-    vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, index-1, index, false, {
-      "+ " .. name .. ": Building..."
-    })
-    vim.bo[PLUG_SYNC.buf].modifiable = false
-
-    local s, msg = pcall(function()
-      build{ dir = joinpath(PLUG_HOME, name) }
-      vim.bo[PLUG_SYNC.buf].modifiable = true
-      vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, index-1, index, false, {
-        "- " .. name .. ": Building... Done!"
-      })
-      vim.bo[PLUG_SYNC.buf].modifiable = false
+    local p = git.clone{ name = name, url = plug.uri, cwd = cwd }
+    p.await(function(_p)
+      if _p.code == 0 then
+        set_lines(i-1, i, { "- " .. name .. ": Cloning... Done!" })
+      else
+        set_lines(i-1, i, { "x " .. name .. ": Cloning... Error!" })
+        notify.error(_p.message)
+        todo.errors = true
+      end
     end)
-    if not s then
-      error = true
-      vim.bo[PLUG_SYNC.buf].modifiable = true
-      vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, index-1, index, false, {
-        "x " .. name .. ": Building... ERROR!"
-      })
-      vim.bo[PLUG_SYNC.buf].modifiable = false
-      notify.error(msg)
-    end
+    table.insert(todo.promises, p)
 
     ::continue::
   end
 
-  if error then return end
+  vim.api.nvim_win_call(PLUG_SYNC.win, function() vim.fn.cursor(1, 2) end)
+  for _, p in ipairs(todo.promises) do await(p) end
+  if todo.errors then promise.reject("") end
+
+  -- FETCH --
+
+  todo.promises = {}
+  for i, name in ipairs(todo.plugs) do
+    local plug = PLUGS[name]
+    if not plug then
+      goto continue
+    else
+      set_lines(i-1, i, { "+ " .. name .. ": Fetching..." })
+    end
+
+    local p = git.fetch{ name = name, cwd = joinpath(PLUG_HOME, name), commit = plug.commit, tag = plug.tag, branch = plug.branch }
+    p.await(function(_p)
+      if _p.code == 0 then
+        set_lines(i-1, i, { "- " .. name .. ": Fetching... Done!" })
+      else
+        set_lines(i-1, i, { "x " .. name .. ": Fetching... Error!" })
+        notify.error(_p.message)
+        todo.errors = true
+      end
+    end)
+    table.insert(todo.promises, p)
+
+    ::continue::
+  end
+
+  vim.api.nvim_win_call(PLUG_SYNC.win, function() vim.fn.cursor(1, 2) end)
+  for _, p in ipairs(todo.promises) do await(p) end
+  if todo.errors then promise.reject("") end
+
+  -- BUILD --
+
+  todo.promises = {}
+  todo.build = {}
+
+  local plugs_i = {}
+  for i, name in ipairs(todo.plugs) do
+    plugs_i[name] = i
+  end
+
+  for _, name in ipairs(PLUGS_ORDER) do
+    local i = plugs_i[name]
+    if not i then goto continue end
+
+    local build = PLUGS[name].build
+    if not build then goto continue end
+
+    set_lines(i-1, i, { "+ " .. name .. ": Building..." })
+    table.insert(todo.build, { name = name, i = i, build = build })
+
+    ::continue::
+  end
+
+  vim.api.nvim_win_call(PLUG_SYNC.win, function() vim.fn.cursor(1, 2) end)
+
+  for _, p in ipairs(todo.build) do
+    local name = p.name
+    local i = p.i
+    local build = p.build
+
+    local status, result = pcall(function()
+      build{ dir = joinpath(PLUG_HOME, name) }
+    end)
+    if status then
+      set_lines(i-1, i, { "- " .. name .. ": Building... Done!" })
+    else
+      set_lines(i-1, i, { "x " .. name .. ": Building... Error!" })
+      notify.error(result)
+      todo.errors = true
+    end
+  end
+
+  if todo.errors then promise.reject("") end
+  -- FINISH --
 
   vim.api.nvim_buf_call(PLUG_SYNC.buf, function()
     vim.cmd[[hi link PlugSyncDone Label]]
   end)
-  local seconds = string.format("%.3f", vim.trim(vim.fn.reltimestr(vim.fn.reltime(PLUG_SYNC.reltime))))
+
+  local seconds = string.format("%.3f", vim.trim(vim.fn.reltimestr(vim.fn.reltime(reltime))))
   notify.warn("[LUA-PLUG] Elapsed time: " .. seconds .. " seconds")
 
-  for _, n in ipairs(po) do
+  for _, n in ipairs(todo.plugs) do
     vim.cmd("silent! helptags " .. vim.fn.fnameescape(joinpath(PLUG_HOME, n, "doc")))
   end
-end
 
-PLUG_SYNC.fn.clean = function()
-  local len = #(joinpath(PLUG_HOME, "/"))+1
+  promise.resolve()
+end)
 
-  local untracked = vim.tbl_filter(function(v)
-    return PLUGS[string.sub(v,len)] == nil
-  end, vim.fn.globpath(PLUG_HOME, "*", true, true)) -- dot files are ignored
-
-  if #untracked == 0 then return end
-
-  vim.bo[PLUG_SYNC.buf].modifiable = true
-  vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, 0, -1, false, {"","","",""})
-  vim.api.nvim_buf_set_lines(PLUG_SYNC.buf, 4, -1, false,
-    vim.tbl_map(function(v) return "- "..v end, untracked)
-  )
-  vim.bo[PLUG_SYNC.buf].modifiable = false
-  vim.bo[PLUG_SYNC.buf].modified = false
-
-  vim.cmd.redraw()
-  local answer = vim.fn.input("Delete untracked directories? (y/N)")
-
-  if vim.fn.match(answer, "^[yY]") == 0 then
-    untracked = vim.tbl_filter(function(u)
-      local s = vim.fn.delete(u,"rf") ~= 0
-      if s then notify.error("\""..u.."\" couldn't be delete!") end
-      return s
-    end, untracked)
-  end
-
-  local u = vim.fn.sort(vim.tbl_map(function(v) return string.sub(v,#PLUG_HOME+2) end, untracked), "i")
-  for _, name in ipairs(u) do
-    table.insert(PLUG_SYNC.text, "~ " .. name .. ": Untracked")
-  end
+PLUG_SYNC.fn.run = function(args)
+  _run(args).await(function(promise)
+    PLUG_SYNC.fn.run_lock = false
+    if promise.code ~= 0 and #promise.message > 0 then
+      notify.error(promise.message)
+    end
+  end)
 end
 
 vim.api.nvim_create_user_command("PlugSync", PLUG_SYNC.fn.run, {
@@ -358,18 +429,24 @@ plug{
 
 plug{
   github("nvim-telescope/telescope-fzf-native.nvim"),
-  build = function(opts)
+  build = async_wrap(function(promise, opts)
     local cc = vim.fn.exepath("gcc")
-    if not cc then return notify.error("GCC not found") end
+    if not cc then
+      return promise.reject("GCC not found")
+    end
 
-    fs.mkdir(joinpath(opts.dir, "build"))
+    await(fs.mkdir(joinpath(opts.dir, "build")))
 
     local target = vim.fn.has("win32") == 1 and "libfzf.dll" or "libfzf.so"
     local cmd = { cc, "-O3", "-fpic", "-std=gnu99", "-shared", "src/fzf.c", "-o", "build/"..target }
 
     local o  = vim.system(cmd, { text = true, cwd = opts.dir }):wait()
-    if o.code ~= 0 then notify.error("Error compiling fzf:" .. o.stderr) end
-  end
+    if o.code ~= 0 then
+      return promise.reject("Error compiling fzf:" .. o.stderr)
+    end
+
+    promise.resolve()
+  end)
 }
 
 -- TELESCOPE-UI --
@@ -496,6 +573,16 @@ plug{
   end
 }
 
+-- TYPST PREVIEW --
+
+plug{
+  github("chomosuke/typst-preview.nvim"),
+  tag = "v*",
+  setup = prequire_wrap("typst-preview", function(typst_preview)
+    typst_preview.setup{}
+  end)
+}
+
 -- BOTTOM STATUS LINE --
 
 plug{ github("nvim-tree/nvim-web-devicons") }
@@ -551,19 +638,19 @@ plug{
     ll("lua-plug", { fn("LUA-PLUG") })
     ll("lua-explorer", { fn("LUA-EXPLORER"), nil, lua_explorer })
 
-    local o = { icons_enabled = true, theme = "auto" }
+    local o = {
+      section_separators   = { left = "",  right = ""  },
+      component_separators = { left = "|", right = "|" },
 
-    -- if vim.g.nvy then
-    if (vim.fn.has("win32") == 0) and fs.readfile("/etc/hostname")[1] == "host7" then
-      o.section_separators   = { left = "",  right = ""  }
-      o.component_separators = { left = "|", right = "|" }
-    else
-      o.section_separators   = { left = "", right = "" }
-      o.component_separators = { left = "╲", right = "╱" }
+      -- section_separators   = { left = "", right = "" },
+      -- component_separators = { left = "╲", right = "╱" },
 
-      -- o.section_separators   = { left = "", right = "" }
-      -- o.component_separators = { left = "", right = "" }
-    end
+      -- section_separators   = { left = "", right = "" },
+      -- component_separators = { left = "", right = "" },
+
+      icons_enabled = true,
+      theme = "auto"
+    }
 
     lualine.setup{
       options = o,

@@ -23,6 +23,10 @@ REPLACE TELESCOPE ASAP !!!!!
 :h lsp-autocompletion
 :h lsp-attach
 
+patch markdown preview
+typst tuto
+  https://www.youtube.com/watch?v=Yu5lt_q-4fE
+
 https://github.com/Makaze/watch.nvim
 
 replace <space>gd for lua & vim script
@@ -67,6 +71,29 @@ vim.on_key({fn}, {ns_id}, {opts})
 
 vim.go.path
 vim.bo.path
+
+
+
+local async, await, log, sh = (function()
+  local _ = require("_")
+  return _.async, _.await, _.log, _.sh
+end)()
+
+async(function(_)
+  log("1")
+  await(async(function(_)
+    await(sh({ "sleep", "1" }))
+    log("2")
+    await(sh({ "sleep", "1" }))
+    log("3")
+    await(sh({ "sleep", "1" }))
+    log("4")
+    await(sh({ "sleep", "1" }))
+  end))
+  log("5")
+end)
+
+
 
 -- tranparency --
 -- vim.api.nvim_set_hl(0, "Normal", { bg = "none" })

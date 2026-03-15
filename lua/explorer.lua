@@ -1,6 +1,6 @@
-local notify, fs, random, window = (function()
+local async_wrap, await, notify, fs, random, window = (function()
   local _ = require("_")
-  return _.notify, _.fs, _.random, _.window
+  return _.async_wrap, _.await, _.notify, _.fs, _.random, _.window
 end)()
 
 local ffi = require("ffi")
@@ -447,7 +447,7 @@ local function fn_BufWriteCmd__parse_buffers()
   return error, r
 end
 
-local function fn_BufWriteCmd()
+local fn_BufWriteCmd = async_wrap(function(promise)
   local slash = vim.fn.has("win32") == 1 and "\\" or "/"
   local TASK_FILES = {} -- { { copy, remove, gone } ... }
   local TASKS = {}
@@ -480,7 +480,9 @@ local function fn_BufWriteCmd()
   end
 
   local error, buffers_ls = fn_BufWriteCmd__parse_buffers()
-  if error then return end
+  if error then
+    return promise.reject("Error parsing buffer")
+  end
 
   for _, b in ipairs(buffers_ls) do
     -- b => { name, new_info, old_info }
@@ -567,50 +569,58 @@ local function fn_BufWriteCmd()
     if t[1] == TASK.REMOVE then
       local tf = TASK_FILES[t[2]]
       if tf.copy == 0 and not tf.gone then
-        fs.remove(t[2])
+        -- await(fs.remove(t[2])).unwrap()
+        await(fs.remove(t[2]))
         tf.gone = true
         if vim.fn.isdirectory(t[2]) == 1 then
           local dir = string.sub(vim.fn.undofile(t[2]), #undodir + 2)
           for _, f in ipairs(vim.fn.globpath(undodir, dir .. "*", 1, true, 1)) do
-            fs.remove(f)
+            -- await(fs.remove(f)).unwrap()
+            await(fs.remove(f))
           end
         else
-          fs.remove(vim.fn.undofile(t[2]))
+          -- await(fs.remove(vim.fn.undofile(t[2]))).unwrap()
+          await(fs.remove(vim.fn.undofile(t[2])))
         end
       end
     else
       local dest = t[#t]
       if vim.uv.fs_stat(dest) then
-        local tmp_path = dest .. ".tmp_" .. random.string(10) .. ".bak"
-        t[#t] = tmp_path
-        table.insert(last_move, { tmp_path, dest })
+        while true do
+          local tmp_path = dest .. ".tmp_" .. random.string(10) .. ".bak"
+          if vim.fn.isdirectory(tmp_path) == 0 then
+            t[#t] = tmp_path
+            table.insert(last_move, { tmp_path, dest })
+            break
+          end
+        end
       end
       if t[1] == TASK.MKMDIR then
-        fs.mkdir(t[2])
+        await(fs.mkdir(t[2])).unwrap()
       elseif t[1] == TASK.MKFILE then
-        fs.mkfile(t[2])
+        await(fs.mkfile(t[2])).unwrap()
       elseif t[1] == TASK.MKLINK then
-        fs.mklink(t[2], t[3])
+        await(fs.mklink(t[2], t[3])).unwrap()
       elseif t[1] == TASK.COPY then
         local tf = TASK_FILES[t[2]]
         tf.copy = tf.copy - 1
         if tf.remove and tf.copy == 0 then
-          fs.move(t[2], t[3])
+          await(fs.move(t[2], t[3])).unwrap()
           tf.gone = true
         else
-          fs.copy(t[2], t[3])
+          await(fs.copy(t[2], t[3])).unwrap()
         end
         local action = tf.gone and fs.move or fs.copy
         if vim.fn.isdirectory(t[3]) == 1 then
           local src_dir = string.sub(vim.fn.undofile(t[2]), #undodir + 2)
           local trim_len = #undodir + 2 + #src_dir
           for _, f in ipairs(vim.fn.globpath(undodir, src_dir .. "*", 1, true, 1)) do
-            action(f, vim.fn.undofile(t[3]) .. string.sub(f, trim_len))
+            await(action(f, vim.fn.undofile(t[3]) .. string.sub(f, trim_len))).unwrap()
           end
         else
           local src_undo = vim.fn.undofile(t[2])
           if vim.uv.fs_stat(src_undo) then
-            action(src_undo, vim.fn.undofile(t[3]))
+            await(action(src_undo, vim.fn.undofile(t[3]))).unwrap()
           end
         end
       end
@@ -618,17 +628,17 @@ local function fn_BufWriteCmd()
   end
 
   for _, lm in ipairs(last_move) do
-    fs.move(lm[1], lm[2])
+    await(fs.move(lm[1], lm[2])).unwrap()
     if vim.fn.isdirectory(lm[2]) == 1 then
       local src_dir = string.sub(vim.fn.undofile(lm[1]), #undodir + 2)
       local trim_len = #undodir + 2 + #src_dir
       for _, f in ipairs(vim.fn.globpath(undodir, src_dir .. "*", 1, true, 1)) do
-        fs.move(f, vim.fn.undofile(lm[2]) .. string.sub(f, trim_len))
+        await(fs.move(f, vim.fn.undofile(lm[2]) .. string.sub(f, trim_len))).unwrap()
       end
     else
       local src_undo = vim.fn.undofile(lm[1])
       if vim.uv.fs_stat(src_undo) then
-        fs.move(src_undo, vim.fn.undofile(lm[2]))
+        await(fs.move(src_undo, vim.fn.undofile(lm[2]))).unwrap()
       end
     end
   end
@@ -647,11 +657,13 @@ local function fn_BufWriteCmd()
 
   M.history.skip = true
   vim.schedule_wrap(M.go)(M.dir)
-end
+
+  return promise.resolve()
+end)
 
 vim.api.nvim_create_autocmd("BufWriteCmd", {
   pattern = PATTERN,
-  callback = fn_BufWriteCmd
+  callback = function() fn_BufWriteCmd() end
 })
 
 vim.api.nvim_create_autocmd({ "CursorMovedI", "CursorMoved", "ModeChanged" }, {

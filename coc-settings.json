@@ -24,7 +24,9 @@
   "html.autoClosingTags": false,
   "html.autoCreateQuotes": false,
 
+  "javascript.autoClosingTags": false,
   "javascript.suggestionActions.enabled": true,
+  "typescript.autoClosingTags": false,
   "typescript.suggestionActions.enabled": true,
 
   "java.compile.nullAnalysis.mode": "automatic",

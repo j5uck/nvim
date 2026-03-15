@@ -235,7 +235,7 @@ M.marketplace.run = function()
 
   menu:hide()
 
-  if #to_install > 0 then vim.cmd[[tabnew]] end
+  vim.cmd[[tabnew]]
 
   local empty_window = vim.api.nvim_get_current_win()
 

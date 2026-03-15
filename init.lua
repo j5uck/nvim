@@ -130,6 +130,28 @@ vim.api.nvim_create_autocmd("FileType", {
   callback = function() vim.wo.spell = false end
 })
 
+-- vim.treesitter.language.register("tsx", { "tsx" })
+-- vim.filetype.add({
+--   extension = {
+--     tsx = "javascriptreact",
+--   },
+-- })
+
+-- vim.api.nvim_create_autocmd("FileType", {
+--   pattern = { "typescript" },
+--   callback = vim.schedule_wrap(function(ev)
+--     vim.bo[ev.buf].filetype = "javascript"
+--   end)
+-- })
+
+-- vim.api.nvim_create_autocmd("FileType", {
+--   pattern = { "typescriptreact" },
+--   callback = vim.schedule_wrap(function(ev)
+--     vim.bo[ev.buf].filetype = "javascriptreact"
+--     vim.treesitter.get_parser(ev.buf, "jsx", {})
+--   end)
+-- })
+
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "svelte" },
   callback = vim.schedule_wrap(function(ev)
@@ -149,27 +171,28 @@ if vim.g.nvy then
   vim.opt.guifont = { "FiraCode Nerd Font Mono:h12" }
 end
 
-local fs, notify, pcall_wrap, window = (function()
+local await, async_wrap, fs, notify, pcall_wrap, window = (function()
   local _ = require("_")
-  return _.fs, _.notify, _.pcall_wrap, _.window
+  return _.await, _.async_wrap, _.fs, _.notify, _.pcall_wrap, _.window
 end)()
 
-vim.api.nvim_create_user_command("LOC", function()
+local loc = async_wrap(function(promise)
   local sb = {}
   local config = vim.fn.stdpath("config") .. "/"
   local total = 0
 
   local function loc(s)
-    for _, d in ipairs(vim.fn.sort(vim.fn.globpath(config .. s, "*", 1, true), "i")) do
-      local name = vim.fs.basename(d)
-      if vim.fn.isdirectory(d) == 1 then
-        loc(s .. name .. "/")
-      else
-        local n = #fs.readfile(d)
+    for _, e in ipairs(await(fs.ls(config .. s)).unwrap()) do
+      if e.type == "directory" then
+        loc(s .. e.name .. "/")
+      elseif vim.endswith(e.name, ".vim") or vim.endswith(e.name, ".lua") then
+        local n = #await(fs.readfile(config .. s .. e.name)).unwrap()
         total = total + n
-        table.insert(sb, string.format("%4d", n) .. " :: " .. s .. name)
+        table.insert(sb, string.format("%4d", n) .. " :: " .. s .. e.name)
       end
     end
+
+    promise.resolve()
   end
 
   loc("")
@@ -178,7 +201,9 @@ vim.api.nvim_create_user_command("LOC", function()
   table.insert(sb, string.format("%4d", total) .. " :: total")
 
   notify.warn(table.concat(sb, "\n"))
-end, {})
+end)
+
+vim.api.nvim_create_user_command("LOC", function() loc() end, {})
 
 local term_ns = vim.api.nvim_create_namespace("")
 vim.api.nvim_set_hl(term_ns, "Normal", { fg = "#FFFFFF", bg = "#000000" })
