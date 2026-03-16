@@ -46,6 +46,8 @@ PLUG_SYNC.fn = {}
 PLUG_SYNC.fn.run_lock = false
 
 local _run = async_wrap(function(promise, args)
+  await(fs.mkdir(PLUG_HOME)).unwrap()
+
   local reltime = vim.fn.reltime()
 
   if PLUG_SYNC.fn.run_lock then
