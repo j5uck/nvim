@@ -372,21 +372,17 @@ M.fs.find = M.promisify_wrap((function()
     ---@diagnostic disable-next-line: param-type-mismatch
     local fd = vim.uv.fs_opendir(path, nil, 16384) -- 1 << 14
 
-    local content = vim.uv.fs_readdir(fd) or {}
-    for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
-      M.list.merge(content, t)
-    end
-    vim.uv.fs_closedir(fd)
-
     local r = {}
-
-    for _, e in ipairs(content) do
-      if e.type == "directory" then
-        M.list.merge(r, find(regex, path .. "/" .. e.name))
-      elseif vim.fn.match(e.name, regex) > -1 then
-        M.list.insert(r, path .. "/" .. e.name)
+    for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
+      for _, e in ipairs(t) do
+        if e.type == "directory" then
+          M.list.merge(r, find(regex, path .. "/" .. e.name))
+        elseif vim.fn.match(e.name, regex) > -1 then
+          M.list.insert(r, path .. "/" .. e.name)
+        end
       end
     end
+    vim.uv.fs_closedir(fd)
 
     return r
   end
@@ -455,18 +451,8 @@ M.sh = M.promisify_wrap(function(promise, cmd, opts)
   end
 end)
 
--- M.sh_chained = function(cmd_fns, opts)
---   local promise = {}
---   for _, cmd_fn in ipairs(cmd_fns) do
---     promise = M.await(M.sh(cmd_fn(promise), opts))
---   end
--- end
-
 local GIT_OPTIONS = { text = true, clear_env = true, timeout = (3 * 60 * 1000) }
 M.git = {}
--- M.git._clone = function(opts)
---   M.await(M.sh({ "git", "clone", "--shallow-submodules", "--depth=1", "--progress", "--", opts.url, opts.cwd }))
--- end
 
 M.git.clone = M.promisify_wrap(function(promise, o)
   M.await(M.fs.mkdir(o.cwd)).unwrap()

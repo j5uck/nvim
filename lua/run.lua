@@ -1,4 +1,3 @@
-local fs = require("_").fs
 local ffi = require("ffi")
 local C = ffi.C
 
@@ -16,6 +15,42 @@ end)()
 
 local T_GRAY  = "\x1b[1;30m"
 local T_RESET = "\x1b[0m"
+
+local fs = {}
+fs.find = (function()
+  local function find(regex, path)
+    ---@diagnostic disable-next-line: param-type-mismatch
+    local fd = vim.uv.fs_opendir(path, nil, 16384) -- 1 << 14
+
+    local r = {}
+    for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
+      for _, e in ipairs(t) do
+        if e.type == "directory" then
+          vim.list_extend(r, find(regex, path .. "/" .. e.name))
+        elseif vim.fn.match(e.name, regex) > -1 then
+          table.insert(r, path .. "/" .. e.name)
+        end
+      end
+    end
+    vim.uv.fs_closedir(fd)
+
+    return r
+  end
+
+  return function(regex, path)
+    path = path or ""
+    if vim.fn.isabsolutepath(path) == 1 then
+      path = vim.fs.normalize(path)
+    else
+      path = vim.fs.normalize(vim.fn.getcwd() .. "/" .. path)
+    end
+    local pre = #path + 2
+
+    return vim.tbl_map(function(e)
+      return string.sub(e, pre)
+    end, find(regex, path))
+  end
+end)()
 
 local runner = { cwd = vim.fn.getcwd() }
 

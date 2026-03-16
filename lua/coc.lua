@@ -18,7 +18,7 @@ M.extensions.required = {
   -- "coc-go",
   "coc-html",
   "coc-java",
-  "coc-java-lombok",
+  -- "coc-java-lombok",
   -- "coc-jedi",
   "coc-json",
   -- "coc-kotlin",
