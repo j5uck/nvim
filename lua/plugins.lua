@@ -381,7 +381,7 @@ plug{
   setup = prequire_wrap("notify", function(n)
     n.setup{
       background_colour = "NotifyBackground",
-      -- background_colour = ""#000000",
+      -- background_colour = "#000000",
       fps = 20,
       icons = {
         DEBUG = "",

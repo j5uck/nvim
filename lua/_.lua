@@ -71,9 +71,7 @@ M.promisify = function(fn, ...)
     end
   end)
   promise.unwrap = function()
-    if promise.code ~= 0 then
-      error(promise.message)
-    end
+    assert(promise.code ~= 0, promise.message)
     return unpack(promise.r)
   end
 
@@ -87,7 +85,7 @@ M.promisify = function(fn, ...)
     local traceback = debug.traceback("")
     vim.schedule(function()
       promise.code = promise.code or 1
-      promise.message = message and message or "Promise rejected"
+      promise.message = message or "Promise rejected"
       if M.flags.error_promise then
         M.notify.error(promise.message .. traceback)
       end
@@ -95,7 +93,11 @@ M.promisify = function(fn, ...)
     end)
   end
 
-  fn(promise, ...)
+  local status, result = pcall(fn, promise, ...)
+
+  if not status then
+    promise.reject(result)
+  end
 
   return promise
 end
@@ -121,8 +123,8 @@ M.async = M.promisify_wrap(function(promise, fn, ...)
     return promise.resolve()
   end)
 
-  promise.yield = coroutine.yield
   promise.resume = function(...) coroutine.resume(promise.coroutine, ...) end
+  promise.yield = coroutine.yield
 
   promise.schedule = function()
     vim.schedule(promise.resume)
@@ -130,9 +132,7 @@ M.async = M.promisify_wrap(function(promise, fn, ...)
   end
 
   promise.sleep = function(timeout)
-    if type(timeout) ~= "number" then
-      error("Invalid timeout")
-    end
+    assert(type(timeout) ~= "number", "Invalid timeout")
     vim.defer_fn(promise.resume, timeout)
     promise.yield()
   end
@@ -148,9 +148,7 @@ end
 
 M.await = function(promise)
   local co = coroutine.running()
-  if not co then
-    error("\"await\" can only be used inside an \"async\" function")
-  end
+  assert(not co, "\"await\" can only be used inside an \"async\" function")
 
   vim.schedule(function()
     if promise.code then
@@ -332,7 +330,7 @@ M.fs.ls = M.promisify_wrap(function(promise, path)
     if fa ~= fb then return fb end
 
     local c = vim.stricmp(a.name, b.name)
-    return c == 0 and a.name < b.name or c == -1
+    return (c == 0) and (a.name < b.name) or (c == -1)
   end)
 
   return promise.resolve(content)
@@ -341,7 +339,7 @@ end)
 M.fs.find = M.promisify_wrap((function()
   local function find(regex, path)
     ---@diagnostic disable-next-line: param-type-mismatch
-    local fd = vim.uv.fs_opendir(path, nil, 16384)
+    local fd = vim.uv.fs_opendir(path, nil, 16384) -- 1 << 14
 
     local content = vim.uv.fs_readdir(fd) or {}
     for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
@@ -378,30 +376,31 @@ M.fs.find = M.promisify_wrap((function()
 end)())
 
 M.sh = M.promisify_wrap(function(promise, cmd, opts)
-  local job_opts = {}
   opts = opts or {}
-  job_opts.clear_env = true
-  job_opts.cwd = opts.cwd
-  job_opts.detach = opts.detach
-  job_opts.timeout = opts.timeout
+  opts.clear_env = true
+  opts.cwd = opts.cwd
+  opts.detach = opts.detach
+  opts.timeout = opts.timeout
 
   if not string.find(cmd[1], (vim.fn.has("win32") == 1) and "[\\/]" or "/") then
     cmd[1] = vim.fn.exepath(cmd[1])
   end
 
   if opts.stdout then
-    job_opts.on_stdout = function(_, strings, _)
+    opts.on_stdout = function(_, strings, _)
       opts.stdout(strings)
     end
+    opts.stdout = nil
   end
   if opts.stderr then
-    job_opts.on_stderr = function(_, strings, _)
+    opts.on_stderr = function(_, strings, _)
       opts.stderr(strings)
     end
+    opts.stdout = nil
   end
 
-  if opts.stdout or opts.stderr then
-    job_opts.on_exit = function(_, code, _)
+  if opts.on_stdout or opts.on_stderr then
+    opts.on_exit = function(_, code, _)
       if code == 0 then
         return promise.resolve()
       else
@@ -410,9 +409,9 @@ M.sh = M.promisify_wrap(function(promise, cmd, opts)
       end
     end
 
-    vim.fn.jobstart(cmd, job_opts)
+    vim.fn.jobstart(cmd, opts)
   else
-    vim.system(cmd, job_opts, function(o)
+    vim.system(cmd, opts, function(o)
       promise.stdout = o.stdout
       promise.stderr = o.stderr
       if o.code == 0 then
@@ -439,6 +438,7 @@ M.git = {}
 -- end
 
 M.git.clone = M.promisify_wrap(function(promise, o)
+  M.await(M.fs.mkdir(o.cwd)).unwrap()
   local cmd = { "git", "clone", "--shallow-submodules", "--depth=1", "--progress", "--", o.url, o.cwd }
   vim.system(cmd, GIT_OPTIONS, function(r)
     if r.code == 0 then
