@@ -43,17 +43,17 @@ local function runtimepath()
 end
 
 PLUG_SYNC.fn = {}
-PLUG_SYNC.fn.run_lock = false
+PLUG_SYNC.run_lock = false
 
 local _run = async_wrap(function(promise, args)
   await(fs.mkdir(PLUG_HOME)).unwrap()
 
   local reltime = vim.fn.reltime()
 
-  if PLUG_SYNC.fn.run_lock then
+  if PLUG_SYNC.run_lock then
     return promise.reject("Plug sync is still running")
   end
-  PLUG_SYNC.fn.run_lock = true
+  PLUG_SYNC.run_lock = true
 
   if vim.fn.executable("git") == 0 then
     return promise.reject("Git not found")
@@ -227,6 +227,8 @@ local _run = async_wrap(function(promise, args)
   for _, p in ipairs(todo.promises) do await(p) end
   if todo.errors then promise.reject("") end
 
+  runtimepath()
+
   -- BUILD --
 
   todo.promises = {}
@@ -270,6 +272,7 @@ local _run = async_wrap(function(promise, args)
   end
 
   if todo.errors then promise.reject("") end
+
   -- FINISH --
 
   vim.api.nvim_buf_call(PLUG_SYNC.buf, function()
@@ -288,7 +291,7 @@ end)
 
 PLUG_SYNC.fn.run = function(args)
   _run(args).await(function(promise)
-    PLUG_SYNC.fn.run_lock = false
+    PLUG_SYNC.run_lock = false
     if promise.code ~= 0 and #promise.message > 0 then
       notify.error(promise.message)
     end
@@ -794,28 +797,30 @@ local ts_extensions = {
   "yaml"
 }
 
+local setup_nvim_treesitter = prequire_wrap("nvim-treesitter", function(_)
+  require("nvim-treesitter.configs").setup{
+    --sync_install = true,
+      ensure_installed = ts_extensions,
+      highlight = {
+        enable = true,
+        additional_vim_regex_highlighting = false
+      },
+      indent = { enable = true }
+  }
+end)
+
 plug{
   github("nvim-treesitter/nvim-treesitter"),
   -- tag = "v*",
   branch = "master",
   build = function(_)
-    if vim.fn.exists("TSUpdate") ~= 0 then
-      require("nvim-treesitter.configs").setup{ ensure_installed = ts_extensions }
+    if vim.fn.exists(":TSUpdate") == 0 then
+      setup_nvim_treesitter()
     else
       vim.cmd.TSUpdate()
     end
   end,
-  setup = prequire_wrap("nvim-treesitter", function(_)
-    require("nvim-treesitter.configs").setup{
-      --sync_install = true,
-        ensure_installed = ts_extensions,
-        highlight = {
-          enable = true,
-          additional_vim_regex_highlighting = false
-        },
-        indent = { enable = true }
-    }
-  end)
+  setup = setup_nvim_treesitter
 }
 
 -- COC --
