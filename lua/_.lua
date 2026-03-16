@@ -14,6 +14,37 @@ M.flags = {
   warn_missing_module = true,
 }
 
+M.list = {}
+M.list.concat = table.concat
+M.list.sort = function(l, fn) return fn and table.sort(l, fn) or vim.fn.sort(l, "i") end
+M.list.map = vim.tbl_map
+M.list.filter = vim.tbl_filter
+M.list.remove = table.remove
+M.list.slice = vim.list_slice
+M.list.clone = function(t) return vim.list_slice(t, 1, #t) end
+M.list.insert = table.insert
+M.list.merge = function(...)
+  local r = ({...})[1]
+  for _, t in ipairs{...}, {...}, 1 do
+    vim.list_extend(r, t)
+  end
+  return r
+end
+
+M.dictionary = {}
+M.dictionary.isempty = vim.tbl_isempty
+M.dictionary.clone = function(d)
+  local r = {}
+  for _, k in ipairs(vim.tbl_keys(d)) do
+    r[k] = d[k]
+  end
+  return r
+end
+M.dictionary.deep_clone = vim.deepcopy
+M.dictionary.keys = vim.tbl_keys
+M.dictionary.merge = function(...) return vim.tbl_extend("force", ...) end
+M.dictionary.deep_merge = function(...) return vim.tbl_deep_extend("force", ...) end
+
 local WRAP = vim.schedule_wrap
 local I, W, E = vim.log.levels.INFO, vim.log.levels.WARN, vim.log.levels.ERROR
 
@@ -31,9 +62,9 @@ M.log = function(...)
   local len = select("#", ...)
   for i = 1, len, 1 do
     local e = select(i, ...)
-    table.insert(sb, vim.inspect(e))
+    M.list.insert(sb, vim.inspect(e))
   end
-  vim.schedule_wrap(vim.notify)(table.concat(sb, "\n"), W)
+  vim.schedule_wrap(vim.notify)(M.list.concat(sb, "\n"), W)
 end
 
 M.prequire = function(name, fn)
@@ -67,11 +98,11 @@ M.promisify = function(fn, ...)
     if promise.code then
       _fn(promise)
     else
-      table.insert(promise.awaiting, function() _fn(promise) end)
+      M.list.insert(promise.awaiting, function() _fn(promise) end)
     end
   end)
   promise.unwrap = function()
-    assert(promise.code ~= 0, promise.message)
+    assert(promise.code == 0, promise.message)
     return unpack(promise.r)
   end
 
@@ -132,7 +163,7 @@ M.async = M.promisify_wrap(function(promise, fn, ...)
   end
 
   promise.sleep = function(timeout)
-    assert(type(timeout) ~= "number", "Invalid timeout")
+    assert(type(timeout) == "number", "Invalid timeout")
     vim.defer_fn(promise.resume, timeout)
     promise.yield()
   end
@@ -148,13 +179,13 @@ end
 
 M.await = function(promise)
   local co = coroutine.running()
-  assert(not co, "\"await\" can only be used inside an \"async\" function")
+  assert(co, "\"await\" can only be used inside an \"async\" function")
 
   vim.schedule(function()
     if promise.code then
       coroutine.resume(co)
     else
-      table.insert(promise.awaiting, function()
+      M.list.insert(promise.awaiting, function()
         coroutine.resume(co)
       end)
     end
@@ -294,7 +325,7 @@ M.fs.ls = M.promisify_wrap(function(promise, path)
   local C_BUFFER = ffi.new("char [?]", C_BUFFER_SIZE)
 
   ---@diagnostic disable-next-line: param-type-mismatch
-  local fd, message, _ = vim.uv.fs_opendir(vim.fs.normalize(path), nil, 16384)
+  local fd, message, _ = vim.uv.fs_opendir(vim.fs.normalize(path), nil, 16384) -- 1 << 14
   if not fd then
     promise.message = message
     return promise.reject()
@@ -302,12 +333,12 @@ M.fs.ls = M.promisify_wrap(function(promise, path)
 
   local content = vim.uv.fs_readdir(fd) or {}
   for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
-    vim.list_extend(content, t)
+    M.list.merge(content, t)
   end
   vim.uv.fs_closedir(fd)
 
   if vim.fn.has("win32") == 1 then
-    content = vim.tbl_filter(function(e) return e.type ~= "link" end, content)
+    content = M.list.filter(function(e) return e.type ~= "link" end, content)
   end
 
   for _, e in ipairs(content) do
@@ -323,7 +354,7 @@ M.fs.ls = M.promisify_wrap(function(promise, path)
     ::continue::
   end
 
-  table.sort(content, function(a, b)
+  M.list.sort(content, function(a, b)
     if a.is_directory ~= b.is_directory then return a.is_directory end
 
     local fa, fb = string.sub(a.name, 1, 1) == ".", string.sub(b.name, 1, 1) == "."
@@ -343,7 +374,7 @@ M.fs.find = M.promisify_wrap((function()
 
     local content = vim.uv.fs_readdir(fd) or {}
     for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
-      vim.list_extend(content, t)
+      M.list.merge(content, t)
     end
     vim.uv.fs_closedir(fd)
 
@@ -351,9 +382,9 @@ M.fs.find = M.promisify_wrap((function()
 
     for _, e in ipairs(content) do
       if e.type == "directory" then
-        vim.list_extend(r, find(regex, path .. "/" .. e.name))
+        M.list.merge(r, find(regex, path .. "/" .. e.name))
       elseif vim.fn.match(e.name, regex) > -1 then
-        table.insert(r, path .. "/" .. e.name)
+        M.list.insert(r, path .. "/" .. e.name)
       end
     end
 
@@ -369,7 +400,7 @@ M.fs.find = M.promisify_wrap((function()
     end
     local pre = #path + 2
 
-    return promise.resolve(vim.tbl_map(function(e)
+    return promise.resolve(M.list.map(function(e)
       return string.sub(e, pre)
     end, find(regex, path)))
   end
@@ -452,7 +483,7 @@ end)
 
 M.git.fetch = M.promisify_wrap(function(promise, o)
   local cmds = {}
-  local function t(cmd) table.insert(cmds, cmd) end
+  local function t(cmd) M.list.insert(cmds, cmd) end
 
   if o.commit then
     t(function(_) return { "git", "fetch", "origin", "--depth=1", "--progress", o.commit } end)
@@ -474,7 +505,7 @@ M.git.fetch = M.promisify_wrap(function(promise, o)
     t(function(_) return { "git", "submodule", "update", "--init", "--recursive", "--depth=1", "--jobs=16" } end)
   end
 
-  local options = vim.tbl_extend("keep", GIT_OPTIONS, { cwd = o.cwd })
+  local options = M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
   local function run(r, i)
     if r.code ~= 0 then
       promise.code = r.code
@@ -500,7 +531,7 @@ function window:show()
     self.buf = vim.api.nvim_create_buf(false, true)
   end
 
-  self.win = vim.api.nvim_open_win(self.buf, self.focus, vim.tbl_extend("force",{
+  self.win = vim.api.nvim_open_win(self.buf, self.focus, M.dictionary.merge({
     relative = "editor",
     style = "minimal",
     border = self.border,
@@ -547,7 +578,7 @@ local function new(conf)
 
   self.on_show = { conf.on_show }
   self.on_resize = { conf.on_resize }
-  table.insert(self.on_resize, function(_)
+  M.list.insert(self.on_resize, function(_)
     local s = self.size()
     s.relative = "editor"
     vim.api.nvim_win_set_config(self.win, s)
@@ -564,7 +595,7 @@ local function new(conf)
       end
     end }
 
-    table.insert(self.on_show, function()
+    M.list.insert(self.on_show, function()
       vim.api.nvim_win_set_hl_ns(self.win, self.ns)
       for _, fn in ipairs(self.on_colorscheme) do fn(self) end
     end)

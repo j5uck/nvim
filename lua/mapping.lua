@@ -1,6 +1,6 @@
-local async, async_wrap, await, notify, notify_once, flags, fs, prequire, window = (function()
+local async, async_wrap, await, dictionary, list, notify, notify_once, flags, fs, prequire, window = (function()
   local _ = require("_")
-  return _.async, _.async_wrap, _.await, _.notify, _.notify_once, _.flags, _.fs, _.prequire, _.window
+  return _.async, _.async_wrap, _.await, _.dictionary, _.list, _.notify, _.notify_once, _.flags, _.fs, _.prequire, _.window
 end)()
 local explorer = require("explorer")
 
@@ -9,7 +9,7 @@ local W = {}
 vim.g.mapleader = " "
 
 local function unmap(modes, lhs, opts)
-  opts = vim.tbl_extend("force", { noremap = true, silent = true }, opts or {})
+  opts = dictionary.merge({ noremap = true, silent = true }, opts or {})
 
   for _, l in ipairs(type(lhs) == "string" and { lhs } or lhs) do
     vim.keymap.set(modes, l, l, opts)
@@ -17,7 +17,7 @@ local function unmap(modes, lhs, opts)
 end
 
 local function map(modes, lhs, rhs, opts)
-  opts = vim.tbl_extend("force", { noremap = true, silent = true }, opts or {})
+  opts = dictionary.merge({ noremap = true, silent = true }, opts or {})
 
   for _, l in ipairs(type(lhs) == "string" and { lhs } or lhs) do
     vim.keymap.set(modes, l, rhs, opts)
@@ -556,10 +556,11 @@ vim.api.nvim_create_autocmd("FileType", {
 })
 
 map("n", "<leader>in", function()
-  async(function(_)
+  async(function(promise)
     vim.cmd.cd(await(fs.mktmp()).unwrap())
     vim.cmd.e("new.txt")
     explorer.open()
+    return promise.resolve()
   end)
 end, { desc = "create tmp folder" })
 
@@ -580,10 +581,8 @@ local select = async_wrap(function(promise)
   end
   if lang.runner then
     local build = await(fs.readfile(vim.fn.stdpath("config") .. "/lua/run.lua")).unwrap()
-    ---@diagnostic disable-next-line: param-type-mismatch
-    vim.list_extend(build, { "" })
-    ---@diagnostic disable-next-line: param-type-mismatch
-    vim.list_extend(build, lang.runner)
+    list.merge(build, { "" })
+    list.merge(build, lang.runner)
     await(fs.mkfile(dir .. "/build.lua", build)).unwrap()
   end
   for _, file in ipairs(lang.init) do

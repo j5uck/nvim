@@ -1,13 +1,13 @@
-local async_wrap, await, flags, fs, git, notify, notify_once, prequire_wrap = (function()
+local async_wrap, await, dictionary, flags, fs, git, list, notify, notify_once, prequire_wrap = (function()
   local _ = require("_")
-  return _.async_wrap, _.await, _.flags, _.fs, _.git, _.notify, _.notify_once, _.prequire_wrap
+  return _.async_wrap, _.await, _.dictionary, _.flags, _.fs, _.git, _.list, _.notify, _.notify_once, _.prequire_wrap
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
-  local r = string.gsub(table.concat({...}, "\\"), "[\\/]+", "\\")
+  local r = string.gsub(list.concat({...}, "\\"), "[\\/]+", "\\")
   return r
 end or function(...)
-  local r = string.gsub(table.concat({...}, "/"), "/+", "/")
+  local r = string.gsub(list.concat({...}, "/"), "/+", "/")
   return r
 end
 
@@ -20,7 +20,7 @@ local function runtimepath()
   local rtp, rtp_after = vim.opt.runtimepath:get(), {}
   for i, v in ipairs(rtp) do
     if ({string.gsub(v,"after$","%1")})[2] == 1 then
-      rtp, rtp_after = vim.list_slice(rtp, 1, i-1), vim.list_slice(rtp, i, #rtp)
+      rtp, rtp_after = list.slice(rtp, 1, i-1), list.slice(rtp, i, #rtp)
       break
     end
   end
@@ -33,13 +33,13 @@ local function runtimepath()
   for _, name in ipairs(PLUGS_ORDER) do
     local d = joinpath(PLUG_HOME, name)
     if (not exists[d]) and vim.fn.isdirectory(d) == 1 then
-      table.insert(rtp, d)
+      list.insert(rtp, d)
       local a = vim.fn.globpath(d, "after")
-      if #a > 0 then table.insert(rtp_after, a) end
+      if #a > 0 then list.insert(rtp_after, a) end
     end
   end
 
-  vim.opt.runtimepath = vim.list_extend(rtp, rtp_after)
+  vim.opt.runtimepath = list.merge(rtp, rtp_after)
 end
 
 PLUG_SYNC.fn = {}
@@ -70,16 +70,16 @@ local _run = async_wrap(function(promise, args)
 
   local todo = { errors = false }
   if #args.fargs == 0 then
-    todo.plugs = vim.list_slice(PLUGS_ORDER, 1, #PLUGS_ORDER)
+    todo.plugs = list.slice(PLUGS_ORDER, 1, #PLUGS_ORDER)
   else
     local missing = {}
     for _, name in ipairs(args.fargs) do
       if not PLUGS[name] then
-        table.insert(missing, name)
+        list.insert(missing, name)
       end
     end
     if #missing > 0 then
-      return promise.reject("Plugin" .. (#missing == 1 and "" or "s") .. " not configured:\n  >>" .. table.concat(missing, "\n  >>"))
+      return promise.reject("Plugin" .. (#missing == 1 and "" or "s") .. " not configured:\n  >>" .. list.concat(missing, "\n  >>"))
     end
 
     todo.plugs = args.fargs
@@ -109,18 +109,18 @@ local _run = async_wrap(function(promise, args)
   todo.untracked = (function()
     local l = await(fs.ls(PLUG_HOME)).unwrap()
 
-    local u = vim.tbl_map(function(e)
+    local u = list.map(function(e)
       return e.name
     end, l)
 
-    return vim.tbl_filter(function(name)
+    return list.filter(function(name)
       return PLUGS[name] == nil
     end, u)
   end)()
 
   if (#args.fargs == 0) and (#todo.untracked > 0) then
     set_lines(0, -1, { "", "", "", "", "" })
-    set_lines(5, -1, vim.tbl_map(function(v) return "- "..v end, todo.untracked))
+    set_lines(5, -1, list.map(function(v) return "- "..v end, todo.untracked))
 
     vim.cmd.redraw()
     local answer = vim.fn.input("Delete untracked plugins? (y/N)")
@@ -130,7 +130,7 @@ local _run = async_wrap(function(promise, args)
       for _, u in ipairs(todo.untracked) do
         local p = fs.remove(u)
         p.meta = { untracked = u }
-        table.insert(promises, p)
+        list.insert(promises, p)
       end
       for _, p in ipairs(promises) do
         if await(p).code ~= 0 then
@@ -143,15 +143,15 @@ local _run = async_wrap(function(promise, args)
   todo.untracked = (#args.fargs > 0) and {} or (function()
     local l = await(fs.ls(PLUG_HOME)).unwrap()
 
-    local u = vim.tbl_map(function(e)
+    local u = list.map(function(e)
       return e.name
     end, l)
 
-    return vim.tbl_filter(function(name)
+    return list.filter(function(name)
       return PLUGS[name] == nil
     end, u)
   end)()
-  todo.plugs = vim.fn.sort(vim.list_extend(todo.plugs, todo.untracked), "i")
+  todo.plugs = list.sort(list.merge(todo.plugs, todo.untracked))
   todo.untracked = nil
 
   vim.api.nvim_buf_call(PLUG_SYNC.buf, function()
@@ -178,7 +178,7 @@ local _run = async_wrap(function(promise, args)
       set_lines(i-1, i, { "+ " .. name .. ": Cloning..." })
     end
 
-    local p = git.clone{ name = name, url = plug.uri, cwd = cwd }
+    local p = git.clone{ name = name, url = plug.url, cwd = cwd }
     p.await(function(_p)
       if _p.code == 0 then
         set_lines(i-1, i, { "- " .. name .. ": Cloning... Done!" })
@@ -188,7 +188,7 @@ local _run = async_wrap(function(promise, args)
         todo.errors = true
       end
     end)
-    table.insert(todo.promises, p)
+    list.insert(todo.promises, p)
 
     ::continue::
   end
@@ -218,7 +218,7 @@ local _run = async_wrap(function(promise, args)
         todo.errors = true
       end
     end)
-    table.insert(todo.promises, p)
+    list.insert(todo.promises, p)
 
     ::continue::
   end
@@ -247,7 +247,7 @@ local _run = async_wrap(function(promise, args)
     if not build then goto continue end
 
     set_lines(i-1, i, { "+ " .. name .. ": Building..." })
-    table.insert(todo.build, { name = name, i = i, build = build })
+    list.insert(todo.build, { name = name, i = i, build = build })
 
     ::continue::
   end
@@ -300,9 +300,9 @@ end
 
 vim.api.nvim_create_user_command("PlugSync", PLUG_SYNC.fn.run, {
   complete = function(search)
-    return vim.fn.sort(vim.tbl_filter(function(name)
+    return list.sort(list.filter(function(name)
       return vim.fn.match(name, search) == 0
-    end, PLUGS_ORDER), "i")
+    end, PLUGS_ORDER))
   end,
   nargs = "*",
   bang = true
@@ -315,10 +315,10 @@ local function plug(plugin)
     return string.gsub(r, "(.+)%.git$", "%1")
   end)()
 
-  if not PLUGS[name] then table.insert(PLUGS_ORDER, name) end
+  if not PLUGS[name] then list.insert(PLUGS_ORDER, name) end
 
   PLUGS[name] = {
-    uri = plugin[1],
+    url = plugin[1],
     tag = plugin.tag,
     branch = plugin.branch,
     commit = plugin.commit,
@@ -477,7 +477,7 @@ plug{
       },
       extensions = {
         ["ui-select"] = {
-          vim.tbl_deep_extend("force", require("telescope.themes").get_dropdown(), {
+          dictionary.deep_merge(require("telescope.themes").get_dropdown(), {
             borderchars = {
               prompt  = { "─", "│", "─", "│", "╭", "╮", "╯", "╰" },
               results = { "─", "│", "─", "│", "╭", "╮", "╯", "╰" },
@@ -601,7 +601,7 @@ plug{
     local function ll(filetype, sl, sr)
       sl = sl or {}
       sr = sr or {}
-      table.insert(extensions, {
+      list.insert(extensions, {
         sections = {
           lualine_a = sl[1] and { sl[1] } or nil,
           lualine_b = sl[2] and { sl[2] } or nil,

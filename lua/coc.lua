@@ -1,6 +1,6 @@
-local notify, window = (function()
+local list, notify, window = (function()
   local _ = require("_")
-  return _.notify, _.window
+  return _.list, _.notify, _.window
 end)()
 
 local M = {}
@@ -45,11 +45,11 @@ M.extensions.missing = function()
   end
 
   local filter = {}
-  for _, f in ipairs(vim.tbl_map(function(v) return v.id end, extensionStats)) do
+  for _, f in ipairs(list.map(function(v) return v.id end, extensionStats)) do
     filter[f] = true
   end
 
-  return vim.tbl_filter(function(v)
+  return list.filter(function(v)
     return not filter[v]
   end, M.extensions.required)
 end
@@ -88,7 +88,7 @@ end
 M.extensions.install = function(l)
   if #l == 0 then return end
   for i=1, #l, 8 do
-    vim.fn["coc#rpc#notify"]("installExtensions", vim.list_slice(l, i, i+7))
+    vim.fn["coc#rpc#notify"]("installExtensions", list.slice(l, i, i+7))
   end
   vim.api.nvim_create_autocmd("BufEnter", {
     once = true,
@@ -99,7 +99,7 @@ end
 M.extensions.uninstall = function(l)
   if #l == 0 then return end
   for i=1, #l, 8 do
-    vim.fn["coc#rpc#notify"]("uninstallExtension", vim.list_slice(l, i, i+7))
+    vim.fn["coc#rpc#notify"]("uninstallExtension", list.slice(l, i, i+7))
   end
 end
 
@@ -139,12 +139,12 @@ local menu = window{
     pcall(function() extensionStats = vim.fn["coc#rpc#request"]("extensionStats", {}) end)
 
     local filter = {}
-    for _, f in ipairs(vim.tbl_map(function(v) return v.id end, extensionStats)) do
+    for _, f in ipairs(list.map(function(v) return v.id end, extensionStats)) do
       filter[f] = true
     end
 
     -- https://github.com/fannheyward/coc-marketplace
-    local lines = vim.tbl_map(function(e)
+    local lines = list.map(function(e)
       local sign = filter[e.name] and "✓" or " "
       return string.format("[%s] %-30s %s", sign, e.name, e.description)
     end, ALL_EXTENSIONS)
@@ -179,7 +179,7 @@ M.marketplace.option.toggle = function()
   pcall(function() extensionStats = vim.fn["coc#rpc#request"]("extensionStats", {}) end)
 
   local filter = {}
-  for _, f in ipairs(vim.tbl_map(function(v) return v.id end, extensionStats)) do
+  for _, f in ipairs(list.map(function(v) return v.id end, extensionStats)) do
     filter[f] = true
   end
 
@@ -227,9 +227,9 @@ M.marketplace.run = function()
   for i, l in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, true)) do
     local sign = string.gsub(l, "^%[(.*)%].*", "%1")
     if sign == "✗" then
-      table.insert(to_uninstall, ALL_EXTENSIONS[i].name)
+      list.insert(to_uninstall, ALL_EXTENSIONS[i].name)
     elseif sign == "~" then
-      table.insert(to_install, ALL_EXTENSIONS[i].name)
+      list.insert(to_install, ALL_EXTENSIONS[i].name)
     end
   end
 
@@ -274,7 +274,7 @@ M.marketplace.show = function()
 
     local json = vim.json.decode(out.stdout)
     for _, v in ipairs(json.results) do
-      table.insert(ALL_EXTENSIONS, {
+      list.insert(ALL_EXTENSIONS, {
         name = v.package.name,
         description = v.package.description,
         keywords = v.package.keywords

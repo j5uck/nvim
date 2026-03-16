@@ -1,3 +1,8 @@
+local list = (function()
+  local _ = require("_")
+  return _.list
+end)()
+
 local M = {}
 
 M.new = function()
@@ -39,7 +44,7 @@ end
 
 M.toggle = function()
   local wins = vim.api.nvim_tabpage_list_wins(0)
-  local undotree_wins = vim.tbl_filter(function(w)
+  local undotree_wins = M.list.filter(function(w)
     return vim.bo[vim.api.nvim_win_get_buf(w)].filetype == "undotree"
   end, wins)
 
@@ -121,7 +126,7 @@ M.update = function()
     t_undotree.tree = { seq = 0, p = {}, time =  0 }
 
     local function parse_node(_in, out)
-      if vim.tbl_isempty(_in) then return end
+      if M.dictionary.isempty(_in) then return end
       -- local curnode = out
       for _, i in ipairs(_in) do
         if i.alt then parse_node(i.alt, out) end
@@ -135,7 +140,7 @@ M.update = function()
         end
 
         local newnode = { seq = i.seq, p = {}, time = i.time }
-        vim.list_extend(out.p, { newnode })
+        list.merge(out.p, { newnode })
         out = newnode
       end
     end
@@ -167,7 +172,7 @@ M.update = function()
       text[i] = vim.fn.substitute(text[i], "\\zs \\ze (","s","")
     end
 
-    if #vim.tbl_keys(u.seq_saved) > 0 then
+    if not M.dictionary.isempty(u.seq_saved) then
       local _i = u.seq_saved[tostring(u.save_last)]
       if _i then
         local i = u.seq2index[tostring(_i)] + 1

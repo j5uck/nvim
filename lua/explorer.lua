@@ -1,6 +1,6 @@
-local async_wrap, await, notify, fs, random, window = (function()
+local async_wrap, await, dictionary, list, notify, fs, random, window = (function()
   local _ = require("_")
-  return _.async_wrap, _.await, _.notify, _.fs, _.random, _.window
+  return _.async_wrap, _.await, _.dictionary, _.list, _.notify, _.fs, _.random, _.window
 end)()
 
 local ffi = require("ffi")
@@ -194,7 +194,7 @@ vim.api.nvim_create_autocmd("BufHidden", {
   nested = true,
   callback = vim.schedule_wrap(function()
     if vim.api.nvim_win_is_valid(w.win) then return end
-    local bufs = vim.tbl_filter(vim.api.nvim_buf_is_loaded, vim.tbl_map(function(b)
+    local bufs = list.filter(vim.api.nvim_buf_is_loaded, list.map(function(b)
       return b[1]
     end, BUFFERS))
 
@@ -212,46 +212,6 @@ vim.api.nvim_create_autocmd("BufHidden", {
   end)
 })
 
-local function ls(dir)
-  ---@diagnostic disable-next-line: param-type-mismatch
-  local fd = vim.uv.fs_opendir(vim.fs.normalize(dir), nil, 16384)
-
-  local content = vim.uv.fs_readdir(fd) or {}
-  for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
-    vim.list_extend(content, t)
-  end
-  vim.uv.fs_closedir(fd)
-
-  if vim.fn.has("win32") == 1 then
-    content = vim.tbl_filter(function(e) return e.type ~= "link" end, content)
-  end
-
-  for _, e in ipairs(content) do
-    e.is_directory = e.type == "directory"
-    if e.is_directory or (e.type ~= "link") then goto continue end
-
-    e.link = ffi.string(C_BUFFER, C.readlink(dir..e.name, C_BUFFER, C_BUFFER_SIZE))
-    local link_full = vim.fs.normalize(vim.fn.isabsolutepath(e.link) == 1 and e.link or (dir .. "/" .. e.link))
-
-    e.link_exists = C.stat(link_full, C_BUFFER) == 0
-    e.is_directory = e.link_exists and vim.fn.isdirectory(link_full) == 1
-
-    ::continue::
-  end
-
-  table.sort(content, function(a, b)
-    if a.is_directory ~= b.is_directory then return a.is_directory end
-
-    local fa, fb = string.sub(a.name, 1, 1) == ".", string.sub(b.name, 1, 1) == "."
-    if fa ~= fb then return fb end
-
-    local c = vim.stricmp(a.name, b.name)
-    return c == 0 and a.name < b.name or c == -1
-  end)
-
-  return content
-end
-
 local HL = {
   DIRECTORY   = "Directory",
   FILE        = "Normal",
@@ -263,7 +223,7 @@ local HL = {
   SOCKET      = "Keyword"
 }
 
-local function fn_BufReadCmd()
+local fn_BufReadCmd = async_wrap(function(promise)
   local status, devicons = pcall(require, "nvim-web-devicons")
   if not status then devicons = nil end
 
@@ -288,10 +248,10 @@ local function fn_BufReadCmd()
   vim.wo.spell          = false
   vim.wo.wrap           = false
 
-  local list, is_modifiable
+  local ls, is_modifiable
 
   if #M.dir == 0 and (vim.fn.has("win32") == 1) then
-    list = vim.tbl_map(function(name)
+    ls = list.map(function(name)
       return {
         is_directory = true,
         name = string.sub(name, 1, #name - 1),
@@ -301,23 +261,19 @@ local function fn_BufReadCmd()
 
     is_modifiable = false
   else
-    list = ls(M.dir)
-
-    local ft = vim.fn.getftype(M.dir)
-    if #ft == 0 then return true end
-    if ft ~= "dir" then return false end
-    is_modifiable = not not vim.uv.fs_access(M.dir, "W")
+    ls = await(fs.ls(M.dir)).unwrap()
+    is_modifiable = vim.uv.fs_access(M.dir, "W")
   end
 
   local hls = {}
   local text = {}
-  for i, e in ipairs(list) do
+  for i, e in ipairs(ls) do
     local _i = i - 1
     local line = {}
     local line_len = 0
     local function add(txt, hl)
       if hl then
-        table.insert(hls, {
+        list.insert(hls, {
           line = _i,
           col_start = line_len,
           end_col = line_len + #txt,
@@ -325,10 +281,10 @@ local function fn_BufReadCmd()
         })
       end
       line_len = line_len + #txt + 1
-      table.insert(line, txt)
+      list.insert(line, txt)
     end
 
-    table.insert(PATHS, M.dir .. e.name)
+    list.insert(PATHS, M.dir .. e.name)
     add(("/%016d"):format(#PATHS))
     e.id = #PATHS
 
@@ -357,7 +313,7 @@ local function fn_BufReadCmd()
       add(e.link, e.link_exists and HL.LINK or HL.LINK_ORPHAN)
     end
 
-    table.insert(text, table.concat(line, " "))
+    list.insert(text, list.concat(line, " "))
   end
 
   vim.api.nvim_buf_set_lines(w.buf, 0, -1, false, text)
@@ -374,17 +330,19 @@ local function fn_BufReadCmd()
   vim.bo.modifiable = is_modifiable
   vim.bo.modified   = false
 
-  if not is_modifiable then return end
+  if not is_modifiable then return promise.resolve() end
 
   local list_directory = {}
 
-  for _, e in ipairs(list) do
+  for _, e in ipairs(ls) do
     list_directory[e.name] = e
   end
 
   BUFFERS[#BUFFERS][2] = list_directory
   vim.cmd.clearjumps()
-end
+
+  return promise.resolve()
+end)
 
 local function fn_BufWriteCmd__parse_buffers()
   local ENTRY_BUFFER
@@ -414,17 +372,17 @@ local function fn_BufWriteCmd__parse_buffers()
     local string_builder = {}
     ENTRY_BUFFER = {}
 
-    local buffer_ls = vim.tbl_filter(function(v)
+    local buffer_ls = list.filter(function(v)
       return v ~= ""
     end, vim.api.nvim_buf_get_lines(id, 0, -1, true))
 
-    buffer_ls = vim.tbl_map(function(f)
+    buffer_ls = list.map(function(f)
       local t = M.parse(f)
       if not t or string.match(t.name, "/") then
-        table.insert(string_builder, "  PARSING ERROR:\n    >> " .. f)
+        list.insert(string_builder, "  PARSING ERROR:\n    >> " .. f)
         error = true
       elseif is_entry_dupped(t.name) then
-        table.insert(string_builder, "  ENTRY ALREADY EXISTS:\n    >> " .. f)
+        list.insert(string_builder, "  ENTRY ALREADY EXISTS:\n    >> " .. f)
         error = true
       else
         return t
@@ -433,13 +391,13 @@ local function fn_BufWriteCmd__parse_buffers()
 
     if error then
       if #string_builder > 0 then
-        notify.error(vim.api.nvim_buf_get_name(id) .. "\n" .. table.concat(string_builder, "\n"))
+        notify.error(vim.api.nvim_buf_get_name(id) .. "\n" .. list.concat(string_builder, "\n"))
       end
       goto continue
     end
 
     local p = M.URL_to_path(vim.api.nvim_buf_get_name(id))
-    table.insert(r, { string.sub(p, 1, #p - 1), buffer_ls, b[2] })
+    list.insert(r, { string.sub(p, 1, #p - 1), buffer_ls, b[2] })
 
     ::continue::
   end
@@ -467,15 +425,15 @@ local fn_BufWriteCmd = async_wrap(function(promise)
       else
         TASK_FILES[args[2]].copy = TASK_FILES[args[2]].copy + 1
       end
-      table.insert(TASKS, args)
+      list.insert(TASKS, args)
     elseif args[1] == TASK.REMOVE then
       if not TASK_FILES[args[2]] then
         TASK_FILES[args[2]] = { copy = 0 }
       end
       TASK_FILES[args[2]].remove = true
-      table.insert(TASKS, args)
+      list.insert(TASKS, args)
     else
-      table.insert(TASKS, args)
+      list.insert(TASKS, args)
     end
   end
 
@@ -486,7 +444,7 @@ local fn_BufWriteCmd = async_wrap(function(promise)
 
   for _, b in ipairs(buffers_ls) do
     -- b => { name, new_info, old_info }
-    local buffer_name, cached_info = b[1], vim.tbl_extend("force", {}, b[3])
+    local buffer_name, cached_info = b[1], dictionary.clone(b[3])
 
     for _, entry in ipairs(b[2]) do
       local entry_path = PATHS[entry.id]
@@ -590,7 +548,7 @@ local fn_BufWriteCmd = async_wrap(function(promise)
           local tmp_path = dest .. ".tmp_" .. random.string(10) .. ".bak"
           if vim.fn.isdirectory(tmp_path) == 0 then
             t[#t] = tmp_path
-            table.insert(last_move, { tmp_path, dest })
+            list.insert(last_move, { tmp_path, dest })
             break
           end
         end
@@ -680,7 +638,7 @@ vim.api.nvim_create_autocmd({ "CursorMovedI", "CursorMoved", "ModeChanged" }, {
 
 local insert_buffer = vim.fn.has("win32") == 1 and function(id)
   local b = { id, nil }
-  table.insert(BUFFERS, b)
+  list.insert(BUFFERS, b)
   if (#M.dir == 0) or string.match(M.dir,"^%w:\\$") then
     BUFFERS_BY_PATH[M.dir] = b
   else
@@ -688,7 +646,7 @@ local insert_buffer = vim.fn.has("win32") == 1 and function(id)
   end
 end or function(id)
   local b = { id, nil }
-  table.insert(BUFFERS, b)
+  list.insert(BUFFERS, b)
   if M.dir == "/" then
     BUFFERS_BY_PATH[M.dir] = b
   else
@@ -720,8 +678,11 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
 
     if vim.api.nvim_win_is_valid(w.win) then
       insert_buffer(ev.buf)
-      local s, m = pcall(vim.api.nvim_buf_call, ev.buf, fn_BufReadCmd)
-      if not s then notify.error(m) end
+      fn_BufReadCmd().await(function(promise)
+        if promise.code ~= 0 and #promise.message > 0 then
+          notify.error(promise.message)
+        end
+      end)
     else
       -- when :e file://...
       if vim.bo[ev.buf].filetype ~= "lua-explorer" then

@@ -171,9 +171,9 @@ if vim.g.nvy then
   vim.opt.guifont = { "FiraCode Nerd Font Mono:h12" }
 end
 
-local await, async_wrap, fs, notify, pcall_wrap, window = (function()
+local await, async_wrap, fs, list, notify, pcall_wrap, window = (function()
   local _ = require("_")
-  return _.await, _.async_wrap, _.fs, _.notify, _.pcall_wrap, _.window
+  return _.await, _.async_wrap, _.fs, _.list, _.notify, _.pcall_wrap, _.window
 end)()
 
 local loc = async_wrap(function(promise)
@@ -188,7 +188,7 @@ local loc = async_wrap(function(promise)
       elseif vim.endswith(e.name, ".vim") or vim.endswith(e.name, ".lua") then
         local n = #await(fs.readfile(config .. s .. e.name)).unwrap()
         total = total + n
-        table.insert(sb, string.format("%4d", n) .. " :: " .. s .. e.name)
+        list.insert(sb, string.format("%4d", n) .. " :: " .. s .. e.name)
       end
     end
 
@@ -197,10 +197,10 @@ local loc = async_wrap(function(promise)
 
   loc("")
 
-  table.insert(sb, "")
-  table.insert(sb, string.format("%4d", total) .. " :: total")
+  list.insert(sb, "")
+  list.insert(sb, string.format("%4d", total) .. " :: total")
 
-  notify.warn(table.concat(sb, "\n"))
+  notify.warn(list.concat(sb, "\n"))
 end)
 
 vim.api.nvim_create_user_command("LOC", function() loc() end, {})
