@@ -4,7 +4,7 @@ local prequire = (function()
 end)()
 
 if not _G.arg[0] then -- :help -l
-  prequire("nvim-web-devicons", function() end)
+  prequire("nvim-web-devicons", function(_) end)
 end
 
 local M = {
@@ -75,12 +75,10 @@ M.bun.code["package.json"] = {
   "  \"type\": \"module\",",
   "  \"scripts\": { ",
   "    \"dev\": \"bun --bun ./src/server.js\",",
---"    \"node\": \"node --disable-warning=ExperimentalWarning ./src/server.js\",",
   "    \"watch\": \"bun --bun --watch ./src/server.js\"",
   "  },",
   "  \"devDependencies\": {",
-  "    \"@types/bun\": \"*\",",
-  "    \"@types/node\": \"*\"",
+  "    \"@types/bun\": \"*\"",
   "  }",
   "}"
 }
