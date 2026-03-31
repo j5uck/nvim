@@ -1,7 +1,39 @@
-local prequire = (function()
+local async_wrap, await, fs, list, prequire = (function()
   local _ = require("_")
-  return _.prequire
+  return _.async_wrap, _.await, _.fs, _.list, _.prequire
 end)()
+
+local T_GRAY  = "\x1b[1;30m"
+local T_RESET = "\x1b[0m"
+
+local build = { cwd = vim.fn.getcwd() }
+
+function build:cmd(cmd)
+  io.stdout:write(T_GRAY .. ">>" .. T_RESET .. " "  .. table.concat(cmd, " ") .. "\n")
+
+  local job = vim.fn.jobstart(cmd, { cwd = self.cwd, on_stdout = function(_, strings, _)
+    if #strings == 1 then return end
+    io.stdout:write(table.concat(strings, "\n"))
+  end, on_stderr = function(_, strings, _)
+    if #strings == 1 then return end
+    io.stderr:write(table.concat(strings, "\n"))
+  end })
+
+  return vim.fn.jobwait{job}[1] == 0 and self or os.exit(1)
+end
+
+function build:cd(dir)
+  io.stdout:write(T_GRAY .. ">>" .. T_RESET .. " cd " .. dir .. "\n")
+  if vim.fn.isabsolutepath(dir) == 1 then
+    self.cwd = dir
+  else
+    self.cwd = vim.fs.normalize(self.cwd .. "/" .. dir)
+  end
+  if vim.fn.isdirectory(self.cwd) == 0 then
+    vim.fn.mkdir(dir, "p")
+  end
+  return self
+end
 
 if not _G.arg[0] then -- :help -l
   prequire("nvim-web-devicons", function(_) end)
@@ -33,6 +65,7 @@ local gitignore = {
   "**/node_modules/",
   "**/dist/",
   "**/build/",
+  "**/bin/",
   "**/logs/",
   "**/.idea/",
   "**/.vim/",
@@ -62,30 +95,113 @@ M.c.code["src/main.c"] = {
   "  return 0;",
   "}"
 }
-M.c.runner = {
-  "runner",
-  "  :cmd({ vim.fn.exepath(\"cc\"), \"-o\", \"main\", \"src/main.c\" })",
-  "  :cmd{ \"./main\" }"
+M.c.code["build.lua"] = {
+  "#!/bin/nvim -l",
+  "require(\"langs\").c.build()"
 }
+M.c.build = async_wrap(function(promise)
+  build
+    :cmd({ vim.fn.exepath("cc"), "-o", "main", "src/main.c" })
+    :cmd{ "./main" }
+  promise.resolve()
+end)
 
-M.bun.init = { "src/server.js" }
+M.bun.init = { "src/server.ts" }
 M.bun.code = {}
 M.bun.code["package.json"] = {
   "{",
   "  \"type\": \"module\",",
   "  \"scripts\": { ",
-  "    \"dev\": \"bun --bun ./src/server.js\",",
-  "    \"watch\": \"bun --bun --watch ./src/server.js\"",
+  "    \"dev\": \"bun --bun src/server.js\",",
+  "    \"clean\": \"bun -e \\\"import fs from 'fs'; try{ fs.rmSync('./build/', { recursive: true }) }catch(e){}\\\"\",",
+  "    \"build\": \"bun --bun run clean && bun build src/server.ts --minify --outdir build --target bun\",",
+  "    \"release\": \"bun --bun run build && cd build && bun --bun server.js\"",
   "  },",
   "  \"devDependencies\": {",
   "    \"@types/bun\": \"*\"",
   "  }",
   "}"
 }
-M.bun.code["src/server.js"] = {
-  "(async () => {",
-  "  console.log(\"" .. MESSAGE .. "\");",
-  "})();"
+M.bun.code["tsconfig.json"] = {
+  "{",
+  "  \"compilerOptions\": {",
+  "    \"esModuleInterop\": true,",
+  "    \"baseUrl\": \".\",",
+  "    \"paths\": {",
+  "      \"@/*\": [ \"src/*\" ]",
+  "    },",
+  "    \"lib\": [",
+  "      \"dom\",",
+  "      \"WebWorker\",",
+  "      \"es2023\"",
+  "    ],",
+  "    \"noEmit\": true,",
+  "    \"allowImportingTsExtensions\": true,",
+  "  }",
+  "}"
+}
+M.bun.code["src/server.ts"] = {
+  "import index from \"@/index.html\";",
+  "",
+  "const PORT = 8080;",
+  "",
+  "// https://bun.com/docs/runtime/http/server",
+  "Bun.serve({",
+  "  port: PORT,",
+  "  routes: {",
+  "    \"/\": index,",
+  "    \"/*\": Response.json({ message: \"Not found\" }, { status: 404 })",
+  "  }",
+  "});",
+  "",
+  "process.on(\"SIGINT\", () => {",
+  "  process.exit(0);",
+  "});",
+  "",
+  "console.log(\"Server running at http://localhost:\" + PORT + \"/\");"
+}
+M.bun.code["src/index.html"] = {
+  "<!DOCTYPE html>",
+  "<html lang=\"en\">",
+  "  <head>",
+  "    <meta charset=\"UTF-8\">",
+  "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+  "    <title>" .. MESSAGE .. "</title>",
+  "    <style>html, body { background-color: #222222; }</style>",
+  "    <link href=\"style/global.css\" rel=\"stylesheet\">",
+  "    <script lang=\"ts\" type=\"module\" src=\"index.ts\"></script>",
+  "  </head>",
+  "  <body></body>",
+  "</html>"
+}
+M.bun.code["src/index.ts"] = {
+  "const body: HTMLElement = document.body;",
+  "",
+  "const message = document.createElement(\"div\");",
+  "message.innerText = \"Hello World!\";",
+  "",
+  "message.style.height = \"100%\";",
+  "",
+  "message.style.color = \"white\";",
+  "message.style.fontSize = \"5em\";",
+  "",
+  "message.style.display = \"flex\";",
+  "message.style.justifyContent = \"center\";",
+  "message.style.alignItems = \"center\";",
+  "",
+  "body.append(message);",
+}
+M.bun.code["src/style/global.css"] = {
+  "* {",
+  "  margin: 0;",
+  "  padding: 0;",
+  "  box-sizing: border-box;",
+  "}",
+  "",
+  "html, body {",
+  "  width: 100%;",
+  "  height: 100%;",
+  "}"
 }
 M.bun.code[".gitignore"] = gitignore
 
@@ -100,13 +216,19 @@ M.java.code["src/Main.java"] = {
   "  }",
   "}"
 }
-M.java.runner = {
-  "runner",
-  "  :cmd(vim.list_extend({ vim.fn.exepath(\"javac\"), \"-d\", \"build\", \"src/Main.java\" }, fs.find(\"\\\\.java$\")))",
-  "  :cd(\"build\")",
-  "  :cmd(vim.list_extend({ vim.fn.exepath(\"jar\"), \"-cfe\", \"Main.jar\", \"src/Main\" }, fs.find(\"\\\\.class$\", \"build\")))",
-  "  :cmd{ vim.fn.exepath(\"java\"), \"-jar\", \"Main.jar\" }"
+M.java.code["build.lua"] = {
+  "#!/bin/nvim -l",
+  "require(\"langs\").java.build()"
 }
+M.java.build = async_wrap(function(promise)
+  local javas = list.uniq(list.insert(await(fs.find("\\.java$")).unwrap(), 1, "src/Main.java"))
+  build
+    :cmd(list.merge({ vim.fn.exepath("javac"), "-d", "build" }, javas))
+    :cd("build")
+    :cmd(list.merge({ vim.fn.exepath("jar"), "-cfe", "Main.jar", "src/Main" }, await(fs.find("\\.class$", "build")).unwrap()))
+    :cmd{ vim.fn.exepath("java"), "-jar", "Main.jar" }
+  promise.resolve()
+end)
 
 M.kotlin.init = { "src/Main.kt" }
 M.kotlin.code = {}
@@ -115,11 +237,17 @@ M.kotlin.code["src/Main.kt"] = {
   "  println(\"" .. MESSAGE .. "\")",
   "}"
 }
-M.kotlin.runner = {
-  "runner",
-  "  :cmd(vim.list_extend({ vim.fn.exepath(\"kotlinc\"), \"-Wextra\", \"-d\", \"build/Main.jar\", \"src/Main.kt\" }, fs.find(\"\\\\.kt$\")))",
-  "  :cmd{ vim.fn.exepath(\"java\"), \"-jar\", \"build/Main.jar\" }"
+M.kotlin.code["build.lua"] = {
+  "#!/bin/nvim -l",
+  "require(\"langs\").kotlin.build()"
 }
+M.kotlin.build = async_wrap(function(promise)
+  local kts = list.uniq(list.insert(await(fs.find("\\.kt$")).unwrap(), 1, "src/Main.kt"))
+  build
+    :cmd(list.merge({ vim.fn.exepath("kotlinc"), "-Wextra", "-d", "build/Main.jar" }, kts))
+    :cmd{ vim.fn.exepath("java"), "-jar", "build/Main.jar" }
+  promise.resolve()
+end)
 
 M.lua.init = { "script.lua" }
 M.lua.code = {}

@@ -146,8 +146,8 @@ end, { desc = "show buffer path" })
 map("n", "<leader>A", function()
   local b = vim.fn.expand("%:p")
   notify.info(b)
-  vim.fn.setreg("\"", b)
-  vim.fn.setreg("+", b)
+  vim.fn.setreg([["]], b)
+  vim.fn.setreg([[+]], b)
 end, { desc = "copy buffer path" })
 
 map("n", "<c-h>", "<c-o>", { desc = "jump to previous location" })
@@ -245,12 +245,16 @@ vim.api.nvim_create_autocmd("FileType", {
       vim.cmd.cd(s)
     end, { buffer = ev.buf })
 
+    map("n", "<leader>a", function()
+      notify.info(explorer.buf_get_name())
+    end, { buffer = ev.buf, desc = "show buffer path" })
+
     map("n", "<leader>A", function()
-      local s = explorer.buf_get_name()
-      notify.info(s)
-      vim.fn.setreg([["]], s)
-      vim.fn.setreg([[+]], s)
-    end, { buffer = ev.buf })
+      local b = explorer.buf_get_name()
+      notify.info(b)
+      vim.fn.setreg([["]], b)
+      vim.fn.setreg([[+]], b)
+    end, { buffer = ev.buf, desc = "copy buffer path" })
   end
 })
 
@@ -578,12 +582,6 @@ local select = async_wrap(function(promise)
     if (vim.fn.has("win32") == 0) and (vim.fn.match(content[1], "^#!") == 0) then
       vim.system({ "chmod", "a+x", f }, { cwd = dir }):wait()
     end
-  end
-  if lang.runner then
-    local build = await(fs.readfile(vim.fn.stdpath("config") .. "/lua/run.lua")).unwrap()
-    list.merge(build, { "" })
-    list.merge(build, lang.runner)
-    await(fs.mkfile(dir .. "/build.lua", build)).unwrap()
   end
   for _, file in ipairs(lang.init) do
     vim.cmd.e(vim.fn.fnameescape(dir .. "/" .. file))

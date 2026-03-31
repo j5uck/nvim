@@ -19,10 +19,24 @@ M.list.concat = table.concat
 M.list.sort = function(l, fn) return fn and table.sort(l, fn) or vim.fn.sort(l, "i") end
 M.list.map = vim.tbl_map
 M.list.filter = vim.tbl_filter
+M.list.uniq = function(l)
+  local r = {}
+  local d = {}
+  for _, e in ipairs(l) do
+    if not d[e] then
+      d[e] = true
+      M.list.insert(r, e)
+    end
+  end
+  return r
+end
 M.list.remove = table.remove
 M.list.slice = vim.list_slice
 M.list.clone = function(t) return vim.list_slice(t, 1, #t) end
-M.list.insert = table.insert
+M.list.insert = function(l, ...)
+  table.insert(l, ...)
+  return l
+end
 M.list.merge = function(...)
   local r = ({...})[1]
   for _, t in ipairs{...}, {...}, 1 do

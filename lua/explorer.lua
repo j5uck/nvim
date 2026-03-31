@@ -684,9 +684,9 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
         end
       end)
     else
-      -- when :e file://...
+      -- :e file://...
       if vim.bo[ev.buf].filetype ~= "lua-explorer" then
-        vim.cmd[[exe "norm \<c-o>"]]
+        vim.cmd[[exe "norm! \<c-o>"]]
         if ev.file == vim.api.nvim_buf_get_name(0) then
           vim.api.nvim_buf_set_name(0, "")
         end
@@ -738,18 +738,16 @@ return {
   select = M.select,
 
   open_on_explorer = vim.fn.has("win32") == 1 and function()
-    vim.uv.spawn(vim.fn.exepath[[explorer]], { args = { M.dir }, detached = true })
+    vim.uv.spawn(vim.fn.exepath("explorer"), { args = { M.dir }, detached = true })
   end or (vim.fn.has("mac") == 1 and function()
-    -- TODO: test it
-    vim.uv.spawn(vim.fn.exepath[[open]], { args = { M.dir }, detached = true })
+    vim.uv.spawn(vim.fn.exepath("open"), { args = { M.dir }, detached = true })
   end or function()
-    for _, e in ipairs{ "thunar", "dolphin", "nautilus" } do
+    for _, e in ipairs{ "xdg-open", "thunar", "dolphin", "nautilus" } do
       local ep =  vim.fn.exepath(e)
       if string.len(ep) > 0 then
         return vim.uv.spawn(ep, { args = { M.dir }, detached = true })
       end
     end
-    notify.error("Explorer not found")
   end),
 
   buf_get_name = function()
