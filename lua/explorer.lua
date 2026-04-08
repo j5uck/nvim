@@ -737,19 +737,6 @@ return {
   resume = function() M.go(M.dir) end,
   select = M.select,
 
-  open_on_explorer = vim.fn.has("win32") == 1 and function()
-    vim.uv.spawn(vim.fn.exepath("explorer"), { args = { M.dir }, detached = true })
-  end or (vim.fn.has("mac") == 1 and function()
-    vim.uv.spawn(vim.fn.exepath("open"), { args = { M.dir }, detached = true })
-  end or function()
-    for _, e in ipairs{ "xdg-open", "thunar", "dolphin", "nautilus" } do
-      local ep =  vim.fn.exepath(e)
-      if string.len(ep) > 0 then
-        return vim.uv.spawn(ep, { args = { M.dir }, detached = true })
-      end
-    end
-  end),
-
   buf_get_name = function()
     return M.URL_to_path(vim.api.nvim_buf_get_name(0))
   end,

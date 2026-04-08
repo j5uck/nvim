@@ -1,6 +1,6 @@
-local async, async_wrap, await, dictionary, list, notify, notify_once, flags, fs, prequire, window = (function()
+local async, async_wrap, await, dictionary, notify, notify_once, flags, fs, open, prequire, window = (function()
   local _ = require("_")
-  return _.async, _.async_wrap, _.await, _.dictionary, _.list, _.notify, _.notify_once, _.flags, _.fs, _.prequire, _.window
+  return _.async, _.async_wrap, _.await, _.dictionary, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.window
 end)()
 local explorer = require("explorer")
 
@@ -188,7 +188,29 @@ map("n", "<leader>b", function()
   end
 end, { desc = "toggle line number signs" })
 
+-- unmap({ "n", "x" }, "gc")
+-- unmap("n", "gcc")
+do
+  local operator_rhs = function()
+    vim.o.operatorfunc = "v:lua.require'vim._comment'.operator"
+    return "g@_"
+  end
+  map("x", "<leader>c", operator_rhs, { expr = true, desc = "Toggle comment" })
+
+  local line_rhs = function()
+    vim.o.operatorfunc = "v:lua.require'vim._comment'.operator"
+    return "g@_"
+  end
+  map("n", "<leader>c", line_rhs, { expr = true, desc = "Toggle comment line" })
+end
+
 map("n", "<leader>m", "<cmd>nohlsearch<CR>", { desc = "[m]ute search" })
+
+local open_url = function()
+  open.browser(vim.fn.getregion(vim.fn.getpos("v"), vim.fn.getpos("."), { type = vim.api.nvim_get_mode().mode })[1])
+end
+
+map("v", "<leader>b", open_url, { desc = "open url on the default [b]rowser" })
 
 map("n", "<leader>E", explorer.open, { desc = "open file tre[e]" })
 map("n", "<leader>e", explorer.resume, { desc = "resume file tre[e]" })
@@ -237,7 +259,9 @@ vim.api.nvim_create_autocmd("FileType", {
     map("n", "<M-k>", explorer.go_up, { buffer = ev.buf })
     map("n", "<M-l>", explorer.go_next, { buffer = ev.buf })
 
-    map("n", "<leader>e", explorer.open_on_explorer, { buffer = ev.buf })
+    map("n", "<leader>e", function()
+      open.explorer(explorer.buf_get_name())
+    end, { buffer = ev.buf })
 
     map("n", "<leader>c", function()
       local s = explorer.buf_get_name()
@@ -428,7 +452,8 @@ prequire("telescope", function()
   local function man_pages() tb.man_pages{ sections = { "ALL" } } end
   map("n", "<leader>fm", man_pages,      { desc = "[f]ind [m]an pages [telescope]" })
 
-  map("n", "<leader>ft", tb.builtin,     { desc = "[f]ind [t]elescope builtin [telescope]" })
+  map("n", "<leader>fT", tb.builtin,     { desc = "[f]ind [t]elescope builtin [telescope]" })
+  map("n", "<leader>ft", tb.filetypes,   { desc = "[f]ind file[t]ype [telescope]" })
   map("n", "<leader>fr", tb.resume,      { desc = "[f]ind [r]esumed search [telescope]" })
   map("n", "<leader>ff", tb.find_files,  { desc = "[f]ind [f]iles [telescope]" })
   map("n", "<leader>fg", tb.live_grep,   { desc = "[f]ind with [g]rep [telescope]" })
@@ -498,20 +523,6 @@ prequire("telescope", function()
   prequire("noice", function()
     map("n", "<leader>fn", "<cmd>NoiceTelescope<cr>", { desc = "[f]ind noice [n]otification with telescope" })
   end)
-end)
-
--- COMMENT --
-
-prequire("Comment", function()
-  local function cnorm()
-    if vim.api.nvim_get_vvar("count") == 0 then
-      return "<Plug>(comment_toggle_linewise_current)"
-    else
-      return "<Plug>(comment_toggle_linewise_count)"
-    end
-  end
-  map("n", "<leader>c", cnorm, { expr = true, desc = "toggle [c]omments" })
-  map("x", "<leader>c", "<Plug>(comment_toggle_linewise_visual)", { desc = "toggle [c]omments" })
 end)
 
 -- COC --

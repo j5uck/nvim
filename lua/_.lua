@@ -382,15 +382,22 @@ M.fs.ls = M.promisify_wrap(function(promise, path)
 end)
 
 M.fs.find = M.promisify_wrap((function()
-  local function find(regex, path)
+  local function find(promise, regex, path)
     ---@diagnostic disable-next-line: param-type-mismatch
-    local fd = vim.uv.fs_opendir(path, nil, 16384) -- 1 << 14
+    local fd, message, _ = vim.uv.fs_opendir(path, nil, 16384) -- 1 << 14
+    if not fd then
+      promise.message = message
+      promise.reject()
+      return nil
+    end
 
     local r = {}
     for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
       for _, e in ipairs(t) do
         if e.type == "directory" then
-          M.list.merge(r, find(regex, path .. "/" .. e.name))
+          local f = find(promise, regex, path .. "/" .. e.name)
+          if not f then return nil end
+          M.list.merge(r, f)
         elseif vim.fn.match(e.name, regex) > -1 then
           M.list.insert(r, path .. "/" .. e.name)
         end
@@ -410,11 +417,37 @@ M.fs.find = M.promisify_wrap((function()
     end
     local pre = #path + 2
 
+    local f = find(promise, regex, path)
+    if not f then return nil end
+
     return promise.resolve(M.list.map(function(e)
       return string.sub(e, pre)
-    end, find(regex, path)))
+    end, f))
   end
 end)())
+
+M.open = {}
+
+M.open.browser = (vim.fn.has("win32") == 1) and function(url)
+  return vim.uv.spawn(vim.fn.exepath("rundll32"), { args = { "url.dll,FileProtocolHandler", url }, detached = true })
+end or ((vim.fn.has("mac") == 1) and function(url)
+  return vim.uv.spawn("open", { args = { url }, detached = true })
+end or function(url)
+  return vim.uv.spawn("xdg-open", { args = { url }, detached = true })
+end)
+
+M.open.explorer = (vim.fn.has("win32") == 1) and function(path)
+  vim.uv.spawn(vim.fn.exepath("explorer"), { args = { path }, detached = true })
+end or ((vim.fn.has("mac") == 1) and function(path)
+  vim.uv.spawn(vim.fn.exepath("open"), { args = { path }, detached = true })
+end or function(path)
+  for _, e in ipairs{ "xdg-open", "thunar", "dolphin", "nautilus" } do
+    local ep =  vim.fn.exepath(e)
+    if string.len(ep) > 0 then
+      return vim.uv.spawn(ep, { args = { path }, detached = true })
+    end
+  end
+end)
 
 M.sh = M.promisify_wrap(function(promise, cmd, opts)
   opts = opts or {}

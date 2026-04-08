@@ -123,7 +123,8 @@ vim.g.c_syntax_for_h = 1
 
 -- vim.g.comment_strings = 1
 
-vim.lsp.set_log_level(vim.log.levels.OFF)
+---@diagnostic disable-next-line:deprecated 
+(vim.lsp.log.set_level or vim.lsp.set_log_level)(vim.log.levels.OFF)
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "help", "man" },

@@ -35,7 +35,7 @@ function build:cd(dir)
   return self
 end
 
-if not _G.arg[0] then -- :help -l
+if #_G.arg == 0 then -- :help -l
   prequire("nvim-web-devicons", function(_) end)
 end
 
@@ -112,10 +112,11 @@ M.bun.code["package.json"] = {
   "{",
   "  \"type\": \"module\",",
   "  \"scripts\": { ",
-  "    \"dev\": \"bun --bun src/server.js\",",
+  "    \"dev\": \"bun --bun src/server.ts\",",
   "    \"clean\": \"bun -e \\\"import fs from 'fs'; try{ fs.rmSync('./build/', { recursive: true }) }catch(e){}\\\"\",",
-  "    \"build\": \"bun --bun run clean && bun build src/server.ts --minify --outdir build --target bun\",",
-  "    \"release\": \"bun --bun run build && cd build && bun --bun server.js\"",
+  "    \"build\": \"bun --bun run clean && bun build --production --outdir build --target bun src/server.ts\",",
+  "    \"compile\": \"bun --bun run clean && bun build --compile --outfile build/server --target bun src/server.ts\",",
+  "    \"release\": \"bun --bun run build && cd build && bun --bun server.ts\"",
   "  },",
   "  \"devDependencies\": {",
   "    \"@types/bun\": \"*\"",
@@ -125,18 +126,21 @@ M.bun.code["package.json"] = {
 M.bun.code["tsconfig.json"] = {
   "{",
   "  \"compilerOptions\": {",
+  "    \"module\": \"nodenext\",",
+  "    \"moduleResolution\": \"nodenext\",",
   "    \"esModuleInterop\": true,",
-  "    \"baseUrl\": \".\",",
+  "    \"baseUrl\": \"./\",",
   "    \"paths\": {",
   "      \"@/*\": [ \"src/*\" ]",
   "    },",
   "    \"lib\": [",
   "      \"dom\",",
   "      \"WebWorker\",",
-  "      \"es2023\"",
+  "      \"ESNext\"",
   "    ],",
   "    \"noEmit\": true,",
   "    \"allowImportingTsExtensions\": true,",
+  "    \"removeComments\": true",
   "  }",
   "}"
 }

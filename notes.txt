@@ -102,6 +102,20 @@ end)
 
 
 
+-- v.log(vim.fn.synIDattr(vim.fn.synIDtrans(vim.fn.hlID("Normal")), "bg#"))
+
+
+local d = ""
+for _, r in ipairs(vim.opt.runtimepath:get()) do
+  if vim.fn.match(r, "share/nvim/runtime$") > 0 then
+    d = r
+    break
+  end
+end
+require("_").log(d .. "/lua/vim/_core/defaults.lua")
+
+
+
 local wrap = function(fn, ...)
   local t = { ... }
   local len = select("#", ...)

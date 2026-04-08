@@ -128,7 +128,7 @@ local _run = async_wrap(function(promise, args)
     if vim.fn.match(answer, "^[yY]\\([eE][sS]\\)\\?$") == 0 then
       local promises = {}
       for _, u in ipairs(todo.untracked) do
-        local p = fs.remove(u)
+        local p = fs.remove(joinpath(PLUG_HOME, u))
         p.meta = { untracked = u }
         list.insert(promises, p)
       end
@@ -729,16 +729,6 @@ plug{
 -- AUTO TABSIZE --
 
 plug{ github("tpope/vim-sleuth") }
-
--- COMMENTS --
-
-plug{
-  github("numToStr/Comment.nvim"),
-  setup = prequire_wrap("Comment", function(comment)
-    require("Comment.utils").catch = pcall
-    comment.setup{ ignore = "^$" }
-  end)
-}
 
 -- AUTO RENAME TAG --
 
