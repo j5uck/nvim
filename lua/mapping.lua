@@ -161,7 +161,7 @@ vim.api.nvim_create_autocmd("FileType", {
 })
 
 map("n", "<leader>l", ":lua require(\"_\").log()<left>", { silent = false, desc = "open [l]ua cmd" })
-map("n", "<leader>0", "<cmd>only<CR> ", { desc = "[0]nly" })
+map("n", "<leader>0", "<cmd>silent! only<CR>", { desc = "[0]nly" })
 
 map("n", "<leader>W", function()
   local o = not vim.wo.wrap

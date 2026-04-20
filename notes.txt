@@ -124,3 +124,13 @@ local wrap = function(fn, ...)
     return fn(unpack(t, 1, len))
   end
 end
+
+-- ------------------------- x ------------------------- --
+
+git
+  -> git init wrapper
+    -> default to master branch
+    -> set user and email
+    -> (optional) set remote url
+
+-- ------------------------- x ------------------------- --
