@@ -175,6 +175,17 @@ M.select = function()
   local link = entry.link and (vim.fn.isabsolutepath(entry.link) == 1 and entry.link or (M.dir .. entry.link))
   local url = link or (M.dir .. entry.name)
 
+  ---@diagnostic disable-next-line: param-type-mismatch
+  if vim.uv.fs_access(url, "") then
+    if not vim.uv.fs_access(url, "R") or vim.uv.fs_stat(url).type == "socket" then
+      return notify.error("\"" .. url .. "\" [Access denied]")
+    end
+  else
+    if entry.is_directory then
+      return notify.warn("Save \"" .. M.dir .. "\" first")
+    end
+  end
+
   if entry.is_directory then
     local dest = vim.fs.normalize(url)
     if select__is_root(dest) then
@@ -182,11 +193,10 @@ M.select = function()
     else
       M.go(dest.."/")
     end
-    return
+  else
+    w:hide()
+    pcall(vim.cmd.edit, { vim.fn.fnameescape(vim.fs.normalize(url)) })
   end
-
-  w:hide()
-  pcall(vim.cmd.edit, { vim.fn.fnameescape(vim.fs.normalize(url)) })
 end
 
 vim.api.nvim_create_autocmd("BufHidden", {

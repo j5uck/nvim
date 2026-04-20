@@ -178,7 +178,7 @@ local _run = async_wrap(function(promise, args)
       set_lines(i-1, i, { "+ " .. name .. ": Cloning..." })
     end
 
-    local p = git.clone{ name = name, url = plug.url, cwd = cwd }
+    local p = git.clone{ name = name, url = plug.url, cwd = cwd, shallow = true }
     p.await(function(_p)
       if _p.code == 0 then
         set_lines(i-1, i, { "- " .. name .. ": Cloning... Done!" })
@@ -208,7 +208,15 @@ local _run = async_wrap(function(promise, args)
       set_lines(i-1, i, { "+ " .. name .. ": Fetching..." })
     end
 
-    local p = git.fetch{ name = name, cwd = joinpath(PLUG_HOME, name), commit = plug.commit, tag = plug.tag, branch = plug.branch }
+    local p = git.fetch{
+      name = name,
+      cwd = joinpath(PLUG_HOME, name),
+      commit = plug.commit,
+      tag = plug.tag,
+      branch = plug.branch,
+      shallow = true
+    }
+
     p.await(function(_p)
       if _p.code == 0 then
         set_lines(i-1, i, { "- " .. name .. ": Fetching... Done!" })

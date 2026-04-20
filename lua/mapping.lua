@@ -601,6 +601,10 @@ local select = async_wrap(function(promise)
   vim.cmd.q()
   vim.cmd.cd(dir)
 
+  if lang.post then
+    await(lang.post{ cwd = dir }).unwrap()
+  end
+
   return promise.resolve()
 end)
 

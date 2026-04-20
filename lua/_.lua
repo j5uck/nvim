@@ -9,7 +9,7 @@ D.TMP = vim.fn.has("win32") == 0 and
 local M = {}
 
 M.flags = {
-  error_promise = false,
+  show_promise_error = true,
   warn_missing_lsp = true,
   warn_missing_module = true,
 }
@@ -131,7 +131,7 @@ M.promisify = function(fn, ...)
     vim.schedule(function()
       promise.code = promise.code or 1
       promise.message = message or "Promise rejected"
-      if M.flags.error_promise then
+      if M.flags.show_promise_error then
         M.notify.error(promise.message .. traceback)
       end
       for _, _fn in ipairs(promise.awaiting) do _fn() end
@@ -498,13 +498,11 @@ M.sh = M.promisify_wrap(function(promise, cmd, opts)
   end
 end)
 
+local GIT_DEFAULT_BRANCH = "master"
 local GIT_OPTIONS = { text = true, clear_env = true, timeout = (3 * 60 * 1000) }
-M.git = {}
 
-M.git.clone = M.promisify_wrap(function(promise, o)
-  M.await(M.fs.mkdir(o.cwd)).unwrap()
-  local cmd = { "git", "clone", "--shallow-submodules", "--depth=1", "--progress", "--", o.url, o.cwd }
-  vim.system(cmd, GIT_OPTIONS, function(r)
+local function _system_git(promise, cmd, cwd)
+  vim.system(cmd, M.dictionary.merge(GIT_OPTIONS, { cwd = cwd }), function(r)
     if r.code == 0 then
       return promise.resolve()
     else
@@ -512,13 +510,29 @@ M.git.clone = M.promisify_wrap(function(promise, o)
       return promise.reject(r.stderr)
     end
   end)
+end
+
+M.git = {}
+
+M.git.init = M.promisify_wrap(function(promise, o)
+  _system_git(promise, { "git", "init", "-b", GIT_DEFAULT_BRANCH }, o.cwd)
+end)
+
+M.git.clone = M.promisify_wrap(function(promise, o)
+  M.await(M.fs.mkdir(o.cwd)).unwrap()
+  local cmd = o.shallow and
+    { "git", "clone", "--shallow-submodules", "--depth=1", "--progress", "--", o.url, o.cwd } or
+    { "git", "clone", "--shallow-submodules", "--progress", "--", o.url, o.cwd }
+  _system_git(promise, cmd, o.cwd)
 end)
 
 M.git.fetch = M.promisify_wrap(function(promise, o)
   local cmds = {}
   local function t(cmd) M.list.insert(cmds, cmd) end
 
-  if o.commit then
+  if not o.shallow then
+    t(function(_) return { "git", "fetch", "--all" } end)
+  elseif o.commit then
     t(function(_) return { "git", "fetch", "origin", "--depth=1", "--progress", o.commit } end)
     t(function(_) return { "git", "reset", "--hard", o.commit } end)
   elseif o.tag then
