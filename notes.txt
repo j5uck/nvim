@@ -138,11 +138,15 @@ git
 
 -- TODO: remove pcall_wrap
 
-local M = require("_")
+-- local M = require("_")
+local M = (function()
+  local _ = require("_")
+  return _.dictionary.clone(_)
+end)()
 
 -- TODO: store all promises + timestamp to track them
 -- TODO: maybe add timeout???
--- local promises = {}
+local promises = {}
 
 do
   local promise = {}
@@ -154,45 +158,46 @@ do
 
     self.code = 0
     self.result = { ... }
-    for _, fn in ipairs(self.awaiting) do fn() end
 
-    -- promises[self.coroutine] = nil
-
-    -- TODO: yield all till coroutine.running() == self.coroutine
-    -- if coroutine.status(self.coroutine) == "running" then
-    --   self:yield()
-    -- end
+    vim.schedule(function()
+      for _, fn in ipairs(self.awaiting) do fn() end
+      promises[self.coroutine] = nil
+    end)
   end
 
   function promise:reject(reason)
     local DEFAULT_CODE = 1
     local DEFAULT_MESSAGE = "Promise rejected!"
 
-    if reason == nil then
-      self.code = DEFAULT_CODE
-      self.message = DEFAULT_MESSAGE
-    elseif type(reason) == "string" then
-      self.code = DEFAULT_CODE
-      self.message = reason
-    elseif type(reason) == "table" then
-      self.code = reason.code or DEFAULT_CODE
-      self.message = reason.message or DEFAULT_MESSAGE
-    else
-      assert(false, "Expected table, string or nil, got " .. type(reason))
-    end
+    vim.schedule(function()
+      if reason == nil then
+        self.code = DEFAULT_CODE
+        self.message = DEFAULT_MESSAGE
+      elseif type(reason) == "string" then
+        self.code = DEFAULT_CODE
+        self.message = reason
+      elseif type(reason) == "table" then
+        self.code = reason.code or DEFAULT_CODE
+        self.message = reason.message or DEFAULT_MESSAGE
+      else
+        assert(false, "Expected table, string or nil, got " .. type(reason))
+      end
 
-    -- TODO: store full stacktrace (somehow)?? aka branching (for every :await())???
-    -- TODO: detect stacktrace depth ???????????
-    M.notify.error(self.message)
+      if coroutine.status(self.parent_coroutine) == "dead" then
+        M.notify.error(self.message)
+      else
+        -- TODO: store full stacktrace (somehow)?? aka branching (for every :await())???
+        -- TODO: detect stacktrace depth ???????????
+      end
 
-    for _, fn in ipairs(self.awaiting) do fn() end
-    -- TODO: maybe append to awaiting and check if anybody consumes the error?
+      for _, fn in ipairs(self.awaiting) do fn() end
+      -- TODO: maybe append to awaiting and check if anybody consumes the error?
+      -- promises[self.coroutine] = nil
 
-    -- promises[self.coroutine] = nil
-
-    if coroutine.status(self.coroutine) == "running" then
-      self:yield()
-    end
+      if coroutine.status(self.coroutine) == "running" then
+        self:yield()
+      end
+    end)
   end
 
   function promise:resume(...)
@@ -214,7 +219,7 @@ do
 
   function promise:await()
     local co = coroutine.running()
-    assert(co, "\"await\" can only be used inside an \"async\" function")
+    assert(co, "\"await\" can only be used inside another promise")
 
     vim.schedule(function()
       if self.code == nil then
@@ -265,9 +270,11 @@ do
     local self = {}
     setmetatable(self, { __index = promise })
 
+    self.awaiting = {}
+
     self.trace = {}
     self.trace.init = debug.traceback("", 2)
-    -- self.trace.error
+    self.parent_coroutine = coroutine.running()
 
     self.coroutine = coroutine.create(function(...)
       local status, result = pcall(fn, self, ...)
@@ -276,9 +283,6 @@ do
         return self:reject(result)
       end
     end)
-    -- promises[self.coroutine] = self
-
-    self.awaiting = {}
 
     vim.schedule_wrap(coroutine.resume)(self.coroutine, ...)
 
@@ -298,17 +302,10 @@ end
 
 local p = M.promisify_wrap(function(promise)
   M.promisify(function(promise_2)
+    a()
     M.notify.warn("1")
-    -- a()
-
     promise_2:sleep(200)
-
-    -- vim.defer_fn(function()
-    -- --   a()
-    --   promise_2:resolve()
-    -- end, 200)
-
-    -- return promise_2:resolve()
+    return promise_2:resolve()
   end):await():unwrap()
 
   M.notify.warn("2")
