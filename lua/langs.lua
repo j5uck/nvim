@@ -1,6 +1,6 @@
-local async_wrap, await, fs, git, list, prequire = (function()
+local promisify_wrap, fs, git, list, prequire = (function()
   local _ = require("_")
-  return _.async_wrap, _.await, _.fs, _.git, _.list, _.prequire
+  return _.promisify_wrap, _.fs, _.git, _.list, _.prequire
 end)()
 
 local T_GRAY  = "\x1B[1;30m"
@@ -101,11 +101,11 @@ M.c.code["build.lua"] = {
   "#!/bin/nvim -l",
   "require(\"langs\").c.build()"
 }
-M.c.build = async_wrap(function(promise)
+M.c.build = promisify_wrap(function(promise)
   build
     :cmd({ vim.fn.exepath("cc"), "-o", "main", "src/main.c" })
     :cmd{ "./main" }
-  promise.resolve()
+  promise:resolve()
 end)
 
 M.bun.init = { "src/server.ts" }
@@ -390,14 +390,14 @@ M.java.code["build.lua"] = {
   "#!/bin/nvim -l",
   "require(\"langs\").java.build()"
 }
-M.java.build = async_wrap(function(promise)
-  local javas = list.uniq(list.insert(await(fs.find("\\.java$")).unwrap(), 1, "src/Main.java"))
+M.java.build = promisify_wrap(function(promise)
+  local javas = list.uniq(list.insert(fs.find("\\.java$"):await():unwrap(), 1, "src/Main.java"))
   build
     :cmd(list.merge({ vim.fn.exepath("javac"), "-d", "build" }, javas))
     :cd("build")
-    :cmd(list.merge({ vim.fn.exepath("jar"), "-cfe", "Main.jar", "src/Main" }, await(fs.find("\\.class$", "build")).unwrap()))
+    :cmd(list.merge({ vim.fn.exepath("jar"), "-cfe", "Main.jar", "src/Main" }, fs.find("\\.class$", "build"):await():unwrap()))
     :cmd{ vim.fn.exepath("java"), "-jar", "Main.jar" }
-  promise.resolve()
+  promise:resolve()
 end)
 
 M.kotlin.init = { "src/Main.kt" }
@@ -411,12 +411,12 @@ M.kotlin.code["build.lua"] = {
   "#!/bin/nvim -l",
   "require(\"langs\").kotlin.build()"
 }
-M.kotlin.build = async_wrap(function(promise)
-  local kts = list.uniq(list.insert(await(fs.find("\\.kt$")).unwrap(), 1, "src/Main.kt"))
+M.kotlin.build = promisify_wrap(function(promise)
+  local kts = list.uniq(list.insert(fs.find("\\.kt$"):await():unwrap(), 1, "src/Main.kt"))
   build
     :cmd(list.merge({ vim.fn.exepath("kotlinc"), "-Wextra", "-d", "build/Main.jar" }, kts))
     :cmd{ vim.fn.exepath("java"), "-jar", "build/Main.jar" }
-  promise.resolve()
+  promise:resolve()
 end)
 
 M.lua.init = { "script.lua" }

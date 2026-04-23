@@ -172,23 +172,23 @@ if vim.g.nvy then
   vim.opt.guifont = { "FiraCode Nerd Font Mono:h12" }
 end
 
-local async_wrap, await, fs, list, notify, pcall_wrap, window = (function()
+local promisify_wrap, fs, list, notify, window = (function()
   local _ = require("_")
-  return _.async_wrap, _.await, _.fs, _.list, _.notify, _.pcall_wrap, _.window
+  return _.promisify_wrap, _.fs, _.list, _.notify, _.window
 end)()
 
-local loc = async_wrap(function(promise)
+local loc = promisify_wrap(function(promise)
   local sb = {}
   local config = vim.fn.stdpath("config") .. "/"
   local total = 0
 
   local function loc(s)
-    for _, e in ipairs(await(fs.ls(config .. s)).unwrap()) do
+    for _, e in ipairs(fs.ls(config .. s):await():unwrap()) do
       if e.name == ".git" then
       elseif e.type == "directory" then
         loc(s .. e.name .. "/")
       elseif vim.endswith(e.name, ".vim") or vim.endswith(e.name, ".lua") then
-        local n = #await(fs.readfile(config .. s .. e.name)).unwrap()
+        local n = #fs.readfile(config .. s .. e.name):await():unwrap()
         total = total + n
         list.insert(sb, string.format("%4d", n) .. " :: " .. s .. e.name)
       end
@@ -202,7 +202,7 @@ local loc = async_wrap(function(promise)
 
   notify.warn(list.concat(sb, "\n"))
 
-  return promise.resolve()
+  return promise:resolve()
 end)
 
 vim.api.nvim_create_user_command("LOC", function() loc() end, {})
@@ -211,15 +211,17 @@ local term_ns = vim.api.nvim_create_namespace("")
 vim.api.nvim_set_hl(term_ns, "Normal", { fg = "#FFFFFF", bg = "#000000" })
 
 vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter" }, {
-  callback = vim.schedule_wrap(pcall_wrap(function(e)
-    local win = vim.api.nvim_get_current_win()
+  callback = vim.schedule_wrap(function(e)
+    pcall(function()
+      local win = vim.api.nvim_get_current_win()
 
-    if vim.fn.match(vim.api.nvim_buf_get_name(e.buf), "^term://") == 0 then
-      vim.api.nvim_win_set_hl_ns(win, term_ns)
-    elseif vim.api.nvim_get_hl_ns({ winid = win }) == term_ns then
-      vim.api.nvim_win_set_hl_ns(win, 0)
-    end
-  end))
+      if vim.fn.match(vim.api.nvim_buf_get_name(e.buf), "^term://") == 0 then
+        vim.api.nvim_win_set_hl_ns(win, term_ns)
+      elseif vim.api.nvim_get_hl_ns({ winid = win }) == term_ns then
+        vim.api.nvim_win_set_hl_ns(win, 0)
+      end
+    end)
+  end)
 })
 
 vim.api.nvim_create_autocmd("TermOpen", {
@@ -234,21 +236,25 @@ vim.api.nvim_create_autocmd("TermOpen", {
 
     vim.api.nvim_create_autocmd("BufLeave", {
       buffer = buffer,
-      callback = pcall_wrap(function()
-        vim.wo.wrap = false
+      callback = function()
+        pcall(function()
+          vim.wo.wrap = false
 
-        local w = vim.api.nvim_get_current_win()
+          local w = vim.api.nvim_get_current_win()
 
-        local scrolloff = vim.wo[w].scrolloff
-        local sidescrolloff = vim.wo[w].sidescrolloff
-        vim.wo[w].scrolloff = 0
-        vim.wo[w].sidescrolloff = 0
+          local scrolloff = vim.wo[w].scrolloff
+          local sidescrolloff = vim.wo[w].sidescrolloff
+          vim.wo[w].scrolloff = 0
+          vim.wo[w].sidescrolloff = 0
 
-        vim.schedule(pcall_wrap(function()
-          vim.wo[w].scrolloff = scrolloff
-          vim.wo[w].sidescrolloff = sidescrolloff
-        end))
-      end)
+          vim.schedule(function()
+            pcall(function()
+              vim.wo[w].scrolloff = scrolloff
+              vim.wo[w].sidescrolloff = sidescrolloff
+            end)
+          end)
+        end)
+      end
     })
 
     vim.api.nvim_create_autocmd("BufEnter", {

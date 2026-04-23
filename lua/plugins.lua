@@ -1,6 +1,6 @@
-local async_wrap, await, dictionary, flags, fs, git, list, notify, notify_once, prequire_wrap = (function()
+local promisify_wrap, dictionary, flags, fs, git, list, notify, notify_once, prequire_wrap = (function()
   local _ = require("_")
-  return _.async_wrap, _.await, _.dictionary, _.flags, _.fs, _.git, _.list, _.notify, _.notify_once, _.prequire_wrap
+  return _.promisify_wrap, _.dictionary, _.flags, _.fs, _.git, _.list, _.notify, _.notify_once, _.prequire_wrap
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
@@ -45,18 +45,18 @@ end
 PLUG_SYNC.fn = {}
 PLUG_SYNC.run_lock = false
 
-local _run = async_wrap(function(promise, args)
-  await(fs.mkdir(PLUG_HOME)).unwrap()
+local run = promisify_wrap(function(promise, args)
+  fs.mkdir(PLUG_HOME):await():unwrap()
 
   local reltime = vim.fn.reltime()
 
   if PLUG_SYNC.run_lock then
-    return promise.reject("Plug sync is still running")
+    return promise:reject("Plug sync is still running")
   end
   PLUG_SYNC.run_lock = true
 
   if vim.fn.executable("git") == 0 then
-    return promise.reject("Git not found")
+    return promise:reject("Git not found")
   end
 
   local function set_lines(start, _end, lines)
@@ -79,7 +79,7 @@ local _run = async_wrap(function(promise, args)
       end
     end
     if #missing > 0 then
-      return promise.reject("Plugin" .. (#missing == 1 and "" or "s") .. " not configured:\n  >>" .. list.concat(missing, "\n  >>"))
+      return promise:reject("Plugin" .. (#missing == 1 and "" or "s") .. " not configured:\n  >>" .. list.concat(missing, "\n  >>"))
     end
 
     todo.plugs = args.fargs
@@ -87,7 +87,7 @@ local _run = async_wrap(function(promise, args)
 
   if #todo.plugs == 0 then
     notify.warn("Nothing to do")
-    return promise.resolve()
+    return promise:resolve()
   end
 
   vim.cmd[[tabnew]]
@@ -107,7 +107,7 @@ local _run = async_wrap(function(promise, args)
   -- CLEAN UP --
 
   todo.untracked = (function()
-    local l = await(fs.ls(PLUG_HOME)).unwrap()
+    local l = fs.ls(PLUG_HOME):await():unwrap()
 
     local u = list.map(function(e)
       return e.name
@@ -133,7 +133,7 @@ local _run = async_wrap(function(promise, args)
         list.insert(promises, p)
       end
       for _, p in ipairs(promises) do
-        if await(p).code ~= 0 then
+        if p:await().code ~= 0 then
           notify.error("\"".. p.meta.untracked .."\" couldn't be deleted!")
         end
       end
@@ -141,7 +141,7 @@ local _run = async_wrap(function(promise, args)
   end
 
   todo.untracked = (#args.fargs > 0) and {} or (function()
-    local l = await(fs.ls(PLUG_HOME)).unwrap()
+    local l = fs.ls(PLUG_HOME):await():unwrap()
 
     local u = list.map(function(e)
       return e.name
@@ -179,7 +179,7 @@ local _run = async_wrap(function(promise, args)
     end
 
     local p = git.clone{ name = name, url = plug.url, cwd = cwd, shallow = true }
-    p.await(function(_p)
+    p:after(function(_p)
       if _p.code == 0 then
         set_lines(i-1, i, { "- " .. name .. ": Cloning... Done!" })
       else
@@ -194,8 +194,8 @@ local _run = async_wrap(function(promise, args)
   end
 
   vim.api.nvim_win_call(PLUG_SYNC.win, function() vim.fn.cursor(1, 2) end)
-  for _, p in ipairs(todo.promises) do await(p) end
-  if todo.errors then promise.reject("") end
+  for _, p in ipairs(todo.promises) do p:await() end
+  if todo.errors then promise:reject() end
 
   -- FETCH --
 
@@ -217,7 +217,7 @@ local _run = async_wrap(function(promise, args)
       shallow = true
     }
 
-    p.await(function(_p)
+    p:after(function(_p)
       if _p.code == 0 then
         set_lines(i-1, i, { "- " .. name .. ": Fetching... Done!" })
       else
@@ -232,8 +232,8 @@ local _run = async_wrap(function(promise, args)
   end
 
   vim.api.nvim_win_call(PLUG_SYNC.win, function() vim.fn.cursor(1, 2) end)
-  for _, p in ipairs(todo.promises) do await(p) end
-  if todo.errors then promise.reject("") end
+  for _, p in ipairs(todo.promises) do p:await() end
+  if todo.errors then promise:reject() end
 
   runtimepath()
 
@@ -279,7 +279,7 @@ local _run = async_wrap(function(promise, args)
     end
   end
 
-  if todo.errors then promise.reject("") end
+  if todo.errors then promise:reject() end
 
   -- FINISH --
 
@@ -294,11 +294,11 @@ local _run = async_wrap(function(promise, args)
     vim.cmd("silent! helptags " .. vim.fn.fnameescape(joinpath(PLUG_HOME, n, "doc")))
   end
 
-  promise.resolve()
+  promise:resolve()
 end)
 
-PLUG_SYNC.fn.run = function(args)
-  _run(args).await(function(promise)
+local function command_sync(args)
+  run(args):after(function(promise)
     PLUG_SYNC.run_lock = false
     if promise.code ~= 0 and #promise.message > 0 then
       notify.error(promise.message)
@@ -306,7 +306,7 @@ PLUG_SYNC.fn.run = function(args)
   end)
 end
 
-vim.api.nvim_create_user_command("PlugSync", PLUG_SYNC.fn.run, {
+vim.api.nvim_create_user_command("PlugSync", command_sync, {
   complete = function(search)
     return list.sort(list.filter(function(name)
       return vim.fn.match(name, search) == 0
@@ -442,23 +442,23 @@ plug{
 
 plug{
   github("nvim-telescope/telescope-fzf-native.nvim"),
-  build = async_wrap(function(promise, opts)
+  build = promisify_wrap(function(promise, opts)
     local cc = vim.fn.exepath("gcc")
     if not cc then
-      return promise.reject("GCC not found")
+      return promise:reject("GCC not found")
     end
 
-    await(fs.mkdir(joinpath(opts.dir, "build")))
+    fs.mkdir(joinpath(opts.dir, "build")):await()
 
     local target = vim.fn.has("win32") == 1 and "libfzf.dll" or "libfzf.so"
     local cmd = { cc, "-O3", "-fpic", "-std=gnu99", "-shared", "src/fzf.c", "-o", "build/"..target }
 
     local o  = vim.system(cmd, { text = true, cwd = opts.dir }):wait()
     if o.code ~= 0 then
-      return promise.reject("Error compiling fzf:" .. o.stderr)
+      return promise:reject("Error compiling fzf:" .. o.stderr)
     end
 
-    promise.resolve()
+    promise:resolve()
   end)
 }
 

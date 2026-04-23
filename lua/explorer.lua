@@ -1,6 +1,6 @@
-local async_wrap, await, dictionary, list, notify, fs, random, window = (function()
+local promisify_wrap, dictionary, list, notify, fs, random, window = (function()
   local _ = require("_")
-  return _.async_wrap, _.await, _.dictionary, _.list, _.notify, _.fs, _.random, _.window
+  return _.promisify_wrap, _.dictionary, _.list, _.notify, _.fs, _.random, _.window
 end)()
 
 local ffi = require("ffi")
@@ -233,7 +233,7 @@ local HL = {
   SOCKET      = "Keyword"
 }
 
-local fn_BufReadCmd = async_wrap(function(promise)
+local fn_BufReadCmd = promisify_wrap(function(promise)
   local status, devicons = pcall(require, "nvim-web-devicons")
   if not status then devicons = nil end
 
@@ -271,7 +271,7 @@ local fn_BufReadCmd = async_wrap(function(promise)
 
     is_modifiable = false
   else
-    ls = await(fs.ls(M.dir)).unwrap()
+    ls = fs.ls(M.dir):await():unwrap()
     is_modifiable = vim.uv.fs_access(M.dir, "W")
   end
 
@@ -340,7 +340,7 @@ local fn_BufReadCmd = async_wrap(function(promise)
   vim.bo.modifiable = is_modifiable
   vim.bo.modified   = false
 
-  if not is_modifiable then return promise.resolve() end
+  if not is_modifiable then return promise:resolve() end
 
   local list_directory = {}
 
@@ -351,7 +351,7 @@ local fn_BufReadCmd = async_wrap(function(promise)
   BUFFERS[#BUFFERS][2] = list_directory
   vim.cmd.clearjumps()
 
-  return promise.resolve()
+  return promise:resolve()
 end)
 
 local function fn_BufWriteCmd__parse_buffers()
@@ -415,7 +415,7 @@ local function fn_BufWriteCmd__parse_buffers()
   return error, r
 end
 
-local fn_BufWriteCmd = async_wrap(function(promise)
+local fn_BufWriteCmd = promisify_wrap(function(promise)
   local slash = vim.fn.has("win32") == 1 and "\\" or "/"
   local TASK_FILES = {} -- { { copy, remove, gone } ... }
   local TASKS = {}
@@ -449,7 +449,7 @@ local fn_BufWriteCmd = async_wrap(function(promise)
 
   local error, buffers_ls = fn_BufWriteCmd__parse_buffers()
   if error then
-    return promise.reject("Error parsing buffer")
+    return promise:reject("Error parsing buffer")
   end
 
   for _, b in ipairs(buffers_ls) do
@@ -537,18 +537,18 @@ local fn_BufWriteCmd = async_wrap(function(promise)
     if t[1] == TASK.REMOVE then
       local tf = TASK_FILES[t[2]]
       if tf.copy == 0 and not tf.gone then
-        -- await(fs.remove(t[2])).unwrap()
-        await(fs.remove(t[2]))
+        -- fs.remove(t[2]):await():unwrap()
+        fs.remove(t[2]):await()
         tf.gone = true
         if vim.fn.isdirectory(t[2]) == 1 then
           local dir = string.sub(vim.fn.undofile(t[2]), #undodir + 2)
           for _, f in ipairs(vim.fn.globpath(undodir, dir .. "*", 1, true, 1)) do
-            -- await(fs.remove(f)).unwrap()
-            await(fs.remove(f))
+            -- fs.remove(f):await():unwrap()
+            fs.remove(f):await()
           end
         else
-          -- await(fs.remove(vim.fn.undofile(t[2]))).unwrap()
-          await(fs.remove(vim.fn.undofile(t[2])))
+          -- fs.remove(vim.fn.undofile(t[2])):await():unwrap()
+          fs.remove(vim.fn.undofile(t[2])):await()
         end
       end
     else
@@ -564,31 +564,31 @@ local fn_BufWriteCmd = async_wrap(function(promise)
         end
       end
       if t[1] == TASK.MKMDIR then
-        await(fs.mkdir(t[2])).unwrap()
+        fs.mkdir(t[2]):await():unwrap()
       elseif t[1] == TASK.MKFILE then
-        await(fs.mkfile(t[2])).unwrap()
+        fs.mkfile(t[2]):await():unwrap()
       elseif t[1] == TASK.MKLINK then
-        await(fs.mklink(t[2], t[3])).unwrap()
+        fs.mklink(t[2], t[3]):await():unwrap()
       elseif t[1] == TASK.COPY then
         local tf = TASK_FILES[t[2]]
         tf.copy = tf.copy - 1
         if tf.remove and tf.copy == 0 then
-          await(fs.move(t[2], t[3])).unwrap()
+          fs.move(t[2], t[3]):await():unwrap()
           tf.gone = true
         else
-          await(fs.copy(t[2], t[3])).unwrap()
+          fs.copy(t[2], t[3]):await():unwrap()
         end
         local action = tf.gone and fs.move or fs.copy
         if vim.fn.isdirectory(t[3]) == 1 then
           local src_dir = string.sub(vim.fn.undofile(t[2]), #undodir + 2)
           local trim_len = #undodir + 2 + #src_dir
           for _, f in ipairs(vim.fn.globpath(undodir, src_dir .. "*", 1, true, 1)) do
-            await(action(f, vim.fn.undofile(t[3]) .. string.sub(f, trim_len))).unwrap()
+            action(f, vim.fn.undofile(t[3]) .. string.sub(f, trim_len)):await():unwrap()
           end
         else
           local src_undo = vim.fn.undofile(t[2])
           if vim.uv.fs_stat(src_undo) then
-            await(action(src_undo, vim.fn.undofile(t[3]))).unwrap()
+            action(src_undo, vim.fn.undofile(t[3])):await():unwrap()
           end
         end
       end
@@ -596,17 +596,17 @@ local fn_BufWriteCmd = async_wrap(function(promise)
   end
 
   for _, lm in ipairs(last_move) do
-    await(fs.move(lm[1], lm[2])).unwrap()
+    fs.move(lm[1], lm[2]):await():unwrap()
     if vim.fn.isdirectory(lm[2]) == 1 then
       local src_dir = string.sub(vim.fn.undofile(lm[1]), #undodir + 2)
       local trim_len = #undodir + 2 + #src_dir
       for _, f in ipairs(vim.fn.globpath(undodir, src_dir .. "*", 1, true, 1)) do
-        await(fs.move(f, vim.fn.undofile(lm[2]) .. string.sub(f, trim_len))).unwrap()
+        fs.move(f, vim.fn.undofile(lm[2]) .. string.sub(f, trim_len)):await():unwrap()
       end
     else
       local src_undo = vim.fn.undofile(lm[1])
       if vim.uv.fs_stat(src_undo) then
-        await(fs.move(src_undo, vim.fn.undofile(lm[2]))).unwrap()
+        fs.move(src_undo, vim.fn.undofile(lm[2])):await():unwrap()
       end
     end
   end
@@ -626,7 +626,7 @@ local fn_BufWriteCmd = async_wrap(function(promise)
   M.history.skip = true
   vim.schedule_wrap(M.go)(M.dir)
 
-  return promise.resolve()
+  return promise:resolve()
 end)
 
 vim.api.nvim_create_autocmd("BufWriteCmd", {
@@ -688,7 +688,7 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
 
     if vim.api.nvim_win_is_valid(w.win) then
       insert_buffer(ev.buf)
-      fn_BufReadCmd().await(function(promise)
+      fn_BufReadCmd():after(function(promise)
         if promise.code ~= 0 and #promise.message > 0 then
           notify.error(promise.message)
         end

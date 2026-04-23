@@ -9,10 +9,11 @@ D.TMP = vim.fn.has("win32") == 0 and
 local M = {}
 
 M.flags = {
-  show_promise_error = true,
   warn_missing_lsp = true,
   warn_missing_module = true,
 }
+
+-- ------------------------- x ------------------------- --
 
 M.list = {}
 M.list.concat = table.concat
@@ -59,6 +60,8 @@ M.dictionary.keys = vim.tbl_keys
 M.dictionary.merge = function(...) return vim.tbl_extend("force", ...) end
 M.dictionary.deep_merge = function(...) return vim.tbl_deep_extend("force", ...) end
 
+-- ------------------------- x ------------------------- --
+
 local WRAP = vim.schedule_wrap
 local I, W, E = vim.log.levels.INFO, vim.log.levels.WARN, vim.log.levels.ERROR
 
@@ -81,6 +84,8 @@ M.log = function(...)
   vim.schedule_wrap(vim.notify)(M.list.concat(sb, "\n"), W)
 end
 
+-- ------------------------- x ------------------------- --
+
 M.prequire = function(name, fn)
   local status, plugin = pcall(require, name)
 
@@ -95,56 +100,142 @@ M.prequire_wrap = function(name, fn)
   return function() return M.prequire(name, fn) end
 end
 
-M.pcall_wrap = function(fn)
-  return function(...)
-    return pcall(fn, ...)
+-- ------------------------- x ------------------------- --
+
+local Promise = {}
+
+function Promise:resolve(...)
+  if not (self.code == nil) then
+    return M.notify.warn("Promise already finished!")
   end
+
+  self.code = 0
+  self.result = { ... }
+
+  vim.schedule(function()
+    for _, fn in ipairs(self.awaiting) do fn() end
+  end)
+end
+
+function Promise:reject(reason)
+  local DEFAULT_CODE = 1
+  local DEFAULT_MESSAGE = "Promise rejected!"
+
+  vim.schedule(function()
+    if reason == nil then
+      self.code = DEFAULT_CODE
+      self.message = DEFAULT_MESSAGE
+    elseif type(reason) == "string" then
+      self.code = DEFAULT_CODE
+      self.message = reason
+    elseif type(reason) == "table" then
+      self.code = reason.code or DEFAULT_CODE
+      self.message = reason.message or DEFAULT_MESSAGE
+    else
+      assert(false, "Expected table, string or nil, got " .. type(reason))
+    end
+
+    if self.parent_coroutine and coroutine.status(self.parent_coroutine) ~= "dead" then
+    else
+      M.notify.error(self.message)
+    end
+
+    for _, fn in ipairs(self.awaiting) do fn() end
+
+    if coroutine.status(self.coroutine) == "running" then
+      self:yield()
+    end
+  end)
+end
+
+function Promise:resume(...)
+  assert(self.code == nil, "Promise already finished!")
+  coroutine.resume(self.coroutine, ...)
+end
+
+function Promise:yield()
+  assert(coroutine.running() == self.coroutine, "Yielding the wrong Promise!")
+  assert(self.code == nil, "Promise already finished!")
+  coroutine.yield()
+end
+
+function Promise:schedule()
+  vim.schedule(function() self:resume() end)
+  self:yield()
+end
+
+function Promise:await()
+  local co = coroutine.running()
+  assert(co, "\"await\" can only be used inside another Promise")
+
+  vim.schedule(function()
+    if self.code == nil then
+      M.list.insert(self.awaiting, function()
+        coroutine.resume(co)
+      end)
+    else
+      coroutine.resume(co)
+    end
+  end)
+
+  coroutine.yield()
+
+  return self
+end
+
+function Promise:unwrap()
+  assert(self.code ~= nil, "Promise still running!")
+  if self.code ~= 0 then
+    assert(false,  debug.traceback("", 2).. "\n" .. self.message)
+  end
+  return unpack(self.result)
+end
+
+function Promise:sleep(milliseconds)
+  assert(coroutine.running() == self.coroutine, "Sleeping the wrong Promise!")
+  assert(type(milliseconds) == "number", "Invalid timeout")
+
+  vim.defer_fn(function()
+    if self.code == nil then
+      self:resume()
+    end
+  end, milliseconds)
+
+  self:yield()
+end
+
+-- TODO: remove it
+function Promise:after(fn)
+  vim.schedule(function()
+    if self.code == nil then
+      M.list.insert(self.awaiting, function() fn(self) end)
+    else
+      fn(self)
+    end
+  end)
 end
 
 M.promisify = function(fn, ...)
-  local promise = {}
+  local self = {}
+  setmetatable(self, { __index = Promise })
 
-  promise.traceback = {
-    init = debug.traceback("", 2)
-  }
-  promise.awaiting = {}
-  promise.await = vim.schedule_wrap(function(_fn)
-    if promise.code then
-      _fn(promise)
-    else
-      M.list.insert(promise.awaiting, function() _fn(promise) end)
+  self.awaiting = {}
+
+  self.trace = {}
+  self.trace.init = debug.traceback("", 2)
+  self.parent_coroutine = coroutine.running()
+
+  self.coroutine = coroutine.create(function(...)
+    local status, result = pcall(fn, self, ...)
+
+    if not status then
+      return self:reject(result)
     end
   end)
-  promise.unwrap = function()
-    assert(promise.code == 0, promise.message)
-    return unpack(promise.r)
-  end
 
-  promise.resolve = vim.schedule_wrap(function(...)
-    promise.code = 0
-    promise.r = { ... }
-    for _, _fn in ipairs(promise.awaiting) do _fn() end
-  end)
+  vim.schedule_wrap(coroutine.resume)(self.coroutine, ...)
 
-  promise.reject = function(message)
-    local traceback = debug.traceback("")
-    vim.schedule(function()
-      promise.code = promise.code or 1
-      promise.message = message or "Promise rejected"
-      if M.flags.show_promise_error then
-        M.notify.error(promise.message .. traceback)
-      end
-      for _, _fn in ipairs(promise.awaiting) do _fn() end
-    end)
-  end
-
-  local status, result = pcall(fn, promise, ...)
-
-  if not status then
-    promise.reject(result)
-  end
-
-  return promise
+  return self
 end
 
 M.promisify_wrap = function(fn)
@@ -153,62 +244,7 @@ M.promisify_wrap = function(fn)
   end
 end
 
-M.async = M.promisify_wrap(function(promise, fn, ...)
-  promise.coroutine = coroutine.create(function(...)
-    local status, result = pcall(fn, promise, ...)
-
-    if not status then
-      return promise.reject(result)
-    end
-
-    promise.schedule()
-
-    if promise.code then return end
-    M.notify.warn("Promise not resolved" .. promise.traceback.init)
-    return promise.resolve()
-  end)
-
-  promise.resume = function(...) coroutine.resume(promise.coroutine, ...) end
-  promise.yield = coroutine.yield
-
-  promise.schedule = function()
-    vim.schedule(promise.resume)
-    promise.yield()
-  end
-
-  promise.sleep = function(timeout)
-    assert(type(timeout) == "number", "Invalid timeout")
-    vim.defer_fn(promise.resume, timeout)
-    promise.yield()
-  end
-
-  vim.schedule_wrap(coroutine.resume)(promise.coroutine, ...)
-end)
-
-M.async_wrap = function(fn)
-  return function(...)
-    return M.async(fn, ...)
-  end
-end
-
-M.await = function(promise)
-  local co = coroutine.running()
-  assert(co, "\"await\" can only be used inside an \"async\" function")
-
-  vim.schedule(function()
-    if promise.code then
-      coroutine.resume(co)
-    else
-      M.list.insert(promise.awaiting, function()
-        coroutine.resume(co)
-      end)
-    end
-  end)
-
-  coroutine.yield()
-
-  return promise
-end
+-- ------------------------- x ------------------------- --
 
 M.random = {}
 
@@ -242,7 +278,7 @@ M.fs.mktmp = M.promisify_wrap(function(promise)
     local r = D.TMP .. M.random.string(10)
     if vim.fn.isdirectory(r) == 0 then
       vim.fn.mkdir(r, "p")
-      return promise.resolve(r)
+      return promise:resolve(r)
     end
   end
 end)
@@ -250,20 +286,20 @@ end)
 M.fs.mkdir = M.promisify_wrap(function(promise, dir)
   local status, result = pcall(vim.fn.mkdir, dir, "p")
   if status then
-    return promise.resolve()
+    return promise:resolve()
   else
-    return promise.reject(result)
+    return promise:reject(result)
   end
 end)
 
 M.fs.mkfile = M.promisify_wrap(function(promise, file, content, flags)
   flags = flags or ""
-  M.await(M.fs.mkdir(M.fs.dirname(file))).unwrap()
+  M.fs.mkdir(M.fs.dirname(file)):await():unwrap()
   local status, result = pcall(vim.fn.writefile, content or {}, file, flags)
   if status then
-    return promise.resolve()
+    return promise:resolve()
   else
-    return promise.reject(result)
+    return promise:reject(result)
   end
 end)
 
@@ -272,34 +308,34 @@ M.fs.mklink = M.promisify_wrap(vim.fn.has("win32") == 1 and function(_, _, _)
 end or function(promise, target, link_name)
   local o = vim.system{ vim.fn.exepath("ln"), "--symbolic", target, link_name }:wait()
   if o.code == 0 then
-    return promise.resolve()
+    return promise:resolve()
   else
-    return promise.reject()
+    return promise:reject()
   end
 end)
 
 M.fs.copy = M.promisify_wrap(vim.fn.has("win32") == 1 and function(promise, src, dest)
-  local p = M.await(M.sh{ vim.fn.exepath("powershell"), "Copy-Item", "-recurse", src, "-destination", dest })
+  local p = M.sh{ vim.fn.exepath("powershell"), "Copy-Item", "-recurse", src, "-destination", dest }:await()
   if p.code == 0 then
-    return promise.resolve()
+    return promise:resolve()
   else
-    return promise.reject()
+    return promise:reject()
   end
 end or function(promise, src, dest)
-  local p = M.await(M.sh{ vim.fn.exepath("cp"), "--recursive", src, dest })
+  local p = M.sh{ vim.fn.exepath("cp"), "--recursive", src, dest }:await()
   if p.code == 0 then
-    return promise.resolve()
+    return promise:resolve()
   else
-    return promise.reject()
+    return promise:reject()
   end
 end)
 
 M.fs.move = M.promisify_wrap(function(promise, src, dest)
   local status, result = pcall(vim.fn.rename, src, dest)
   if status then
-    return promise.resolve()
+    return promise:resolve()
   else
-    return promise.reject(result)
+    return promise:reject(result)
   end
 end)
 
@@ -307,18 +343,18 @@ M.fs.remove = M.promisify_wrap(function(promise, src)
   -- local status, result = pcall(vim.fs.rm, src, { recursive = true, force = true })
   local status, result = pcall(vim.fn.delete, src, "rf")
   if status then
-    return promise.resolve()
+    return promise:resolve()
   else
-    return promise.reject(result)
+    return promise:reject(result)
   end
 end)
 
 M.fs.readfile = M.promisify_wrap(function(promise, file, type)
   local status, result = pcall(vim.fn.readfile, file, type)
   if status then
-    return promise.resolve(result)
+    return promise:resolve(result)
   else
-    return promise.reject(result)
+    return promise:reject(result)
   end
 end)
 
@@ -341,8 +377,7 @@ M.fs.ls = M.promisify_wrap(function(promise, path)
   ---@diagnostic disable-next-line: param-type-mismatch
   local fd, message, _ = vim.uv.fs_opendir(vim.fs.normalize(path), nil, 16384) -- 1 << 14
   if not fd then
-    promise.message = message
-    return promise.reject()
+    return promise:reject{ message = message }
   end
 
   local content = vim.uv.fs_readdir(fd) or {}
@@ -378,7 +413,7 @@ M.fs.ls = M.promisify_wrap(function(promise, path)
     return (c == 0) and (a.name < b.name) or (c == -1)
   end)
 
-  return promise.resolve(content)
+  return promise:resolve(content)
 end)
 
 M.fs.find = M.promisify_wrap((function()
@@ -386,8 +421,7 @@ M.fs.find = M.promisify_wrap((function()
     ---@diagnostic disable-next-line: param-type-mismatch
     local fd, message, _ = vim.uv.fs_opendir(path, nil, 16384) -- 1 << 14
     if not fd then
-      promise.message = message
-      promise.reject()
+      promise:reject{ message = message }
       return nil
     end
 
@@ -420,7 +454,7 @@ M.fs.find = M.promisify_wrap((function()
     local f = find(promise, regex, path)
     if not f then return nil end
 
-    return promise.resolve(M.list.map(function(e)
+    return promise:resolve(M.list.map(function(e)
       return string.sub(e, pre)
     end, f))
   end
@@ -451,10 +485,6 @@ end)
 
 M.sh = M.promisify_wrap(function(promise, cmd, opts)
   opts = opts or {}
-  opts.clear_env = true
-  opts.cwd = opts.cwd
-  opts.detach = opts.detach
-  opts.timeout = opts.timeout
 
   if not string.find(cmd[1], (vim.fn.has("win32") == 1) and "[\\/]" or "/") then
     cmd[1] = vim.fn.exepath(cmd[1])
@@ -476,10 +506,9 @@ M.sh = M.promisify_wrap(function(promise, cmd, opts)
   if opts.on_stdout or opts.on_stderr then
     opts.on_exit = function(_, code, _)
       if code == 0 then
-        return promise.resolve()
+        return promise:resolve()
       else
-        promise.code = code
-        return promise.reject()
+        return promise:reject{ code = code }
       end
     end
 
@@ -489,41 +518,47 @@ M.sh = M.promisify_wrap(function(promise, cmd, opts)
       promise.stdout = o.stdout
       promise.stderr = o.stderr
       if o.code == 0 then
-        return promise.resolve()
+        return promise:resolve()
       else
-        promise.code = o.code
-        return promise.reject(o.stderr)
+        return promise:reject{ code = o.code }
       end
     end)
   end
 end)
 
 local GIT_DEFAULT_BRANCH = "master"
+local GIT_INIT_COMMIT = "init"
 local GIT_OPTIONS = { text = true, clear_env = true, timeout = (3 * 60 * 1000) }
-
-local function _system_git(promise, cmd, cwd)
-  vim.system(cmd, M.dictionary.merge(GIT_OPTIONS, { cwd = cwd }), function(r)
-    if r.code == 0 then
-      return promise.resolve()
-    else
-      promise.code = r.code
-      return promise.reject(r.stderr)
-    end
-  end)
-end
 
 M.git = {}
 
 M.git.init = M.promisify_wrap(function(promise, o)
-  _system_git(promise, { "git", "init", "-b", GIT_DEFAULT_BRANCH }, o.cwd)
+  local cwd = o.cwd or vim.fn.getcwd()
+  local go = M.dictionary.merge(GIT_OPTIONS, { cwd = cwd })
+  local ls = M.fs.ls(cwd):await():unwrap()
+
+  if #M.list.filter(function(e) return e.name == ".git" and e.is_directory end, ls) == 1 then
+    M.notify.warn("Repository already inited")
+    return promise:resolve()
+  end
+
+  M.sh({ "git", "init", "-b", GIT_DEFAULT_BRANCH }, go):await():unwrap()
+  M.sh({ "git", "add", "-A" }, go):await():unwrap()
+
+  if #ls > 0 then
+    M.sh({ "git", "commit", "-m", GIT_INIT_COMMIT }, go):await():unwrap()
+  end
+
+  return promise:resolve()
 end)
 
 M.git.clone = M.promisify_wrap(function(promise, o)
-  M.await(M.fs.mkdir(o.cwd)).unwrap()
+  M.fs.mkdir(o.cwd):await():unwrap()
   local cmd = o.shallow and
     { "git", "clone", "--shallow-submodules", "--depth=1", "--progress", "--", o.url, o.cwd } or
     { "git", "clone", "--shallow-submodules", "--progress", "--", o.url, o.cwd }
-  _system_git(promise, cmd, o.cwd)
+  M.sh(cmd, M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })):await():unwrap()
+  return promise:resolve()
 end)
 
 M.git.fetch = M.promisify_wrap(function(promise, o)
@@ -555,13 +590,12 @@ M.git.fetch = M.promisify_wrap(function(promise, o)
   local options = M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
   local function run(r, i)
     if r.code ~= 0 then
-      promise.code = r.code
-      return promise.reject(r.stderr)
+      return promise:reject{ code = r.code, message = r.stderr }
     end
 
     local cmd = cmds[i]
     if not cmd then
-      return promise.resolve()
+      return promise:resolve()
     end
 
     vim.system(cmd(r), options, function(rr) run(rr, i+1) end)
@@ -569,9 +603,11 @@ M.git.fetch = M.promisify_wrap(function(promise, o)
   run({ code = 0 }, 1)
 end)
 
-local window = {}
+-- ------------------------- x ------------------------- --
 
-function window:show()
+local Window = {}
+
+function Window:show()
   if vim.api.nvim_win_is_valid(self.win) then return end
 
   if not vim.api.nvim_buf_is_valid(self.buf) then
@@ -592,14 +628,14 @@ function window:show()
   end)
 end
 
-function window:hide()
+function Window:hide()
   if vim.api.nvim_win_is_valid(self.win) then
     vim.api.nvim_win_close(self.win, true)
     self.win = -1
   end
 end
 
-function window:toggle()
+function Window:toggle()
   if vim.api.nvim_win_is_valid(self.win) then
     self:hide()
   else
@@ -610,7 +646,7 @@ end
 local DEFAULT_WIDTH = 16 * 4
 local DEFAULT_HEIGHT = 9 * 2
 
-local function new(conf)
+M.window = function(conf)
   local self = {}
 
   self.zindex = conf.zindex or 25
@@ -657,9 +693,9 @@ local function new(conf)
     for _, fn in ipairs(self.on_resize) do fn(self) end
   end})
 
-  return self
+  return setmetatable(self, { __index = Window })
 end
 
-M.window = function(conf) return setmetatable(new(conf), { __index = window }) end
+-- ------------------------- x ------------------------- --
 
 return M

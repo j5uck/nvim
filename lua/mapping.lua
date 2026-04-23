@@ -1,6 +1,6 @@
-local async, async_wrap, await, dictionary, notify, notify_once, flags, fs, open, prequire, window = (function()
+local promisify_wrap, dictionary, notify, notify_once, flags, fs, open, prequire, window = (function()
   local _ = require("_")
-  return _.async, _.async_wrap, _.await, _.dictionary, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.window
+  return _.promisify_wrap, _.dictionary, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.window
 end)()
 local explorer = require("explorer")
 
@@ -571,25 +571,25 @@ vim.api.nvim_create_autocmd("FileType", {
 })
 
 map("n", "<leader>in", function()
-  async(function(promise)
-    vim.cmd.cd(await(fs.mktmp()).unwrap())
+  promisify_wrap(function(promise)
+    vim.cmd.cd(fs.mktmp():await():unwrap())
     vim.cmd.e("new.txt")
     explorer.open()
-    return promise.resolve()
-  end)
+    return promise:resolve()
+  end)()
 end, { desc = "create tmp folder" })
 
 LANGS = require("langs")
 
-local select = async_wrap(function(promise)
+local select = promisify_wrap(function(promise)
   local lnum = vim.api.nvim_win_get_cursor(0)[1]
   local lang = LANGS[lnum]
   vim.cmd.q()
 
-  local dir = await(fs.mktmp()).unwrap()
+  local dir = fs.mktmp():await():unwrap()
   for name, content in pairs(lang.code) do
     local f = dir .. "/" .. name
-    await(fs.mkfile(f, content)).unwrap()
+    fs.mkfile(f, content):await():unwrap()
     if (vim.fn.has("win32") == 0) and (vim.fn.match(content[1], "^#!") == 0) then
       vim.system({ "chmod", "a+x", f }, { cwd = dir }):wait()
     end
@@ -602,10 +602,10 @@ local select = async_wrap(function(promise)
   vim.cmd.cd(dir)
 
   if lang.post then
-    await(lang.post{ cwd = dir }).unwrap()
+    lang.post{ cwd = dir }:await():unwrap()
   end
 
-  return promise.resolve()
+  return promise:resolve()
 end)
 
 W.langs = window{
