@@ -676,4 +676,4 @@ W.langs = window{
   border = "rounded",
 }
 
-map("n", "<leader>ii", function() W.langs:show() end, { desc = "create example file" })
+map("n", "<leader>ii", function() W.langs:show() end, { desc = "create example project" })

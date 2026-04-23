@@ -338,7 +338,7 @@ end
 local function github(p) return "https://github.com/"..p..".git" end
 
 
------ ----- ----- ----- ----- X ----- ----- ----- ----- -----
+-- ------------------------- x ------------------------- --
 
 
 -- THEMES --
@@ -709,14 +709,16 @@ plug{
     vim.o.winminwidth = 10
     vim.o.equalalways = true
     vim.cmd.WindowsDisableAutowidth()
-    pcall(vim.api.nvim_del_user_command, "WindowsDisableAutowidth")
-    pcall(vim.api.nvim_del_user_command, "WindowsEnableAutowidth")
-    pcall(vim.api.nvim_del_user_command, "WindowsEqualize")
-    pcall(vim.api.nvim_del_user_command, "WindowsMaximize")
-    pcall(vim.api.nvim_del_user_command, "WindowsMaximizeHorizontally")
-    pcall(vim.api.nvim_del_user_command, "WindowsMaximizeVertically")
-    pcall(vim.api.nvim_del_user_command, "WindowsMaximizeVerticaly")
-    pcall(vim.api.nvim_del_user_command, "WindowsToggleAutowidth")
+
+    local commands = {
+      "WindowsDisableAutowidth", "WindowsEnableAutowidth",
+      "WindowsEqualize", "WindowsMaximize",
+      "WindowsMaximizeHorizontally", "WindowsMaximizeVertically",
+      "WindowsMaximizeVerticaly", "WindowsToggleAutowidth"
+    }
+    for _, c in ipairs(commands) do
+      pcall(vim.api.nvim_del_user_command, c)
+    end
   end)
 }
 
@@ -864,7 +866,7 @@ plug{
 }
 
 
------ ----- ----- ----- ----- X ----- ----- ----- ----- -----
+-- ------------------------- x ------------------------- --
 
 
 runtimepath()

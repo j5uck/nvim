@@ -271,6 +271,8 @@ M.random.uint = function()
   return buffer[0]
 end
 
+-- ------------------------- x ------------------------- --
+
 M.fs = {}
 
 M.fs.mktmp = M.promisify_wrap(function(promise)
@@ -460,6 +462,8 @@ M.fs.find = M.promisify_wrap((function()
   end
 end)())
 
+-- ------------------------- x ------------------------- --
+
 M.open = {}
 
 M.open.browser = (vim.fn.has("win32") == 1) and function(url)
@@ -482,6 +486,8 @@ end or function(path)
     end
   end
 end)
+
+-- ------------------------- x ------------------------- --
 
 M.sh = M.promisify_wrap(function(promise, cmd, opts)
   opts = opts or {}
@@ -526,6 +532,8 @@ M.sh = M.promisify_wrap(function(promise, cmd, opts)
   end
 end)
 
+-- ------------------------- x ------------------------- --
+
 local GIT_DEFAULT_BRANCH = "master"
 local GIT_INIT_COMMIT = "init"
 local GIT_OPTIONS = { text = true, clear_env = true, timeout = (3 * 60 * 1000) }
@@ -533,9 +541,10 @@ local GIT_OPTIONS = { text = true, clear_env = true, timeout = (3 * 60 * 1000) }
 M.git = {}
 
 M.git.init = M.promisify_wrap(function(promise, o)
-  local cwd = o.cwd or vim.fn.getcwd()
-  local go = M.dictionary.merge(GIT_OPTIONS, { cwd = cwd })
-  local ls = M.fs.ls(cwd):await():unwrap()
+  assert(o.cwd, "cwd is missing!")
+
+  local go = M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
+  local ls = M.fs.ls(o.cwd):await():unwrap()
 
   if #M.list.filter(function(e) return e.name == ".git" and e.is_directory end, ls) == 1 then
     M.notify.warn("Repository already inited")
@@ -553,6 +562,8 @@ M.git.init = M.promisify_wrap(function(promise, o)
 end)
 
 M.git.clone = M.promisify_wrap(function(promise, o)
+  assert(o.cwd, "cwd is missing!")
+
   M.fs.mkdir(o.cwd):await():unwrap()
   local cmd = o.shallow and
     { "git", "clone", "--shallow-submodules", "--depth=1", "--progress", "--", o.url, o.cwd } or
@@ -562,6 +573,8 @@ M.git.clone = M.promisify_wrap(function(promise, o)
 end)
 
 M.git.fetch = M.promisify_wrap(function(promise, o)
+  assert(o.cwd, "cwd is missing!")
+
   local cmds = {}
   local function t(cmd) M.list.insert(cmds, cmd) end
 
@@ -601,6 +614,26 @@ M.git.fetch = M.promisify_wrap(function(promise, o)
     vim.system(cmd(r), options, function(rr) run(rr, i+1) end)
   end
   run({ code = 0 }, 1)
+end)
+
+M.git.config = M.promisify_wrap(function(promise, o)
+  assert(o.cwd, "cwd is missing!")
+
+  local go = M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
+
+  if o.name then
+    M.sh({ "git", "config", "--local", "user.name", o.name }, go):await():unwrap()
+  end
+
+  if o.email then
+    M.sh({ "git", "config", "--local", "user.email", o.email }, go):await():unwrap()
+  end
+
+  if o.url then
+    M.sh({ "git", "config", "--local", "remote.origin.url", o.url }, go):await():unwrap()
+  end
+
+  return promise:resolve()
 end)
 
 -- ------------------------- x ------------------------- --

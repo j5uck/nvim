@@ -779,4 +779,3 @@ return {
     M.go(h.list[(h.index-1 + h.offset) % h.CAPACITY + 1])
   end
 }
-
