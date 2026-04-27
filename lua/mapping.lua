@@ -1,6 +1,6 @@
-local promisify_wrap, dictionary, notify, notify_once, flags, fs, open, prequire, window = (function()
+local promisify_wrap, dictionary, notify, notify_once, flags, fs, open, prequire, term, window = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.dictionary, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.window
+  return _.promisify_wrap, _.dictionary, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.term, _.window
 end)()
 local explorer = require("explorer")
 
@@ -122,22 +122,11 @@ vim.api.nvim_create_autocmd("FileType", {
   end
 })
 
-vim.fn.setreg("q", "")
 map("n", "Q", "qq", { desc = "record macro on [q] register" })
 map("n", ",", "@q", { desc = "do [q] macro" })
 map("v", ",", "<cmd>norm @q<CR>", { desc = "do [q] macro" })
 
-map("n", "<leader>t", function()
-  if vim.fn.has("win32") == 1 then
-    local shell = vim.go.shell
-    vim.go.shell = "powershell"
-    vim.cmd.term()
-    vim.go.shell = shell
-  else
-    vim.cmd.term()
-  end
-  vim.cmd.startinsert()
-end, { desc = "[t]erminal" })
+map("n", "<leader>t", term, { desc = "[t]erminal" })
 
 map("n", "<leader>a", function()
   notify.info(vim.fn.expand("%:p"))
@@ -298,17 +287,9 @@ W.term = window{
     end
 
     if term_buffers[term_buffers_i] ~= vim.api.nvim_get_current_buf() then
-      if vim.fn.has("win32") == 1 then
-        local shell = vim.go.shell
-        vim.go.shell = "powershell"
-        vim.cmd.term()
-        vim.go.shell = shell
-      else
-        vim.cmd.term()
-      end
+      term()
       self.buf = vim.api.nvim_get_current_buf()
       term_buffers[term_buffers_i] = self.buf
-      vim.api.nvim_win_set_buf(self.win, self.buf)
     end
 
     vim.bo.bufhidden  = "hide"

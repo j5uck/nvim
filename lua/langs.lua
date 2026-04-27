@@ -114,7 +114,7 @@ M.bun.code = {}
 M.bun.code["package.json"] = {
   "{",
   "  \"type\": \"module\",",
-  "  \"scripts\": { ",
+  "  \"scripts\": {",
   "    \"help\": \"bun build.ts -- help\",",
   "    \"clean\": \"bun build.ts -- clean\",",
   "    \"dev\": \"bun build.ts -- dev\",",

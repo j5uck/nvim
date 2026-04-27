@@ -489,6 +489,38 @@ end)
 
 -- ------------------------- x ------------------------- --
 
+M.term = (vim.fn.has("win32") == 1) and function()
+  local shell = vim.go.shell
+  local shellxquote = vim.go.shellxquote
+  local shellcmdflag = vim.go.shellcmdflag
+
+  local bb = vim.fn.exepath("busybox")
+  if #bb > 0 then
+    vim.go.shell = "\"" .. bb .. "\" env \"HOME=" .. vim.env.USERPROFILE .. "\" bash"
+    vim.go.shellxquote = ""
+    vim.go.shellcmdflag = "-c"
+  else
+    local ps = vim.fn.exepath("powershell")
+    if #ps > 0 then
+      vim.go.shell = ps
+    end
+  end
+
+  pcall(function()
+    vim.cmd.term()
+    vim.cmd[[silent! startinsert]]
+  end)
+
+  vim.go.shell = shell
+  vim.go.shellxquote = shellxquote
+  vim.go.shellcmdflag = shellcmdflag
+end or function()
+  vim.cmd.term()
+  vim.cmd[[silent! startinsert]]
+end
+
+-- ------------------------- x ------------------------- --
+
 M.sh = M.promisify_wrap(function(promise, cmd, opts)
   opts = opts or {}
 
@@ -676,22 +708,15 @@ function Window:toggle()
   end
 end
 
-local DEFAULT_WIDTH = 16 * 4
-local DEFAULT_HEIGHT = 9 * 2
-
 M.window = function(conf)
+  assert(conf.size, "Size is missing!")
+
   local self = {}
 
   self.zindex = conf.zindex or 25
   self.focus = not not conf.focus
   self.border = conf.border or "rounded"
-  self.size = conf.size or function() return {
-    width = DEFAULT_WIDTH,
-    height = DEFAULT_HEIGHT,
-    col = math.floor((vim.o.columns - DEFAULT_WIDTH) / 2) - 1,
-    row = math.floor((vim.o.lines - DEFAULT_HEIGHT) / 2) - 1
-  } end
-
+  self.size = conf.size
   self.on_show = { conf.on_show }
   self.on_resize = { conf.on_resize }
   M.list.insert(self.on_resize, function(_)
