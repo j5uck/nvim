@@ -134,7 +134,7 @@ end
 
         local bb = vim.fn.exepath("busybox")
         if #bb > 0 then
-          vim.go.shell = "\"" .. bb .. "\" bash"
+          vim.go.shell = "\"" .. bb .. "\" env \"HOME=" .. vim.env.HOMEPATH .. "\" bash"
           vim.go.shellxquote = ""
           vim.go.shellcmdflag = "-c"
         else
