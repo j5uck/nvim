@@ -17,7 +17,17 @@ M.flags = {
 
 M.list = {}
 M.list.concat = table.concat
-M.list.sort = function(l, fn) return fn and table.sort(l, fn) or vim.fn.sort(l, "i") end
+M.list.sort = function(l, s)
+  if not s then
+    return vim.fn.sort(l, "i")
+  elseif type(s) == "function" then
+    local r = M.list.clone(l)
+    table.sort(r, s)
+    return r
+  else
+    assert(false)
+  end
+end
 M.list.map = vim.tbl_map
 M.list.filter = vim.tbl_filter
 M.list.uniq = function(l)
@@ -193,7 +203,7 @@ end
 
 function Promise:sleep(milliseconds)
   assert(coroutine.running() == self.coroutine, "Sleeping the wrong Promise!")
-  assert(type(milliseconds) == "number", "Invalid timeout")
+  assert(type(milliseconds) == "number", "Timeout must be a number")
 
   vim.defer_fn(function()
     if self.code == nil then
@@ -243,249 +253,6 @@ M.promisify_wrap = function(fn)
     return M.promisify(fn, ...)
   end
 end
-
--- ------------------------- x ------------------------- --
-
-M.random = {}
-
-local CHARS = vim.split("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", "")
-M.random.string = function(len)
-  local buffer = ffi.new("char [?]", len)
-  ffi.copy(buffer, vim.uv.random(len), len)
-
-  for i = 0, len - 1, 1 do
-    ffi.copy(buffer+i, CHARS[buffer[i] % #CHARS + 1], 1)
-  end
-  return ffi.string(buffer, len)
-end
-
-M.random.int = function()
-  local buffer = ffi.new("int32_t [1]")
-  ffi.copy(buffer, vim.uv.random(4), 4)
-  return buffer[0]
-end
-
-M.random.uint = function()
-  local buffer = ffi.new("uint32_t [1]")
-  ffi.copy(buffer, vim.uv.random(4), 4)
-  return buffer[0]
-end
-
--- ------------------------- x ------------------------- --
-
-M.fs = {}
-
-M.fs.mktmp = M.promisify_wrap(function(promise)
-  while true do
-    local r = D.TMP .. M.random.string(10)
-    if vim.fn.isdirectory(r) == 0 then
-      vim.fn.mkdir(r, "p")
-      return promise:resolve(r)
-    end
-  end
-end)
-
-M.fs.mkdir = M.promisify_wrap(function(promise, dir)
-  local status, result = pcall(vim.fn.mkdir, dir, "p")
-  if status then
-    return promise:resolve()
-  else
-    return promise:reject(result)
-  end
-end)
-
-M.fs.mkfile = M.promisify_wrap(function(promise, file, content, flags)
-  flags = flags or ""
-  M.fs.mkdir(M.fs.dirname(file)):await():unwrap()
-  local status, result = pcall(vim.fn.writefile, content or {}, file, flags)
-  if status then
-    return promise:resolve()
-  else
-    return promise:reject(result)
-  end
-end)
-
-M.fs.mklink = M.promisify_wrap(vim.fn.has("win32") == 1 and function(_, _, _)
-  error("Unsupported platform")
-end or function(promise, target, link_name)
-  local o = vim.system{ vim.fn.exepath("ln"), "--symbolic", target, link_name }:wait()
-  if o.code == 0 then
-    return promise:resolve()
-  else
-    return promise:reject()
-  end
-end)
-
-M.fs.copy = M.promisify_wrap(vim.fn.has("win32") == 1 and function(promise, src, dest)
-  local p = M.sh{ vim.fn.exepath("powershell"), "Copy-Item", "-recurse", src, "-destination", dest }:await()
-  if p.code == 0 then
-    return promise:resolve()
-  else
-    return promise:reject()
-  end
-end or function(promise, src, dest)
-  local p = M.sh{ vim.fn.exepath("cp"), "--recursive", src, dest }:await()
-  if p.code == 0 then
-    return promise:resolve()
-  else
-    return promise:reject()
-  end
-end)
-
-M.fs.move = M.promisify_wrap(function(promise, src, dest)
-  local status, result = pcall(vim.fn.rename, src, dest)
-  if status then
-    return promise:resolve()
-  else
-    return promise:reject(result)
-  end
-end)
-
-M.fs.remove = M.promisify_wrap(function(promise, src)
-  -- local status, result = pcall(vim.fs.rm, src, { recursive = true, force = true })
-  local status, result = pcall(vim.fn.delete, src, "rf")
-  if status then
-    return promise:resolve()
-  else
-    return promise:reject(result)
-  end
-end)
-
-M.fs.readfile = M.promisify_wrap(function(promise, file, type)
-  local status, result = pcall(vim.fn.readfile, file, type)
-  if status then
-    return promise:resolve(result)
-  else
-    return promise:reject(result)
-  end
-end)
-
-M.fs.basename = vim.fs.basename
-
-M.fs.dirname = vim.fn.has("win32") == 1 and function(file)
-  local r = vim.fs.dirname(file)
-  r = string.gsub(r, "/", "\\")
-  return r
-end or vim.fs.dirname
-
-M.fs.relpath = function(base, target)
-  return vim.fs.relpath(base, target, {})
-end
-
-M.fs.ls = M.promisify_wrap(function(promise, path)
-  local C_BUFFER_SIZE = 8192
-  local C_BUFFER = ffi.new("char [?]", C_BUFFER_SIZE)
-
-  ---@diagnostic disable-next-line: param-type-mismatch
-  local fd, message, _ = vim.uv.fs_opendir(vim.fs.normalize(path), nil, 16384) -- 1 << 14
-  if not fd then
-    return promise:reject{ message = message }
-  end
-
-  local content = vim.uv.fs_readdir(fd) or {}
-  for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
-    M.list.merge(content, t)
-  end
-  vim.uv.fs_closedir(fd)
-
-  if vim.fn.has("win32") == 1 then
-    content = M.list.filter(function(e) return e.type ~= "link" end, content)
-  end
-
-  for _, e in ipairs(content) do
-    e.is_directory = e.type == "directory"
-    if e.is_directory or (e.type ~= "link") then goto continue end
-
-    e.link = ffi.string(C_BUFFER, C.readlink(path..e.name, C_BUFFER, C_BUFFER_SIZE))
-    local link_full = vim.fs.normalize(vim.fn.isabsolutepath(e.link) == 1 and e.link or (path .. "/" .. e.link))
-
-    e.link_exists = C.stat(link_full, C_BUFFER) == 0
-    e.is_directory = e.link_exists and vim.fn.isdirectory(link_full) == 1
-
-    ::continue::
-  end
-
-  M.list.sort(content, function(a, b)
-    if a.is_directory ~= b.is_directory then return a.is_directory end
-
-    local fa, fb = string.sub(a.name, 1, 1) == ".", string.sub(b.name, 1, 1) == "."
-    if fa ~= fb then return fb end
-
-    local c = vim.stricmp(a.name, b.name)
-    return (c == 0) and (a.name < b.name) or (c == -1)
-  end)
-
-  return promise:resolve(content)
-end)
-
-M.fs.find = M.promisify_wrap((function()
-  local function find(promise, regex, path)
-    ---@diagnostic disable-next-line: param-type-mismatch
-    local fd, message, _ = vim.uv.fs_opendir(path, nil, 16384) -- 1 << 14
-    if not fd then
-      promise:reject{ message = message }
-      return nil
-    end
-
-    local r = {}
-    for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
-      for _, e in ipairs(t) do
-        if e.type == "directory" then
-          local f = find(promise, regex, path .. "/" .. e.name)
-          if not f then return nil end
-          M.list.merge(r, f)
-        elseif vim.fn.match(e.name, regex) > -1 then
-          M.list.insert(r, path .. "/" .. e.name)
-        end
-      end
-    end
-    vim.uv.fs_closedir(fd)
-
-    return r
-  end
-
-  return function(promise, regex, path)
-    path = path or ""
-    if vim.fn.isabsolutepath(path) == 1 then
-      path = vim.fs.normalize(path)
-    else
-      path = vim.fs.normalize(vim.fn.getcwd() .. "/" .. path)
-    end
-    local pre = #path + 2
-
-    local f = find(promise, regex, path)
-    if not f then return nil end
-
-    return promise:resolve(M.list.map(function(e)
-      return string.sub(e, pre)
-    end, f))
-  end
-end)())
-
--- ------------------------- x ------------------------- --
-
-M.open = {}
-
-M.open.browser = (vim.fn.has("win32") == 1) and function(url)
-  return vim.uv.spawn(vim.fn.exepath("rundll32"), { args = { "url.dll,FileProtocolHandler", url }, detached = true })
-end or ((vim.fn.has("mac") == 1) and function(url)
-  return vim.uv.spawn("open", { args = { url }, detached = true })
-end or function(url)
-  return vim.uv.spawn("xdg-open", { args = { url }, detached = true })
-end)
-
-M.open.explorer = (vim.fn.has("win32") == 1) and function(path)
-  vim.uv.spawn(vim.fn.exepath("explorer"), { args = { path }, detached = true })
-end or ((vim.fn.has("mac") == 1) and function(path)
-  vim.uv.spawn(vim.fn.exepath("open"), { args = { path }, detached = true })
-end or function(path)
-  for _, e in ipairs{ "xdg-open", "thunar", "dolphin", "nautilus" } do
-    local ep =  vim.fn.exepath(e)
-    if string.len(ep) > 0 then
-      return vim.uv.spawn(ep, { args = { path }, detached = true })
-    end
-  end
-end)
 
 -- ------------------------- x ------------------------- --
 
@@ -566,6 +333,247 @@ end)
 
 -- ------------------------- x ------------------------- --
 
+M.random = {}
+
+local CHARS = vim.split("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", "")
+M.random.string = function(len)
+  local buffer = ffi.new("char [?]", len)
+  ffi.copy(buffer, vim.uv.random(len), len)
+
+  for i = 0, len - 1, 1 do
+    ffi.copy(buffer+i, CHARS[buffer[i] % #CHARS + 1], 1)
+  end
+  return ffi.string(buffer, len)
+end
+
+M.random.int = function()
+  local buffer = ffi.new("int32_t [1]")
+  ffi.copy(buffer, vim.uv.random(4), 4)
+  return buffer[0]
+end
+
+M.random.uint = function()
+  local buffer = ffi.new("uint32_t [1]")
+  ffi.copy(buffer, vim.uv.random(4), 4)
+  return buffer[0]
+end
+
+-- ------------------------- x ------------------------- --
+
+M.fs = {}
+
+M.fs.mktmp = M.promisify_wrap(function(promise)
+  while true do
+    local r = D.TMP .. M.random.string(10)
+    if vim.fn.isdirectory(r) == 0 then
+      vim.fn.mkdir(r, "p")
+      return promise:resolve(r)
+    end
+  end
+end)
+
+M.fs.mkdir = M.promisify_wrap(function(promise, dir)
+  local status, result = pcall(vim.fn.mkdir, dir, "p")
+  if status then
+    return promise:resolve()
+  else
+    return promise:reject(result)
+  end
+end)
+
+M.fs.mkfile = M.promisify_wrap(function(promise, file, content, flags)
+  flags = flags or ""
+  M.fs.mkdir(M.fs.dirname(file)):await():unwrap()
+  local status, result = pcall(vim.fn.writefile, content or {}, file, flags)
+  if status then
+    return promise:resolve()
+  else
+    return promise:reject(result)
+  end
+end)
+
+M.fs.mklink = M.promisify_wrap(vim.fn.has("win32") == 1 and function(_, _, _)
+  error("Unsupported platform")
+end or function(promise, target, link_name)
+  local o = vim.system{ vim.fn.exepath("ln"), "--symbolic", target, link_name }:wait()
+  if o.code == 0 then
+    return promise:resolve()
+  else
+    return promise:reject()
+  end
+end)
+
+M.fs.copy = M.promisify_wrap(vim.fn.has("win32") == 1 and function(promise, src, dest)
+  local p = M.sh{ "powershell", "Copy-Item", "-recurse", src, "-destination", dest }:await()
+  if p.code == 0 then
+    return promise:resolve()
+  else
+    return promise:reject()
+  end
+end or function(promise, src, dest)
+  local p = M.sh{ "cp", "--recursive", src, dest }:await()
+  if p.code == 0 then
+    return promise:resolve()
+  else
+    return promise:reject()
+  end
+end)
+
+M.fs.move = M.promisify_wrap(function(promise, src, dest)
+  local status, result = pcall(vim.fn.rename, src, dest)
+  if status then
+    return promise:resolve()
+  else
+    return promise:reject(result)
+  end
+end)
+
+M.fs.remove = M.promisify_wrap(function(promise, src)
+  -- local status, result = pcall(vim.fs.rm, src, { recursive = true, force = true })
+  local status, result = pcall(vim.fn.delete, src, "rf")
+  if status then
+    return promise:resolve()
+  else
+    return promise:reject(result)
+  end
+end)
+
+M.fs.readfile = M.promisify_wrap(function(promise, file, type)
+  local status, result = pcall(vim.fn.readfile, file, type)
+  if status then
+    return promise:resolve(result)
+  else
+    return promise:reject(result)
+  end
+end)
+
+M.fs.basename = vim.fs.basename
+
+M.fs.dirname = vim.fn.has("win32") == 1 and function(file)
+  local r = vim.fs.dirname(file)
+  r = string.gsub(r, "/", "\\")
+  return r
+end or vim.fs.dirname
+
+M.fs.relpath = function(base, target)
+  return vim.fs.relpath(base, target, {})
+end
+
+M.fs.ls = M.promisify_wrap(function(promise, path)
+  local C_BUFFER_SIZE = 8192
+  local C_BUFFER = ffi.new("char [?]", C_BUFFER_SIZE)
+
+  ---@diagnostic disable-next-line: param-type-mismatch
+  local fd, message, _ = vim.uv.fs_opendir(vim.fs.normalize(path), nil, 16384) -- 1 << 14
+  if not fd then
+    return promise:reject{ message = message }
+  end
+
+  local content = vim.uv.fs_readdir(fd) or {}
+  for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
+    M.list.merge(content, t)
+  end
+  vim.uv.fs_closedir(fd)
+
+  if vim.fn.has("win32") == 1 then
+    content = M.list.filter(function(e) return e.type ~= "link" end, content)
+  end
+
+  for _, e in ipairs(content) do
+    e.is_directory = e.type == "directory"
+    if e.is_directory or (e.type ~= "link") then goto continue end
+
+    e.link = ffi.string(C_BUFFER, C.readlink(path..e.name, C_BUFFER, C_BUFFER_SIZE))
+    local link_full = vim.fs.normalize(vim.fn.isabsolutepath(e.link) == 1 and e.link or (path .. "/" .. e.link))
+
+    e.link_exists = C.stat(link_full, C_BUFFER) == 0
+    e.is_directory = e.link_exists and vim.fn.isdirectory(link_full) == 1
+
+    ::continue::
+  end
+
+  return promise:resolve(M.list.sort(content, function(a, b)
+    if a.is_directory ~= b.is_directory then return a.is_directory end
+
+    local fa, fb = string.sub(a.name, 1, 1) == ".", string.sub(b.name, 1, 1) == "."
+    if fa ~= fb then return fb end
+
+    local c = vim.stricmp(a.name, b.name)
+    return (c == 0) and (a.name < b.name) or (c == -1)
+  end))
+end)
+
+M.fs.find = M.promisify_wrap((function()
+  local function find(promise, regex, path)
+    ---@diagnostic disable-next-line: param-type-mismatch
+    local fd, message, _ = vim.uv.fs_opendir(path, nil, 16384) -- 1 << 14
+    if not fd then
+      promise:reject{ message = message }
+      return nil
+    end
+
+    local r = {}
+    for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
+      for _, e in ipairs(t) do
+        if e.type == "directory" then
+          local f = find(promise, regex, path .. "/" .. e.name)
+          if not f then return nil end
+          M.list.merge(r, f)
+        elseif vim.fn.match(e.name, regex) > -1 then
+          M.list.insert(r, path .. "/" .. e.name)
+        end
+      end
+    end
+    vim.uv.fs_closedir(fd)
+
+    return r
+  end
+
+  return function(promise, regex, path)
+    path = path or ""
+    if vim.fn.isabsolutepath(path) == 1 then
+      path = vim.fs.normalize(path)
+    else
+      path = vim.fs.normalize(vim.fn.getcwd() .. "/" .. path)
+    end
+    local pre = #path + 2
+
+    local f = find(promise, regex, path)
+    if not f then return nil end
+
+    return promise:resolve(M.list.map(function(e)
+      return string.sub(e, pre)
+    end, f))
+  end
+end)())
+
+-- ------------------------- x ------------------------- --
+
+M.open = {}
+
+M.open.browser = (vim.fn.has("win32") == 1) and function(url)
+  return vim.uv.spawn(vim.fn.exepath("rundll32"), { args = { "url.dll,FileProtocolHandler", url }, detached = true })
+end or ((vim.fn.has("mac") == 1) and function(url)
+  return vim.uv.spawn("open", { args = { url }, detached = true })
+end or function(url)
+  return vim.uv.spawn("xdg-open", { args = { url }, detached = true })
+end)
+
+M.open.explorer = (vim.fn.has("win32") == 1) and function(path)
+  vim.uv.spawn(vim.fn.exepath("explorer"), { args = { path }, detached = true })
+end or ((vim.fn.has("mac") == 1) and function(path)
+  vim.uv.spawn(vim.fn.exepath("open"), { args = { path }, detached = true })
+end or function(path)
+  for _, e in ipairs{ "xdg-open", "thunar", "dolphin", "nautilus" } do
+    local ep =  vim.fn.exepath(e)
+    if string.len(ep) > 0 then
+      return vim.uv.spawn(ep, { args = { path }, detached = true })
+    end
+  end
+end)
+
+-- ------------------------- x ------------------------- --
+
 local GIT_DEFAULT_BRANCH = "master"
 local GIT_INIT_COMMIT = "init"
 local GIT_OPTIONS = { text = true, clear_env = true, timeout = (3 * 60 * 1000) }
@@ -573,7 +581,8 @@ local GIT_OPTIONS = { text = true, clear_env = true, timeout = (3 * 60 * 1000) }
 M.git = {}
 
 M.git.init = M.promisify_wrap(function(promise, o)
-  assert(o.cwd, "cwd is missing!")
+  if not o then o = {} end
+  if not o.cwd then o.cwd = "." end
 
   local go = M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
   local ls = M.fs.ls(o.cwd):await():unwrap()
@@ -594,7 +603,8 @@ M.git.init = M.promisify_wrap(function(promise, o)
 end)
 
 M.git.clone = M.promisify_wrap(function(promise, o)
-  assert(o.cwd, "cwd is missing!")
+  if not o then o = {} end
+  if not o.cwd then o.cwd = "." end
 
   M.fs.mkdir(o.cwd):await():unwrap()
   local cmd = o.shallow and
@@ -605,7 +615,8 @@ M.git.clone = M.promisify_wrap(function(promise, o)
 end)
 
 M.git.fetch = M.promisify_wrap(function(promise, o)
-  assert(o.cwd, "cwd is missing!")
+  if not o then o = {} end
+  if not o.cwd then o.cwd = "." end
 
   local cmds = {}
   local function t(cmd) M.list.insert(cmds, cmd) end
@@ -649,7 +660,8 @@ M.git.fetch = M.promisify_wrap(function(promise, o)
 end)
 
 M.git.config = M.promisify_wrap(function(promise, o)
-  assert(o.cwd, "cwd is missing!")
+  if not o then o = {} end
+  if not o.cwd then o.cwd = "." end
 
   local go = M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
 

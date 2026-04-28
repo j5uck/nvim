@@ -204,6 +204,16 @@ local loc = promisify_wrap(function(promise)
 
   loc("")
 
+  sb = vim.fn.reverse(list.sort(sb, function(a, b)
+    local na = tonumber(vim.split(a, " :: ")[1])
+    local nb = tonumber(vim.split(b, " :: ")[1])
+    if na == nb then
+      return a > b
+    else
+      return a < b
+    end
+  end))
+
   list.insert(sb, "")
   list.insert(sb, string.format("%4d", total) .. " :: total")
 

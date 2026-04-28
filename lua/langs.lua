@@ -1,6 +1,6 @@
-local promisify_wrap, fs, git, list, prequire = (function()
+local promisify_wrap, fs, git, notify, list, prequire, sh = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.fs, _.git, _.list, _.prequire
+  return _.promisify_wrap, _.fs, _.git, _.notify, _.list, _.prequire, _.sh
 end)()
 
 local T_GRAY  = "\x1B[1;30m"
@@ -44,20 +44,13 @@ end
 local M = {
   c      = { name = "C",      icon = "", hl = "DevIconC" },
   bun    = { name = "Bun",    icon = "", hl = "DevIconBunLockfile" },
+  sqlite = { name = "SQLite", icon = "", hl = "DevIconSql" },
   java   = { name = "Java",   icon = "", hl = "DevIconJava" },
   kotlin = { name = "Kotlin", icon = "", hl = "DevIconKotlin" },
   lua    = { name = "Lua",    icon = "", hl = "DevIconLua" },
 }
 
-local order = {
-  "c",
-  "bun",
-  "java",
-  "kotlin",
-  "lua"
-}
-
-for i, l in ipairs(order) do
+for i, l in ipairs{ "c", "bun", "sqlite", "java", "kotlin", "lua" } do
   M[i] = M[l]
 end
 
@@ -85,6 +78,29 @@ local gitignore = {
   "**/.DS_Store",
   "**/._*",
 }
+local tsconfig_json = {
+  "{",
+  "  \"compilerOptions\": {",
+  "    \"module\": \"nodenext\",",
+  "    \"moduleResolution\": \"nodenext\",",
+  "    \"esModuleInterop\": true,",
+  "    \"paths\": {",
+  "      \"@/*\": [ \"./src/*\" ]",
+  "    },",
+  "    \"lib\": [",
+  "      \"dom\",",
+  "      \"WebWorker\",",
+  "      \"ESNext\"",
+  "    ],",
+  "    \"strict\": true,",
+  "    \"skipLibCheck\": true,",
+  "    \"noFallthroughCasesInSwitch\": true,",
+  "    \"noEmit\": true,",
+  "    \"allowImportingTsExtensions\": true,",
+  "    \"removeComments\": true",
+  "  }",
+  "}"
+}
 
 M.c.init = { "src/main.c" }
 M.c.code = {}
@@ -109,7 +125,15 @@ M.c.build = promisify_wrap(function(promise)
 end)
 
 M.bun.init = { "src/server.ts" }
-M.bun.post = git.init
+M.bun.post = promisify_wrap(function(promise)
+  sh({ "bun", "i" }, { timeout = (20 * 1000) }):after(function(p)
+    if p.code ~= 0 then notify.error(p.message) end
+  end)
+
+  git.init():await():unwrap()
+
+  promise:resolve()
+end)
 M.bun.code = {}
 M.bun.code["package.json"] = {
   "{",
@@ -118,46 +142,22 @@ M.bun.code["package.json"] = {
   "    \"help\": \"bun build.ts -- help\",",
   "    \"clean\": \"bun build.ts -- clean\",",
   "    \"dev\": \"bun build.ts -- dev\",",
-  "    \"release\": \"bun build.ts -- release\",",
-  "    \"compile\": \"bun build.ts -- compile\"",
+  "    \"web\": \"bun build.ts -- web\",",
+  "    \"bin\": \"bun build.ts -- bin\"",
   "  },",
   "  \"devDependencies\": {",
   "    \"@types/bun\": \"*\"",
   "  }",
   "}"
 }
-M.bun.code["tsconfig.json"] = {
-  "{",
-  "  \"compilerOptions\": {",
-  "    \"module\": \"nodenext\",",
-  "    \"moduleResolution\": \"nodenext\",",
-  "    \"esModuleInterop\": true,",
-  "    \"paths\": {",
-  "      \"@/*\": [ \"./src/*\" ]",
-  "    },",
-  "    \"lib\": [",
-  "      \"dom\",",
-  "      \"WebWorker\",",
-  "      \"ESNext\"",
-  "    ],",
-  "    \"strict\": true,",
-  "    \"skipLibCheck\": true,",
-  "    \"noFallthroughCasesInSwitch\": true,",
-  "    \"noEmit\": true,",
-  "    \"allowImportingTsExtensions\": true,",
-  "    \"removeComments\": true",
-  "  }",
-  "}"
-}
+M.bun.code["tsconfig.json"] = tsconfig_json
 M.bun.code["build.ts"] = {
   "import fs from \"fs\";",
   "import { spawn } from \"child_process\";",
   "",
-  "let NODE_ENV: string = \"\";",
-  "",
-  "function $(cmd: string[]): Promise<void>{",
+  "function sh(cmd: string[], env?: Record<string, string>): Promise<void>{",
   "  return new Promise((resolve, reject) => {",
-  "    spawn(cmd[0], cmd.slice(1), { stdio : \"inherit\", env: { ...process.env, NODE_ENV } })",
+  "    spawn(cmd[0], cmd.slice(1), { stdio : \"inherit\", env: { ...process.env, ...(env || {}) } })",
   "      .on(\"exit\", (code: number) => code === 0 ? resolve() : reject(code))",
   "  });",
   "}",
@@ -165,16 +165,23 @@ M.bun.code["build.ts"] = {
   "const ENTRYPOINT = \"src/server.ts\";",
   "const OUTDIR = \"build/\";",
   "",
-  "const BUN = [ \"bun\", \"--bun\" ];",
-  "const BUN_BUILD = [ ...BUN, \"build\", \"--minify\", \"--production\" ];",
+  "const plugins: Bun.BunPlugin[] = [{",
+  "  name: \"HTML Minifier\",",
+  "  setup(build) {",
+  "    build.onLoad({ filter: /\\.html$/ }, async ({ loader, path }) => ",
+  "      ({ loader, contents: (await Bun.file(path).text()).replace(/[\\s\\t]*[\\r\\n]+[\\s\\t]*/g, \"\") })",
+  "    );",
+  "  }",
+  "}];",
+  "// TODO: WASM plugin",
   "",
-  "const ACTIONS: Record<string, Function> = {};",
+  "const ACTIONS: Record<string, () => Promise<void>> = {};",
   "",
   "ACTIONS.HELP = async () => {",
   "  process.stderr.write(\"Commands:\\n\");",
-  "  Object.keys(ACTIONS).forEach((a: string) => {",
+  "  for(const a of Object.keys(ACTIONS)){",
   "    process.stderr.write(\"  \" + a.toLowerCase() + \"\\n\");",
-  "  });",
+  "  }",
   "};",
   "",
   "ACTIONS.CLEAN = async () => {",
@@ -184,23 +191,35 @@ M.bun.code["build.ts"] = {
   "};",
   "",
   "ACTIONS.DEV = async () => {",
-  "  NODE_ENV = \"DEV\";",
-  "  await $([ ...BUN, ENTRYPOINT, \"--\", ...process.argv.slice(3) ]);",
+  "  await sh([ \"bun\", \"--bun\", ENTRYPOINT, \"--\", ...process.argv.slice(3) ], { NODE_ENV: \"DEV\" });",
   "};",
   "",
-  "ACTIONS.RELEASE = async () => {",
-  "  NODE_ENV = \"WEB\";",
+  "ACTIONS.WEB = async () => {",
   "  await ACTIONS.CLEAN();",
-  "  await $([ ...BUN_BUILD, \"--outdir\", OUTDIR, \"--target\", \"bun\", ENTRYPOINT, \"--env=inline\" ]);",
-  "  fs.writeFileSync(OUTDIR + \"index.html\", fs.readFileSync(OUTDIR + \"index.html\").toString().split(/[\\s\\t]*[\\r\\n]+[\\s\\t]*/).join(\"\"))",
-  "  await $([ ...BUN, \"--bun\", OUTDIR + \"server.js\", \"--\", ...process.argv.slice(3) ]);",
+  "  await Bun.build({",
+  "    entrypoints: [ ENTRYPOINT ],",
+  "    outdir: OUTDIR,",
+  "    minify: true,",
+  "    target: \"bun\",",
+  "    plugins,",
+  "    env: \"inline\",",
+  "    define: { \"process.env.NODE_ENV\": JSON.stringify(\"WEB\") }",
+  "  });",
+  "  await sh([ \"bun\", \"--bun\", OUTDIR + \"server.js\", \"--\", ...process.argv.slice(3) ]);",
   "};",
   "",
-  "ACTIONS.COMPILE = async () => {",
-  "  NODE_ENV = \"BIN\";",
+  "ACTIONS.BIN = async () => {",
   "  await ACTIONS.CLEAN();",
-  "  await $([ ...BUN_BUILD, \"--compile\", \"--outfile\", OUTDIR + \"server\", \"--target\", \"bun\", ENTRYPOINT, \"--env=inline\" ]);",
-  "  await $([ OUTDIR + \"server\", ...process.argv.slice(3) ]);",
+  "  await Bun.build({",
+  "    entrypoints: [ ENTRYPOINT ],",
+  "    compile: { outfile: OUTDIR + \"server\" },",
+  "    minify: true,",
+  "    target: \"bun\",",
+  "    plugins,",
+  "    env: \"inline\",",
+  "    define: { \"process.env.NODE_ENV\": JSON.stringify(\"BIN\") }",
+  "  });",
+  "  await sh([ OUTDIR + \"server\", ...process.argv.slice(3) ]);",
   "};",
   "",
   "if(!process.argv[2] || !ACTIONS[process.argv[2].toUpperCase()]){",
@@ -218,10 +237,11 @@ M.bun.code["build.ts"] = {
   "}"
 }
 M.bun.code["src/server.ts"] = {
+  "import net from \"net\";",
   "import path from \"path\";",
   "import { spawn } from \"child_process\";",
   "",
-  "import index from \"@/index.html\";",
+  "import index from \"@/view/index.html\";",
   "",
   "import * as T from \"@/terminal.ts\";",
   "",
@@ -233,7 +253,24 @@ M.bun.code["src/server.ts"] = {
   "  process.chdir(path.dirname(import.meta.path));",
   "}",
   "",
-  "const PORT = 8080;",
+  "let PORT = 8080;",
+  "if(process.env.NODE_ENV === \"DEV\"){",
+  "  while(true){",
+  "    try {",
+  "      await new Promise<void>((resolve, reject) => {",
+  "        var server = net.createServer();",
+  "        server.once(\"listening\", () => { server.close(); resolve(); });",
+  "        server.once(\"error\", e => { server.close(); reject(e); });",
+  "        server.listen(PORT);",
+  "      });",
+  "      break;",
+  "    } catch (e: any) {",
+  "      if(e.code !== \"EADDRINUSE\")",
+  "        throw e;",
+  "      ++PORT;",
+  "    }",
+  "  }",
+  "}",
   "",
   "// https://bun.com/docs/runtime/http/server",
   "const server: Bun.Server<undefined> = Bun.serve({",
@@ -329,7 +366,7 @@ M.bun.code["src/terminal.ts"] = {
   "export const FG_CYAN_DARK = \"\\x1B[38;2;0;206;206m\";",
   "export const FG_WHITE = \"\\x1B[1;37m\";"
 }
-M.bun.code["src/index.html"] = {
+M.bun.code["src/view/index.html"] = {
   "<!DOCTYPE html>",
   "<html lang=\"en\">",
   "  <head>",
@@ -337,13 +374,13 @@ M.bun.code["src/index.html"] = {
   "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
   "    <title>" .. MESSAGE .. "</title>",
   "    <style>html, body { background-color: #222222; }</style>",
-  "    <link href=\"style/global.css\" rel=\"stylesheet\">",
-  "    <script lang=\"ts\" type=\"module\" src=\"index.ts\"></script>",
+  "    <link href=\"style.css\" rel=\"stylesheet\">",
+  "    <script lang=\"ts\" type=\"module\" src=\"script.ts\"></script>",
   "  </head>",
   "  <body></body>",
   "</html>"
 }
-M.bun.code["src/index.ts"] = {
+M.bun.code["src/view/script.ts"] = {
   "const body: HTMLElement = document.body;",
   "",
   "const message = document.createElement(\"div\");",
@@ -360,7 +397,7 @@ M.bun.code["src/index.ts"] = {
   "",
   "body.append(message);",
 }
-M.bun.code["src/style/global.css"] = {
+M.bun.code["src/view/style.css"] = {
   "* {",
   "  margin: 0;",
   "  padding: 0;",
@@ -373,6 +410,43 @@ M.bun.code["src/style/global.css"] = {
   "}"
 }
 M.bun.code[".gitignore"] = gitignore
+
+M.sqlite.init = { "script.ts" }
+M.sqlite.post = promisify_wrap(function(promise)
+  sh({ "bun", "i" }, { timeout = (20 * 1000) }):after(function(p)
+    if p.code ~= 0 then notify.error(p.message) end
+  end)
+
+  promise:resolve()
+end)
+M.sqlite.code = {}
+M.sqlite.code["package.json"] = {
+  "{",
+  "  \"type\": \"module\",",
+  "  \"scripts\": {",
+  "    \"dev\": \"bun script.ts\"",
+  "  },",
+  "  \"devDependencies\": {",
+  "    \"@types/bun\": \"*\"",
+  "  }",
+  "}"
+}
+M.sqlite.code["script.ts"] = {
+  "import * as sqlite from \"bun:sqlite\";",
+  "",
+  "const db = new sqlite.Database(\"db.sqlite3\");",
+  "",
+  "process.stdout.write(\">>> \");",
+  "for await (const line of console) {",
+  "  try {",
+  "    console.log(db.prepare(line).all());",
+  "  } catch (error) {",
+  "    console.error(error.toString())",
+  "  }",
+  "  process.stdout.write(\">>> \");",
+  "}"
+}
+M.sqlite.code[".gitignore"] = gitignore
 
 M.java.init = { "src/Main.java" }
 M.java.code = {}
