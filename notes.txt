@@ -126,3 +126,21 @@ local wrap = function(fn, ...)
 end
 
 -- ------------------------- x ------------------------- --
+
+import * as sqlite from "bun:sqlite";
+
+console.log(process.env)
+
+const db = new sqlite.Database("db.sqlite3");
+
+process.stdout.write(">>> ");
+for await (const line of console) {
+  try {
+    console.log(db.prepare(line).all());
+  } catch (error) {
+    process.stderr.write("ERROR\n")
+  }
+  process.stdout.write(">>> ");
+}
+
+-- ------------------------- x ------------------------- --
