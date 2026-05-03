@@ -179,7 +179,7 @@ local run = promisify_wrap(function(promise, args)
     end
 
     local p = git.clone{ name = name, url = plug.url, cwd = cwd, shallow = true }
-    p:after(function(_p)
+    p:finally(function(_p)
       if _p.code == 0 then
         set_lines(i-1, i, { "- " .. name .. ": Cloning... Done!" })
       else
@@ -217,7 +217,7 @@ local run = promisify_wrap(function(promise, args)
       shallow = true
     }
 
-    p:after(function(_p)
+    p:finally(function(_p)
       if _p.code == 0 then
         set_lines(i-1, i, { "- " .. name .. ": Fetching... Done!" })
       else
@@ -298,7 +298,7 @@ local run = promisify_wrap(function(promise, args)
 end)
 
 local function command_sync(args)
-  run(args):after(function(promise)
+  run(args):finally(function(promise)
     PLUG_SYNC.run_lock = false
     if promise.code ~= 0 and #promise.message > 0 then
       notify.error(promise.message)

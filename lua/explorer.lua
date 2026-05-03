@@ -688,7 +688,7 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
 
     if vim.api.nvim_win_is_valid(w.win) then
       insert_buffer(ev.buf)
-      fn_BufReadCmd():after(function(promise)
+      fn_BufReadCmd():finally(function(promise)
         if promise.code ~= 0 and #promise.message > 0 then
           notify.error(promise.message)
         end

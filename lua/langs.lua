@@ -57,26 +57,25 @@ end
 local MESSAGE = "Hello World!"
 
 local gitignore = {
-  "**/node_modules/",
-  "**/dist/",
-  "**/build/",
+  "**/.env",
+  "",
   "**/bin/",
-  "**/logs/",
+  "**/build/",
+  "**/dist/",
+  "**/node_modules/",
+  "",
   "**/.idea/",
   "**/.vim/",
   "**/.vscode/",
   "",
-  "**/bun.lock",
-  "**/package-lock.json",
-  "",
   "**/*.lock",
+  "**/*-lock.json",
   "**/.~lock.*",
-  "**/*.log",
-  "**/out",
-  "**/desktop.ini",
-  "**/Thumbs.db",
+  "",
   "**/.DS_Store",
   "**/._*",
+  "**/Thumbs.db",
+  "**/desktop.ini"
 }
 local tsconfig_json = {
   "{",
@@ -126,7 +125,7 @@ end)
 
 M.bun.init = { "src/server.ts" }
 M.bun.post = promisify_wrap(function(promise)
-  sh({ "bun", "i" }, { timeout = (20 * 1000) }):after(function(p)
+  sh({ "bun", "i" }, { timeout = (20 * 1000) }):finally(function(p)
     if p.code ~= 0 then notify.error(p.message) end
   end)
 
@@ -151,13 +150,32 @@ M.bun.code["package.json"] = {
   "}"
 }
 M.bun.code["tsconfig.json"] = tsconfig_json
+M.bun.code[".env"] = {
+  "PORT=8080"
+}
 M.bun.code["build.ts"] = {
   "import fs from \"fs\";",
   "import { spawn } from \"child_process\";",
   "",
+  "if(!Bun){",
+  "  console.error(\"This code MUST be run with Bun!!!\");",
+  "  process.exit(1);",
+  "}",
+  "",
+  "const dot_env: Record<string, string> = {};",
+  "(await Bun.file(\".env\").text())",
+  "  .split(/[\\r\\n]+/)",
+  "  .filter(s => !(/^ *$/.test(s) || /^ *#/.test(s)))",
+  "  .forEach(s => {",
+  "    const [ _, key, value] = s.trim().split(/^([^=]+)=/);",
+  "    dot_env[key] = value",
+  "      .replace(/\\$[\\w_]+/g, v => dot_env[v.substring(1)])",
+  "      .replace(/\\${[\\w_]+}/g, v => dot_env[v.substring(2, s.length - 1)]);",
+  "  });",
+  "",
   "function sh(cmd: string[], env?: Record<string, string>): Promise<void>{",
   "  return new Promise((resolve, reject) => {",
-  "    spawn(cmd[0], cmd.slice(1), { stdio : \"inherit\", env: { ...process.env, ...(env || {}) } })",
+  "    spawn(cmd[0], cmd.slice(1), { stdio : \"inherit\", env: { ...process.env, ...dot_env, ...(env || {}) } })",
   "      .on(\"exit\", (code: number) => code === 0 ? resolve() : reject(code))",
   "  });",
   "}",
@@ -168,7 +186,7 @@ M.bun.code["build.ts"] = {
   "const plugins: Bun.BunPlugin[] = [{",
   "  name: \"HTML Minifier\",",
   "  setup(build) {",
-  "    build.onLoad({ filter: /\\.html$/ }, async ({ loader, path }) => ",
+  "    build.onLoad({ filter: /\\.html$/ }, async ({ loader, path }) =>",
   "      ({ loader, contents: (await Bun.file(path).text()).replace(/[\\s\\t]*[\\r\\n]+[\\s\\t]*/g, \"\") })",
   "    );",
   "  }",
@@ -178,10 +196,7 @@ M.bun.code["build.ts"] = {
   "const ACTIONS: Record<string, () => Promise<void>> = {};",
   "",
   "ACTIONS.HELP = async () => {",
-  "  process.stderr.write(\"Commands:\\n\");",
-  "  for(const a of Object.keys(ACTIONS)){",
-  "    process.stderr.write(\"  \" + a.toLowerCase() + \"\\n\");",
-  "  }",
+  "  process.stderr.write(\"Commands: \" + Object.keys(ACTIONS).sort().join(\", \").toLowerCase() + \"\\n\");",
   "};",
   "",
   "ACTIONS.CLEAN = async () => {",
@@ -250,10 +265,14 @@ M.bun.code["src/server.ts"] = {
   "});",
   "",
   "if(process.env.NODE_ENV === \"WEB\"){",
+  "  if(!Bun){",
+  "    console.error(\"This code MUST be run with Bun!!!\");",
+  "    process.exit(1);",
+  "  }",
   "  process.chdir(path.dirname(import.meta.path));",
   "}",
   "",
-  "let PORT = 8080;",
+  "let PORT = parseInt(process.env.PORT as string);",
   "if(process.env.NODE_ENV === \"DEV\"){",
   "  while(true){",
   "    try {",
@@ -374,28 +393,19 @@ M.bun.code["src/view/index.html"] = {
   "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
   "    <title>" .. MESSAGE .. "</title>",
   "    <style>html, body { background-color: #222222; }</style>",
-  "    <link href=\"style.css\" rel=\"stylesheet\">",
   "    <script lang=\"ts\" type=\"module\" src=\"script.ts\"></script>",
   "  </head>",
   "  <body></body>",
   "</html>"
 }
 M.bun.code["src/view/script.ts"] = {
-  "const body: HTMLElement = document.body;",
+  "import \"@/view/style.css\";",
   "",
   "const message = document.createElement(\"div\");",
-  "message.innerText = \"" .. MESSAGE .. "\";",
+  "message.innerText = \"Hello World!\";",
+  "message.classList.add(\"message\");",
   "",
-  "message.style.height = \"100%\";",
-  "",
-  "message.style.color = \"white\";",
-  "message.style.fontSize = \"5em\";",
-  "",
-  "message.style.display = \"flex\";",
-  "message.style.justifyContent = \"center\";",
-  "message.style.alignItems = \"center\";",
-  "",
-  "body.append(message);",
+  "document.body.append(message);"
 }
 M.bun.code["src/view/style.css"] = {
   "* {",
@@ -407,13 +417,24 @@ M.bun.code["src/view/style.css"] = {
   "html, body {",
   "  width: 100%;",
   "  height: 100%;",
+  "}",
+  "",
+  ".message {",
+  "  height: 100%;",
+  "",
+  "  color: #FFF;",
+  "  font-size: 5em;",
+  "",
+  "  display: flex;",
+  "  justify-content: center;",
+  "  align-items: center;",
   "}"
 }
 M.bun.code[".gitignore"] = gitignore
 
 M.sqlite.init = { "script.ts" }
 M.sqlite.post = promisify_wrap(function(promise)
-  sh({ "bun", "i" }, { timeout = (20 * 1000) }):after(function(p)
+  sh({ "bun", "i" }, { timeout = (20 * 1000) }):finally(function(p)
     if p.code ~= 0 then notify.error(p.message) end
   end)
 

@@ -197,7 +197,7 @@ M.update = function()
       text[i] = vim.fn.substitute(text[i], "\\zs \\(\\d\\+\\) \\ze [sS ] ", "[\\1]", "")
     end
 
-    vim.api.nvim_buf_set_lines(0, 0, -1, true, vim.fn.reverse(text))
+    vim.api.nvim_buf_set_lines(0, 0, -1, true, list.reverse(text))
     vim.bo.modifiable = false
 
     if u.seq_cur ~= -1 then

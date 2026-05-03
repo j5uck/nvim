@@ -185,7 +185,7 @@ local promisify_wrap, fs, list, notify, window = (function()
 end)()
 
 local loc = promisify_wrap(function(promise)
-  local sb = {}
+  local files = {}
   local config = vim.fn.stdpath("config") .. "/"
   local total = 0
 
@@ -197,25 +197,30 @@ local loc = promisify_wrap(function(promise)
       elseif vim.endswith(e.name, ".vim") or vim.endswith(e.name, ".lua") then
         local n = #fs.readfile(config .. s .. e.name):await():unwrap()
         total = total + n
-        list.insert(sb, string.format("%4d", n) .. " :: " .. s .. e.name)
+        list.insert(files, { n, s .. e.name })
       end
     end
   end
 
   loc("")
 
-  sb = vim.fn.reverse(list.sort(sb, function(a, b)
-    local na = tonumber(vim.split(a, " :: ")[1])
-    local nb = tonumber(vim.split(b, " :: ")[1])
+  files = list.reverse(list.sort(files, function(a, b)
+    local na = a[1]
+    local nb = b[1]
     if na == nb then
-      return a > b
+      return na > nb
     else
-      return a < b
+      return na < nb
     end
   end))
 
+  local sb = {}
+  local format = "%" .. (math.floor(math.log(total) / math.log(10)) + 1) .. "d :: %s"
+  for _, f in ipairs(files) do
+    list.insert(sb, string.format(format, f[1], f[2]))
+  end
   list.insert(sb, "")
-  list.insert(sb, string.format("%4d", total) .. " :: total")
+  list.insert(sb, string.format(format, total, "total"))
 
   notify.warn(list.concat(sb, "\n"))
 

@@ -28,6 +28,7 @@ M.list.sort = function(l, s)
     assert(false)
   end
 end
+M.list.reverse = vim.fn.reverse
 M.list.map = vim.tbl_map
 M.list.filter = vim.tbl_filter
 M.list.uniq = function(l)
@@ -214,8 +215,7 @@ function Promise:sleep(milliseconds)
   self:yield()
 end
 
--- TODO: remove it
-function Promise:after(fn)
+function Promise:finally(fn)
   vim.schedule(function()
     if self.code == nil then
       M.list.insert(self.awaiting, function() fn(self) end)
@@ -588,14 +588,16 @@ M.git.init = M.promisify_wrap(function(promise, o)
   local ls = M.fs.ls(o.cwd):await():unwrap()
 
   if #M.list.filter(function(e) return e.name == ".git" and e.is_directory end, ls) == 1 then
+    M.git.config(o):await():unwrap()
     M.notify.warn("Repository already inited")
     return promise:resolve()
   end
 
   M.sh({ "git", "init", "-b", GIT_DEFAULT_BRANCH }, go):await():unwrap()
-  M.sh({ "git", "add", "-A" }, go):await():unwrap()
+  M.git.config(o):await():unwrap()
 
   if #ls > 0 then
+    M.sh({ "git", "add", "-A" }, go):await():unwrap()
     M.sh({ "git", "commit", "-m", GIT_INIT_COMMIT }, go):await():unwrap()
   end
 
@@ -617,6 +619,7 @@ end)
 M.git.fetch = M.promisify_wrap(function(promise, o)
   if not o then o = {} end
   if not o.cwd then o.cwd = "." end
+  M.sh({ "git", "status" }, M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })):await():unwrap()
 
   local cmds = {}
   local function t(cmd) M.list.insert(cmds, cmd) end
@@ -662,6 +665,7 @@ end)
 M.git.config = M.promisify_wrap(function(promise, o)
   if not o then o = {} end
   if not o.cwd then o.cwd = "." end
+  M.sh({ "git", "status" }, M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })):await():unwrap()
 
   local go = M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
 
