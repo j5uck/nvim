@@ -118,7 +118,7 @@ M.c.code["build.lua"] = {
 }
 M.c.build = promisify_wrap(function(promise)
   build
-    :cmd({ vim.fn.exepath("cc"), "-o", "main", "src/main.c" })
+    :cmd({ fs.exepath("cc"), "-o", "main", "src/main.c" })
     :cmd{ "./main" }
   promise:resolve()
 end)
@@ -487,10 +487,10 @@ M.java.code["build.lua"] = {
 M.java.build = promisify_wrap(function(promise)
   local javas = list.uniq(list.insert(fs.find("\\.java$"):await():unwrap(), 1, "src/Main.java"))
   build
-    :cmd(list.merge({ vim.fn.exepath("javac"), "-d", "build" }, javas))
+    :cmd(list.merge({ fs.exepath("javac"), "-d", "build" }, javas))
     :cd("build")
-    :cmd(list.merge({ vim.fn.exepath("jar"), "-cfe", "Main.jar", "src/Main" }, fs.find("\\.class$", "build"):await():unwrap()))
-    :cmd{ vim.fn.exepath("java"), "-jar", "Main.jar" }
+    :cmd(list.merge({ fs.exepath("jar"), "-cfe", "Main.jar", "src/Main" }, fs.find("\\.class$", "build"):await():unwrap()))
+    :cmd{ fs.exepath("java"), "-jar", "Main.jar" }
   promise:resolve()
 end)
 
@@ -508,8 +508,8 @@ M.kotlin.code["build.lua"] = {
 M.kotlin.build = promisify_wrap(function(promise)
   local kts = list.uniq(list.insert(fs.find("\\.kt$"):await():unwrap(), 1, "src/Main.kt"))
   build
-    :cmd(list.merge({ vim.fn.exepath("kotlinc"), "-Wextra", "-d", "build/Main.jar" }, kts))
-    :cmd{ vim.fn.exepath("java"), "-jar", "build/Main.jar" }
+    :cmd(list.merge({ fs.exepath("kotlinc"), "-Wextra", "-d", "build/Main.jar" }, kts))
+    :cmd{ fs.exepath("java"), "-jar", "build/Main.jar" }
   promise:resolve()
 end)
 

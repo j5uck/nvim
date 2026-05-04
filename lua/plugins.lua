@@ -55,7 +55,7 @@ local run = promisify_wrap(function(promise, args)
   end
   PLUG_SYNC.run_lock = true
 
-  if vim.fn.executable("git") == 0 then
+  if fs.exepath("git") then
     return promise:reject("Git not found")
   end
 
@@ -443,7 +443,7 @@ plug{
 plug{
   github("nvim-telescope/telescope-fzf-native.nvim"),
   build = promisify_wrap(function(promise, opts)
-    local cc = vim.fn.exepath("gcc")
+    local cc = fs.exepath("gcc")
     if not cc then
       return promise:reject("GCC not found")
     end

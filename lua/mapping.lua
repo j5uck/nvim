@@ -103,9 +103,9 @@ end, { desc = "tab to [S]paces" })
 
 local ft = {}
 ft.javascript = function(ev)
-  assert(vim.fn.executable("bun") == 1, "Bun not found")
-
   local function bun(code)
+    assert(fs.exepath("bun"), "Bun not found")
+
     sh({ "bun", "-e", code }, {
       stdout = function(s) notify.warn(list.join(s, "\n")) end,
       stderr = function(s) notify.error(list.join(s, "\n")) end
@@ -125,6 +125,26 @@ end
 ft.lua = function(ev)
   map("n", "<leader>s", "<cmd>%lua<CR>", { buffer = ev.buf, desc = "[s]ource file" })
   map("v", "<leader>s", ":lua<CR>",      { buffer = ev.buf, desc = "[s]ource selection" })
+end
+ft.python = function(ev)
+  local function python(code)
+    assert(fs.exepath("python"), "Python not found")
+
+    sh({ "python", "-c", code }, {
+      stdout = function(s) notify.warn(list.join(s, "\n")) end,
+      stderr = function(s) notify.error(list.join(s, "\n")) end
+    })
+  end
+
+  map("n", "<leader>s", function()
+    python(list.join(vim.api.nvim_buf_get_lines(ev.buf, 0, -1, true), "\n"))
+  end, { buffer = ev.buf, desc = "[s]ource file" })
+
+  map("v", "<leader>s", function()
+    local a, b = vim.fn.getpos("v")[2], vim.fn.getpos(".")[2]
+    local lines = vim.api.nvim_buf_get_lines(ev.buf, math.min(a, b) - 1, math.max(a, b), true)
+    python(list.join(lines, "\n"))
+  end, { buffer = ev.buf, desc = "[s]ource selection" })
 end
 ft.vim = function(ev)
   map("n", "<leader>s", "<cmd>%source<CR>", { buffer = ev.buf, desc = "[s]ource file" })
@@ -373,8 +393,8 @@ map({"n", "v", "t"}, "<c-Space>", function() W.term:toggle() end, { desc = "togg
 
 -- if vim.g.nvy then
 --   map("n", "<leader><CR>", function()
---     -- vim.system({ vim.fn.exepath("nvy") }, { detach = true })
---     vim.fn.jobstart({ vim.fn.exepath("nvy") }, { detach = true })
+--     -- vim.system({ fs.exepath("nvy") }, { detach = true })
+--     vim.fn.jobstart({ fs.exepath("nvy") }, { detach = true })
 --   end, { desc = "open nvy instance" })
 -- end
 

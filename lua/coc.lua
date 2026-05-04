@@ -1,6 +1,6 @@
-local list, notify, window = (function()
+local fs, list, notify, window = (function()
   local _ = require("_")
-  return _.list, _.notify, _.window
+  return _.fs, _.list, _.notify, _.window
 end)()
 
 local M = {}
@@ -105,7 +105,7 @@ end
 
 local function url(size, page)
   return {
-    vim.fn.exepath("node"),
+    fs.exepath("bun") or fs.exepath("node"),
     "-e",
     "console.log(" ..
       "await (" ..
@@ -258,8 +258,8 @@ M.marketplace.show = function()
 
   ALL_EXTENSIONS = {}
 
-  local node = vim.fn.exepath("node")
-  if node == "" then
+  local node = fs.exepath("bun") or fs.exepath("node")
+  if not node then
     return notify.error("Node not found\nCannot proceed")
   end
 

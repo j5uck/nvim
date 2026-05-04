@@ -262,14 +262,14 @@ M.term = (vim.fn.has("win32") == 1) and function()
   local shellxquote = vim.go.shellxquote
   local shellcmdflag = vim.go.shellcmdflag
 
-  local bb = vim.fn.exepath("busybox")
-  if #bb > 0 then
+  local bb = M.fs.exepath("busybox")
+  if bb then
     vim.go.shell = "\"" .. bb .. "\" env \"HOME=" .. vim.env.USERPROFILE .. "\" bash"
     vim.go.shellxquote = ""
     vim.go.shellcmdflag = "-c"
   else
-    local ps = vim.fn.exepath("powershell")
-    if #ps > 0 then
+    local ps = M.fs.exepath("powershell")
+    if ps then
       vim.go.shell = ps
     end
   end
@@ -293,7 +293,7 @@ M.sh = M.promisify_wrap(function(promise, cmd, opts)
   opts = opts or {}
 
   if not string.find(cmd[1], (vim.fn.has("win32") == 1) and "[\\/]" or "/") then
-    cmd[1] = vim.fn.exepath(cmd[1])
+    cmd[1] = M.fs.exepath(cmd[1])
   end
 
   if opts.stdout then
@@ -398,7 +398,7 @@ end)
 M.fs.mklink = M.promisify_wrap(vim.fn.has("win32") == 1 and function(_, _, _)
   error("Unsupported platform")
 end or function(promise, target, link_name)
-  local o = vim.system{ vim.fn.exepath("ln"), "--symbolic", target, link_name }:wait()
+  local o = vim.system{ M.fs.exepath("ln"), "--symbolic", target, link_name }:wait()
   if o.code == 0 then
     return promise:resolve()
   else
@@ -460,6 +460,23 @@ end or vim.fs.dirname
 
 M.fs.relpath = function(base, target)
   return vim.fs.relpath(base, target, {})
+end
+
+M.fs.exepath = vim.fn.has("win32") == 1 and function(exe)
+  local ext = vim.split(vim.env.PATHEXT, ";")
+  for _, p in ipairs(vim.split(vim.env.PATH, ";")) do
+    p = string.gsub(vim.fs.normalize(p .. "\\" .. exe), "\\", "/")
+    if vim.uv.fs_access(p, "RX") then return p end
+    for _, e in ipairs(ext) do
+      local pe = p .. e
+      if vim.uv.fs_access(pe, "RX") then return pe end
+    end
+  end
+end or function(bin)
+  for _, p in ipairs(vim.split(vim.env.PATH, ";")) do
+    p = vim.fs.normalize(p .. "/" .. bin)
+    if vim.uv.fs_access(p, "RX") then return p end
+  end
 end
 
 M.fs.ls = M.promisify_wrap(function(promise, path)
@@ -555,7 +572,7 @@ end)())
 M.open = {}
 
 M.open.browser = (vim.fn.has("win32") == 1) and function(url)
-  return vim.uv.spawn(vim.fn.exepath("rundll32"), { args = { "url.dll,FileProtocolHandler", url }, detached = true })
+  return vim.uv.spawn(M.fs.exepath("rundll32"), { args = { "url.dll,FileProtocolHandler", url }, detached = true })
 end or ((vim.fn.has("mac") == 1) and function(url)
   return vim.uv.spawn("open", { args = { url }, detached = true })
 end or function(url)
@@ -563,13 +580,13 @@ end or function(url)
 end)
 
 M.open.explorer = (vim.fn.has("win32") == 1) and function(path)
-  vim.uv.spawn(vim.fn.exepath("explorer"), { args = { path }, detached = true })
+  vim.uv.spawn(M.fs.exepath("explorer"), { args = { path }, detached = true })
 end or ((vim.fn.has("mac") == 1) and function(path)
-  vim.uv.spawn(vim.fn.exepath("open"), { args = { path }, detached = true })
+  vim.uv.spawn(M.fs.exepath("open"), { args = { path }, detached = true })
 end or function(path)
   for _, e in ipairs{ "xdg-open", "thunar", "dolphin", "nautilus" } do
-    local ep =  vim.fn.exepath(e)
-    if string.len(ep) > 0 then
+    local ep = M.fs.exepath(e)
+    if ep then
       return vim.uv.spawn(ep, { args = { path }, detached = true })
     end
   end
