@@ -323,7 +323,7 @@ local fn_BufReadCmd = promisify_wrap(function(promise)
       add(e.link, e.link_exists and HL.LINK or HL.LINK_ORPHAN)
     end
 
-    list.insert(text, list.concat(line, " "))
+    list.insert(text, list.join(line, " "))
   end
 
   vim.api.nvim_buf_set_lines(w.buf, 0, -1, false, text)
@@ -401,7 +401,7 @@ local function fn_BufWriteCmd__parse_buffers()
 
     if error then
       if #string_builder > 0 then
-        notify.error(vim.api.nvim_buf_get_name(id) .. "\n" .. list.concat(string_builder, "\n"))
+        notify.error(vim.api.nvim_buf_get_name(id) .. "\n" .. list.join(string_builder, "\n"))
       end
       goto continue
     end

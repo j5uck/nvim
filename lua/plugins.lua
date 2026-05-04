@@ -4,10 +4,10 @@ local promisify_wrap, dictionary, flags, fs, git, list, notify, notify_once, pre
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
-  local r = string.gsub(list.concat({...}, "\\"), "[\\/]+", "\\")
+  local r = string.gsub(list.join({...}, "\\"), "[\\/]+", "\\")
   return r
 end or function(...)
-  local r = string.gsub(list.concat({...}, "/"), "/+", "/")
+  local r = string.gsub(list.join({...}, "/"), "/+", "/")
   return r
 end
 
@@ -79,7 +79,7 @@ local run = promisify_wrap(function(promise, args)
       end
     end
     if #missing > 0 then
-      return promise:reject("Plugin" .. (#missing == 1 and "" or "s") .. " not configured:\n  >>" .. list.concat(missing, "\n  >>"))
+      return promise:reject("Plugin" .. (#missing == 1 and "" or "s") .. " not configured:\n  >>" .. list.join(missing, "\n  >>"))
     end
 
     todo.plugs = args.fargs

@@ -1,6 +1,6 @@
-local promisify_wrap, dictionary, notify, notify_once, flags, fs, open, prequire, term, window = (function()
+local promisify_wrap, dictionary, list, notify, notify_once, flags, fs, open, prequire, sh, term, window = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.dictionary, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.term, _.window
+  return _.promisify_wrap, _.dictionary, _.list, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.sh, _.term, _.window
 end)()
 local explorer = require("explorer")
 
@@ -101,19 +101,52 @@ map("n", "<leader>S", function()
   vim.opt.smartindent = true
 end, { desc = "tab to [S]paces" })
 
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = "vim",
-  callback = function(ev)
-    map("n", "<leader>s", "<cmd>%source<CR>", { buffer = ev.buf, desc = "[s]ource file" })
-    map("v", "<leader>s", ":source<CR>",      { buffer = ev.buf, desc = "[s]ource selection" })
-  end
-})
+local ft = {}
+ft.javascript = function(ev)
+  map("n", "<leader>s", function()
+    local lines = vim.api.nvim_buf_get_lines(ev.buf, 0, -1, true)
+    sh({ "bun", "-e", list.join(lines, "\n") }, {
+      stdout = function(strings)
+        notify.warn(list.join(strings, "\n"))
+      end,
+      stderr = function(strings)
+        notify.error(list.join(strings, "\n"))
+      end
+    })
+  end, { buffer = ev.buf, desc = "[s]ource file" })
+
+  map("v", "<leader>s", function()
+    local a, b = vim.fn.getpos("v")[2], vim.fn.getpos(".")[2]
+    local lines = vim.api.nvim_buf_get_lines(ev.buf, math.min(a, b) - 1, math.max(a, b), true)
+    sh({ "bun", "-e", list.join(lines, "\n") }, {
+      stdout = function(strings)
+        notify.warn(list.join(strings, "\n"))
+      end,
+      stderr = function(strings)
+        notify.error(list.join(strings, "\n"))
+      end
+    })
+  end, { buffer = ev.buf, desc = "[s]ource selection" })
+end
+ft.lua = function(ev)
+  map("n", "<leader>s", "<cmd>%lua<CR>", { buffer = ev.buf, desc = "[s]ource file" })
+  map("v", "<leader>s", ":lua<CR>",      { buffer = ev.buf, desc = "[s]ource selection" })
+end
+ft.vim = function(ev)
+  map("n", "<leader>s", "<cmd>%source<CR>", { buffer = ev.buf, desc = "[s]ource file" })
+  map("v", "<leader>s", ":source<CR>",      { buffer = ev.buf, desc = "[s]ource selection" })
+end
+ft.typescript = ft.javascript
 
 vim.api.nvim_create_autocmd("FileType", {
-  pattern = "lua",
   callback = function(ev)
-    map("n", "<leader>s", "<cmd>%lua<CR>", { buffer = ev.buf, desc = "[s]ource file" })
-    map("v", "<leader>s", ":lua<CR>",      { buffer = ev.buf, desc = "[s]ource selection" })
+    local fn = ft[ev.match]
+    if fn then
+      fn(ev)
+    else
+      unmap("n", "<leader>s", { buffer = ev.buf })
+      unmap("v", "<leader>s", { buffer = ev.buf })
+    end
   end
 })
 

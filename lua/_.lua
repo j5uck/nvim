@@ -16,7 +16,8 @@ M.flags = {
 -- ------------------------- x ------------------------- --
 
 M.list = {}
-M.list.concat = table.concat
+M.list.contains = vim.tbl_contains
+M.list.join = table.concat
 M.list.sort = function(l, s)
   if not s then
     return vim.fn.sort(l, "i")
@@ -92,7 +93,7 @@ M.log = function(...)
     local e = select(i, ...)
     M.list.insert(sb, vim.inspect(e))
   end
-  vim.schedule_wrap(vim.notify)(M.list.concat(sb, "\n"), W)
+  vim.schedule_wrap(vim.notify)(M.list.join(sb, "\n"), W)
 end
 
 -- ------------------------- x ------------------------- --
@@ -296,16 +297,18 @@ M.sh = M.promisify_wrap(function(promise, cmd, opts)
   end
 
   if opts.stdout then
-    opts.on_stdout = function(_, strings, _)
-      opts.stdout(strings)
-    end
+    local stdout = opts.stdout
     opts.stdout = nil
+    opts.on_stdout = function(_, strings, _)
+      if #strings > 1 then stdout(M.list.slice(strings, 1, #strings - 1)) end
+    end
   end
   if opts.stderr then
-    opts.on_stderr = function(_, strings, _)
-      opts.stderr(strings)
-    end
+    local stderr = opts.stderr
     opts.stdout = nil
+    opts.on_stderr = function(_, strings, _)
+      if #strings > 1 then stderr(M.list.slice(strings, 1, #strings - 1)) end
+    end
   end
 
   if opts.on_stdout or opts.on_stderr then

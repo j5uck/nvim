@@ -9,14 +9,14 @@ local T_RESET = "\x1B[0m"
 local build = { cwd = vim.fn.getcwd() }
 
 function build:cmd(cmd)
-  io.stdout:write(T_GRAY .. ">>" .. T_RESET .. " "  .. table.concat(cmd, " ") .. "\n")
+  io.stdout:write(T_GRAY .. ">>" .. T_RESET .. " "  .. list.join(cmd, " ") .. "\n")
 
   local job = vim.fn.jobstart(cmd, { cwd = self.cwd, on_stdout = function(_, strings, _)
     if #strings == 1 then return end
-    io.stdout:write(table.concat(strings, "\n"))
+    io.stdout:write(list.join(strings, "\n"))
   end, on_stderr = function(_, strings, _)
     if #strings == 1 then return end
-    io.stderr:write(table.concat(strings, "\n"))
+    io.stderr:write(list.join(strings, "\n"))
   end })
 
   return vim.fn.jobwait{job}[1] == 0 and self or os.exit(1)
@@ -402,7 +402,7 @@ M.bun.code["src/view/script.ts"] = {
   "import \"@/view/style.css\";",
   "",
   "const message = document.createElement(\"div\");",
-  "message.innerText = \"Hello World!\";",
+  "message.innerText = \"" .. MESSAGE .. "\";",
   "message.classList.add(\"message\");",
   "",
   "document.body.append(message);"

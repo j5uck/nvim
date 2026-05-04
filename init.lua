@@ -222,7 +222,7 @@ local loc = promisify_wrap(function(promise)
   list.insert(sb, "")
   list.insert(sb, string.format(format, total, "total"))
 
-  notify.warn(list.concat(sb, "\n"))
+  notify.warn(list.join(sb, "\n"))
 
   return promise:resolve()
 end)
