@@ -103,9 +103,8 @@ end, { desc = "tab to [S]paces" })
 
 local ft = {}
 ft.javascript = function(ev)
-  map("n", "<leader>s", function()
-    local lines = vim.api.nvim_buf_get_lines(ev.buf, 0, -1, true)
-    sh({ "bun", "-e", list.join(lines, "\n") }, {
+  local function bun(code)
+    sh({ "bun", "-e", code }, {
       stdout = function(strings)
         notify.warn(list.join(strings, "\n"))
       end,
@@ -113,19 +112,16 @@ ft.javascript = function(ev)
         notify.error(list.join(strings, "\n"))
       end
     })
+  end
+
+  map("n", "<leader>s", function()
+    bun(list.join(vim.api.nvim_buf_get_lines(ev.buf, 0, -1, true), "\n"))
   end, { buffer = ev.buf, desc = "[s]ource file" })
 
   map("v", "<leader>s", function()
     local a, b = vim.fn.getpos("v")[2], vim.fn.getpos(".")[2]
     local lines = vim.api.nvim_buf_get_lines(ev.buf, math.min(a, b) - 1, math.max(a, b), true)
-    sh({ "bun", "-e", list.join(lines, "\n") }, {
-      stdout = function(strings)
-        notify.warn(list.join(strings, "\n"))
-      end,
-      stderr = function(strings)
-        notify.error(list.join(strings, "\n"))
-      end
-    })
+    bun(list.join(lines, "\n"))
   end, { buffer = ev.buf, desc = "[s]ource selection" })
 end
 ft.lua = function(ev)
