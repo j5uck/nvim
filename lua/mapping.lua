@@ -102,6 +102,14 @@ map("n", "<leader>S", function()
 end, { desc = "tab to [S]paces" })
 
 vim.api.nvim_create_autocmd("FileType", {
+  pattern = "vim",
+  callback = function(ev)
+    map("n", "<leader>s", "<cmd>%source<CR>", { buffer = ev.buf, desc = "[s]ource file" })
+    map("v", "<leader>s", ":source<CR>",      { buffer = ev.buf, desc = "[s]ource selection" })
+  end
+})
+
+vim.api.nvim_create_autocmd("FileType", {
   pattern = "lua",
   callback = function(ev)
     map("n", "<leader>s", "<cmd>%lua<CR>", { buffer = ev.buf, desc = "[s]ource file" })
