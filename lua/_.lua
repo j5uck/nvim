@@ -462,21 +462,9 @@ M.fs.relpath = function(base, target)
   return vim.fs.relpath(base, target, {})
 end
 
-M.fs.exepath = vim.fn.has("win32") == 1 and function(exe)
-  local ext = vim.split(vim.env.PATHEXT, ";")
-  for _, p in ipairs(vim.split(vim.env.PATH, ";")) do
-    p = string.gsub(vim.fs.normalize(p .. "\\" .. exe), "\\", "/")
-    if vim.uv.fs_access(p, "RX") then return p end
-    for _, e in ipairs(ext) do
-      local pe = p .. e
-      if vim.uv.fs_access(pe, "RX") then return pe end
-    end
-  end
-end or function(bin)
-  for _, p in ipairs(vim.split(vim.env.PATH, ";")) do
-    p = vim.fs.normalize(p .. "/" .. bin)
-    if vim.uv.fs_access(p, "RX") then return p end
-  end
+M.fs.exepath = function(s)
+  local p = vim.fn.exepath(s)
+  if #p > 0 then return p end
 end
 
 M.fs.ls = M.promisify_wrap(function(promise, path)

@@ -101,66 +101,51 @@ map("n", "<leader>S", function()
   vim.opt.smartindent = true
 end, { desc = "tab to [S]paces" })
 
-local ft = {}
-ft.javascript = function(ev)
-  local function bun(code)
-    assert(fs.exepath("bun"), "Bun not found")
+local filetypes = {
+  javascript = { "bun", "-e" },
+  python = { "python", "-c" },
+  typescript = { "bun", "-e" }
+}
 
-    sh({ "bun", "-e", code }, {
+for filetype, cmd in ipairs(filetypes) do
+  local name = string.upper(string.sub(cmd[1], 1, 1)) .. string.sub(cmd[1], 2)
+  local function run(code)
+    assert(fs.exepath(cmd[1]), name .. " not found")
+    sh(list.insert(cmd, list.join(code, "\n")), {
       stdout = function(s) notify.warn(list.join(s, "\n")) end,
       stderr = function(s) notify.error(list.join(s, "\n")) end
     })
   end
 
-  map("n", "<leader>s", function()
-    bun(list.join(vim.api.nvim_buf_get_lines(ev.buf, 0, -1, true), "\n"))
-  end, { buffer = ev.buf, desc = "[s]ource file" })
+  vim.api.nvim_create_autocmd("FileType", {
+    pattern = filetype,
+    callback = function(ev)
+      map("n", "<leader>s", function()
+        run(vim.api.nvim_buf_get_lines(ev.buf, 0, -1, true))
+      end, { buffer = ev.buf, desc = "[s]ource file" })
 
-  map("v", "<leader>s", function()
-    local a, b = vim.fn.getpos("v")[2], vim.fn.getpos(".")[2]
-    local lines = vim.api.nvim_buf_get_lines(ev.buf, math.min(a, b) - 1, math.max(a, b), true)
-    bun(list.join(lines, "\n"))
-  end, { buffer = ev.buf, desc = "[s]ource selection" })
+      map("v", "<leader>s", function()
+        local a, b = vim.fn.getpos("v")[2], vim.fn.getpos(".")[2]
+        local min, max = math.min(a, b) - 1, math.max(a, b)
+        run(vim.api.nvim_buf_get_lines(ev.buf, min, max, true))
+      end, { buffer = ev.buf, desc = "[s]ource selection" })
+    end
+  })
 end
-ft.lua = function(ev)
-  map("n", "<leader>s", "<cmd>%lua<CR>", { buffer = ev.buf, desc = "[s]ource file" })
-  map("v", "<leader>s", ":lua<CR>",      { buffer = ev.buf, desc = "[s]ource selection" })
-end
-ft.python = function(ev)
-  local function python(code)
-    assert(fs.exepath("python"), "Python not found")
-
-    sh({ "python", "-c", code }, {
-      stdout = function(s) notify.warn(list.join(s, "\n")) end,
-      stderr = function(s) notify.error(list.join(s, "\n")) end
-    })
-  end
-
-  map("n", "<leader>s", function()
-    python(list.join(vim.api.nvim_buf_get_lines(ev.buf, 0, -1, true), "\n"))
-  end, { buffer = ev.buf, desc = "[s]ource file" })
-
-  map("v", "<leader>s", function()
-    local a, b = vim.fn.getpos("v")[2], vim.fn.getpos(".")[2]
-    local lines = vim.api.nvim_buf_get_lines(ev.buf, math.min(a, b) - 1, math.max(a, b), true)
-    python(list.join(lines, "\n"))
-  end, { buffer = ev.buf, desc = "[s]ource selection" })
-end
-ft.vim = function(ev)
-  map("n", "<leader>s", "<cmd>%source<CR>", { buffer = ev.buf, desc = "[s]ource file" })
-  map("v", "<leader>s", ":source<CR>",      { buffer = ev.buf, desc = "[s]ource selection" })
-end
-ft.typescript = ft.javascript
 
 vim.api.nvim_create_autocmd("FileType", {
+  pattern = "lua",
   callback = function(ev)
-    local fn = ft[ev.match]
-    if fn then
-      fn(ev)
-    else
-      unmap("n", "<leader>s", { buffer = ev.buf })
-      unmap("v", "<leader>s", { buffer = ev.buf })
-    end
+    map("n", "<leader>s", "<cmd>%lua<CR>", { buffer = ev.buf, desc = "[s]ource file" })
+    map("v", "<leader>s", ":lua<CR>",      { buffer = ev.buf, desc = "[s]ource selection" })
+  end
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "vim",
+  callback = function(ev)
+    map("n", "<leader>s", "<cmd>%source<CR>", { buffer = ev.buf, desc = "[s]ource file" })
+    map("v", "<leader>s", ":source<CR>",      { buffer = ev.buf, desc = "[s]ource selection" })
   end
 })
 
