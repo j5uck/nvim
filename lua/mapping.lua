@@ -105,12 +105,8 @@ local ft = {}
 ft.javascript = function(ev)
   local function bun(code)
     sh({ "bun", "-e", code }, {
-      stdout = function(strings)
-        notify.warn(list.join(strings, "\n"))
-      end,
-      stderr = function(strings)
-        notify.error(list.join(strings, "\n"))
-      end
+      stdout = function(s) notify.warn(list.join(s, "\n")) end,
+      stderr = function(s) notify.error(list.join(s, "\n")) end
     })
   end
 
