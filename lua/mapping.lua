@@ -101,13 +101,12 @@ map("n", "<leader>S", function()
   vim.opt.smartindent = true
 end, { desc = "tab to [S]paces" })
 
-local filetypes = {
-  javascript = { "bun", "-e" },
-  python = { "python", "-c" },
-  typescript = { "bun", "-e" }
-}
+local ft = {}
+ft.javascript = { "bun", "-e" }
+ft.python = { "python", "-c" }
+ft.typescript = ft.javascript
 
-for filetype, cmd in ipairs(filetypes) do
+for filetype, cmd in pairs(ft) do
   local name = string.upper(string.sub(cmd[1], 1, 1)) .. string.sub(cmd[1], 2)
   local function run(code)
     assert(fs.exepath(cmd[1]), name .. " not found")
@@ -128,7 +127,8 @@ for filetype, cmd in ipairs(filetypes) do
         local a, b = vim.fn.getpos("v")[2], vim.fn.getpos(".")[2]
         local min, max = math.min(a, b) - 1, math.max(a, b)
         run(vim.api.nvim_buf_get_lines(ev.buf, min, max, true))
-      end, { buffer = ev.buf, desc = "[s]ource selection" })
+        return "<esc>"
+      end, { buffer = ev.buf, expr = true, desc = "[s]ource selection" })
     end
   })
 end
