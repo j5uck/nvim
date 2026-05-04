@@ -103,6 +103,8 @@ end, { desc = "tab to [S]paces" })
 
 local ft = {}
 ft.javascript = function(ev)
+  assert(vim.fn.executable("bun") == 1, "Bun not found")
+
   local function bun(code)
     sh({ "bun", "-e", code }, {
       stdout = function(s) notify.warn(list.join(s, "\n")) end,
