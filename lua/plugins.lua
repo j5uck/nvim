@@ -648,7 +648,7 @@ plug{
 
     ll("coc-marketplace", { fn("COC-MARKETPLACE")  }, { nil, PROGRESS, LOCATION })
     ll("coc-nvim", { fn("COC-NVIM") }, { nil, PROGRESS, LOCATION })
-    ll("lua-plug", { fn("LUA-PLUG") })
+    ll("lua-plug", { fn("LUA-PLUG") }, { nil, PROGRESS, LOCATION })
     ll("lua-explorer", { fn("LUA-EXPLORER"), nil, lua_explorer }, { nil, PROGRESS, LOCATION })
 
     local o = {
