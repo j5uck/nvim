@@ -19,14 +19,14 @@ M.list = {}
 M.list.contains = vim.tbl_contains
 M.list.join = table.concat
 M.list.sort = function(l, s)
-  if not s then
+  if s == nil then
     return vim.fn.sort(l, "i")
   elseif type(s) == "function" then
     local r = M.list.clone(l)
     table.sort(r, s)
     return r
   else
-    assert(false)
+    assert(false, "Sorter must be a function or nil")
   end
 end
 M.list.reverse = vim.fn.reverse
@@ -291,6 +291,8 @@ end
 
 M.sh = M.promisify_wrap(function(promise, cmd, opts)
   opts = opts or {}
+  local text = opts.text
+  opts.text = nil
 
   if not string.find(cmd[1], (vim.fn.has("win32") == 1) and "[\\/]" or "/") then
     cmd[1] = M.fs.exepath(cmd[1])
@@ -298,40 +300,39 @@ M.sh = M.promisify_wrap(function(promise, cmd, opts)
 
   if opts.stdout then
     local stdout = opts.stdout
-    opts.stdout = nil
-    opts.on_stdout = function(_, strings, _)
-      if #strings > 1 then stdout(M.list.slice(strings, 1, #strings - 1)) end
+    opts.stdout = (vim.fn.has("win32") == 1) and function(_, data)
+      if data then
+        return stdout(text and string.gsub(data, "\r\n", "\n") or data)
+      end
+    end or function(_, data)
+      if data then return stdout(data) end
     end
   end
   if opts.stderr then
     local stderr = opts.stderr
-    opts.stdout = nil
-    opts.on_stderr = function(_, strings, _)
-      if #strings > 1 then stderr(M.list.slice(strings, 1, #strings - 1)) end
+    opts.stderr = (vim.fn.has("win32") == 1) and function(_, data)
+      if data then
+        return stderr(text and string.gsub(data, "\r\n", "\n") or data)
+      end
+    end or function(_, data)
+      if data then return stderr(data) end
     end
   end
 
-  if opts.on_stdout or opts.on_stderr then
-    opts.on_exit = function(_, code, _)
-      if code == 0 then
-        return promise:resolve()
-      else
-        return promise:reject{ code = code }
-      end
+  vim.system(cmd, opts, function(o)
+    if (vim.fn.has("win32") == 1) and text then
+      promise.stdout = string.gsub(o.stdout or "", "\r\n", "\n")
+      promise.stderr = string.gsub(o.stderr or "", "\r\n", "\n")
+    else
+      promise.stdout = o.stdout or ""
+      promise.stderr = o.stderr or ""
     end
-
-    vim.fn.jobstart(cmd, opts)
-  else
-    vim.system(cmd, opts, function(o)
-      promise.stdout = o.stdout
-      promise.stderr = o.stderr
-      if o.code == 0 then
-        return promise:resolve()
-      else
-        return promise:reject{ code = o.code }
-      end
-    end)
-  end
+    if o.code == 0 then
+      return promise:resolve()
+    else
+      return promise:reject{ code = o.code }
+    end
+  end)
 end)
 
 -- ------------------------- x ------------------------- --
@@ -396,30 +397,18 @@ M.fs.mkfile = M.promisify_wrap(function(promise, file, content, flags)
 end)
 
 M.fs.mklink = M.promisify_wrap(vim.fn.has("win32") == 1 and function(_, _, _)
-  error("Unsupported platform")
+  assert(false, "Unsupported platform")
 end or function(promise, target, link_name)
-  local o = vim.system{ M.fs.exepath("ln"), "--symbolic", target, link_name }:wait()
-  if o.code == 0 then
-    return promise:resolve()
-  else
-    return promise:reject()
-  end
+  M.sh{ "ln", "--symbolic", target, link_name }:await():unwrap()
+  return promise:resolve()
 end)
 
 M.fs.copy = M.promisify_wrap(vim.fn.has("win32") == 1 and function(promise, src, dest)
-  local p = M.sh{ "powershell", "Copy-Item", "-recurse", src, "-destination", dest }:await()
-  if p.code == 0 then
-    return promise:resolve()
-  else
-    return promise:reject()
-  end
+  M.sh{ "powershell", "Copy-Item", "-recurse", src, "-destination", dest }:await():unwrap()
+  return promise:resolve()
 end or function(promise, src, dest)
-  local p = M.sh{ "cp", "--recursive", src, dest }:await()
-  if p.code == 0 then
-    return promise:resolve()
-  else
-    return promise:reject()
-  end
+  M.sh{ "cp", "--recursive", src, dest }:await():unwrap()
+  return promise:resolve()
 end)
 
 M.fs.move = M.promisify_wrap(function(promise, src, dest)
@@ -462,9 +451,21 @@ M.fs.relpath = function(base, target)
   return vim.fs.relpath(base, target, {})
 end
 
-M.fs.exepath = function(s)
-  local p = vim.fn.exepath(s)
-  if #p > 0 then return p end
+M.fs.exepath = (vim.fn.has("win32") == 1) and function(exe)
+  local ext = vim.split(vim.env.PATHEXT, ";")
+  for _, p in ipairs(vim.split(vim.env.PATH, ";")) do
+    p = string.gsub(vim.fs.normalize(p .. "\\" .. exe), "\\", "/")
+    if vim.uv.fs_access(p, "RX") then return p end
+    for _, e in ipairs(ext) do
+      local pe = p .. e
+      if vim.uv.fs_access(pe, "RX") then return pe end
+    end
+  end
+end or function(bin)
+  for _, p in ipairs(vim.split(vim.env.PATH, ";")) do
+    p = vim.fs.normalize(p .. "/" .. bin)
+    if vim.uv.fs_access(p, "RX") then return p end
+  end
 end
 
 M.fs.ls = M.promisify_wrap(function(promise, path)

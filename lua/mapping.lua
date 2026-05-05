@@ -110,9 +110,10 @@ for filetype, cmd in pairs(ft) do
   local name = string.upper(string.sub(cmd[1], 1, 1)) .. string.sub(cmd[1], 2)
   local function run(code)
     assert(fs.exepath(cmd[1]), name .. " not found")
-    sh(list.insert(cmd, list.join(code, "\n")), {
-      stdout = function(s) notify.warn(list.join(s, "\n")) end,
-      stderr = function(s) notify.error(list.join(s, "\n")) end
+    sh(list.insert(list.clone(cmd), list.join(code, "\n")), {
+      text = true,
+      stdout = function(s) notify.warn(string.sub(s, 1, #s - 1)) end,
+      stderr = function(s) notify.error(string.sub(s, 1, #s - 1)) end
     })
   end
 

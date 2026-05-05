@@ -1,6 +1,6 @@
-local promisify_wrap, dictionary, flags, fs, git, list, notify, notify_once, prequire_wrap = (function()
+local promisify_wrap, dictionary, flags, fs, git, list, notify, notify_once, prequire_wrap, sh = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.dictionary, _.flags, _.fs, _.git, _.list, _.notify, _.notify_once, _.prequire_wrap
+  return _.promisify_wrap, _.dictionary, _.flags, _.fs, _.git, _.list, _.notify, _.notify_once, _.prequire_wrap, _.sh
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
@@ -443,21 +443,12 @@ plug{
 plug{
   github("nvim-telescope/telescope-fzf-native.nvim"),
   build = promisify_wrap(function(promise, opts)
-    local cc = fs.exepath("gcc")
-    if not cc then
-      return promise:reject("GCC not found")
-    end
-
-    fs.mkdir(joinpath(opts.dir, "build")):await()
+    fs.mkdir(joinpath(opts.dir, "build")):await():unwrap()
 
     local target = vim.fn.has("win32") == 1 and "libfzf.dll" or "libfzf.so"
-    local cmd = { cc, "-O3", "-fpic", "-std=gnu99", "-shared", "src/fzf.c", "-o", "build/"..target }
+    local cmd = { "gcc", "-O3", "-fpic", "-std=gnu99", "-shared", "src/fzf.c", "-o", "build/"..target }
 
-    local o  = vim.system(cmd, { text = true, cwd = opts.dir }):wait()
-    if o.code ~= 0 then
-      return promise:reject("Error compiling fzf:" .. o.stderr)
-    end
-
+    sh(cmd, { text = true, cwd = opts.dir }):await():unwrap()
     promise:resolve()
   end)
 }

@@ -29,9 +29,7 @@ function build:cd(dir)
   else
     self.cwd = vim.fs.normalize(self.cwd .. "/" .. dir)
   end
-  if vim.fn.isdirectory(self.cwd) == 0 then
-    vim.fn.mkdir(dir, "p")
-  end
+  vim.fn.mkdir(dir, "p")
   return self
 end
 

@@ -131,28 +131,6 @@ vim.api.nvim_create_autocmd("FileType", {
   callback = function() vim.wo.spell = false end
 })
 
--- vim.treesitter.language.register("tsx", { "tsx" })
--- vim.filetype.add({
---   extension = {
---     tsx = "javascriptreact",
---   },
--- })
-
--- vim.api.nvim_create_autocmd("FileType", {
---   pattern = { "typescript" },
---   callback = vim.schedule_wrap(function(ev)
---     vim.bo[ev.buf].filetype = "javascript"
---   end)
--- })
-
--- vim.api.nvim_create_autocmd("FileType", {
---   pattern = { "typescriptreact" },
---   callback = vim.schedule_wrap(function(ev)
---     vim.bo[ev.buf].filetype = "javascriptreact"
---     vim.treesitter.get_parser(ev.buf, "jsx", {})
---   end)
--- })
-
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "svelte" },
   callback = vim.schedule_wrap(function(ev)
