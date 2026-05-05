@@ -462,7 +462,7 @@ M.fs.exepath = (vim.fn.has("win32") == 1) and function(exe)
     end
   end
 end or function(bin)
-  for _, p in ipairs(vim.split(vim.env.PATH, ";")) do
+  for _, p in ipairs(vim.split(vim.env.PATH, ":")) do
     p = vim.fs.normalize(p .. "/" .. bin)
     if vim.uv.fs_access(p, "RX") then return p end
   end
