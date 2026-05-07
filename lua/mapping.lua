@@ -238,9 +238,10 @@ map("n", "<leader>m", "<cmd>nohlsearch<CR>", { desc = "[m]ute search" })
 
 local open_url = function()
   open.browser(vim.fn.getregion(vim.fn.getpos("v"), vim.fn.getpos("."), { type = vim.api.nvim_get_mode().mode })[1])
+  return "<esc>"
 end
 
-map("v", "<leader>b", open_url, { desc = "open url on the default [b]rowser" })
+map("v", "<leader>b", open_url, { expr = true, desc = "open url on the default [b]rowser" })
 
 map("n", "<leader>E", explorer.open, { desc = "open file tre[e]" })
 map("n", "<leader>e", explorer.resume, { desc = "resume file tre[e]" })
