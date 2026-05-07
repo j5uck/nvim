@@ -155,6 +155,14 @@ end)
 
 if vim.g.nvy then
   vim.opt.guifont = { "FiraCode Nerd Font Mono:h12" }
+elseif vim.g.neoray then
+  vim.opt.guifont = { "FiraCodeNerdFontMono:h12" }
+  vim.cmd[[NeoraySet BoxDrawing true]]
+  vim.cmd[[NeoraySet ContextMenu false]]
+  vim.cmd[[NeoraySet CursorAnimTime 0]]
+  vim.cmd[[NeoraySet TargetTPS 60]]
+  vim.cmd[[NeoraySet WindowSize 128x36]]
+  vim.cmd[[NeoraySet WindowState centered]]
 end
 
 local promisify_wrap, fs, list, notify, window = (function()

@@ -377,12 +377,12 @@ W.term = window{
 
 map({"n", "v", "t"}, "<c-Space>", function() W.term:toggle() end, { desc = "toggle floating terminal" })
 
--- if vim.g.nvy then
---   map("n", "<leader><CR>", function()
---     -- vim.system({ fs.exepath("nvy") }, { detach = true })
---     vim.fn.jobstart({ fs.exepath("nvy") }, { detach = true })
---   end, { desc = "open nvy instance" })
--- end
+if vim.g.neoray then
+  vim.cmd[[NeoraySet KeyFullscreen <M-CR>]]
+  map("n", "<leader><CR>", function()
+    sh({ "neoray" }, { detach = true })
+  end, { desc = "open neoray instance" })
+end
 
 map("n", "<leader>ic", function()
   vim.cmd.cd{vim.fn.stdpath("config"), mods = { silent = true }}

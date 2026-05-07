@@ -28,6 +28,7 @@ typst tuto
   https://www.youtube.com/watch?v=Yu5lt_q-4fE
 
 https://github.com/Makaze/watch.nvim
+https://github.com/wsdjeg/calendar.nvim
 
 replace <space>gd for lua & vim script
 lua explorer hl system
