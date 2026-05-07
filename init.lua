@@ -161,7 +161,7 @@ elseif vim.g.neoray then
   vim.cmd[[NeoraySet ContextMenu false]]
   vim.cmd[[NeoraySet CursorAnimTime 0]]
   vim.cmd[[NeoraySet TargetTPS 60]]
-  vim.cmd[[NeoraySet WindowSize 128x36]]
+  vim.cmd[[NeoraySet WindowSize 166x40]]
   vim.cmd[[NeoraySet WindowState centered]]
 end
 
