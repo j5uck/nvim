@@ -34,6 +34,9 @@ replace <space>gd for lua & vim script
 lua explorer hl system
 has("clipboard")
 
+bun build WASM plugin
+https://github.com/mastermakrela/bun-plugin-c/
+
 https://vim.fandom.com/wiki/Regex_lookahead_and_lookbehind
 
 https://github.com/bassamsdata/namu.nvim/
