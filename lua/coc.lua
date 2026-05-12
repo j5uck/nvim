@@ -118,7 +118,12 @@ local function url(size, page)
 end
 
 local menu = window{
-  on_show = function()
+  on_show = function(self)
+    vim.api.nvim_create_autocmd("WinLeave", {
+      callback = function() self:hide() end,
+      once = true
+    })
+
     vim.bo.bufhidden  = "delete"
     vim.bo.buflisted  = false
     vim.bo.buftype    = "nofile"
@@ -254,7 +259,7 @@ M.marketplace.show = function()
   if ALL_EXTENSIONS then
     menu:show()
     return
-   end
+  end
 
   ALL_EXTENSIONS = {}
 
