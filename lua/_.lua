@@ -1,11 +1,6 @@
 local ffi = require("ffi")
 local C = ffi.C
 
-local D = {}
-D.TMP = vim.fn.has("win32") == 0 and
-  (vim.env.XDG_RUNTIME_DIR or "/tmp") .. "/tmp." or
-  string.gsub(vim.fs.dirname(vim.env.APPDATA) .. "/Local/Temp/tmp.", "/", "\\")
-
 local M = {}
 
 M.flags = {
@@ -264,7 +259,7 @@ M.term = (vim.fn.has("win32") == 1) and function()
 
   local bb = M.fs.exepath("busybox")
   if bb then
-    vim.go.shell = "\"" .. bb .. "\" env \"HOME=" .. vim.env.USERPROFILE .. "\" bash"
+    vim.go.shell = "\"" .. bb .. "\" env \"HOME=" .. M.env.USERPROFILE .. "\" bash"
     vim.go.shellxquote = ""
     vim.go.shellcmdflag = "-c"
   else
@@ -364,11 +359,27 @@ end
 
 -- ------------------------- x ------------------------- --
 
+local ENV_BUFFER_SIZE = math.pow(2, 15)
+M.env = setmetatable({}, {
+  __index = function(_, key)
+    return vim.uv.os_getenv(key, ENV_BUFFER_SIZE)
+  end,
+  __newindex = function(_, key, value)
+    return vim.uv.os_setenv(key, value)
+  end,
+})
+
+-- ------------------------- x ------------------------- --
+
 M.fs = {}
+
+local TMP_DIR = vim.fn.has("win32") == 0 and
+  (M.env.XDG_RUNTIME_DIR or "/tmp") .. "/tmp." or
+  string.gsub(vim.fs.dirname(M.env.APPDATA) .. "/Local/Temp/tmp.", "/", "\\")
 
 M.fs.mktmp = M.promisify_wrap(function(promise)
   while true do
-    local r = D.TMP .. M.random.string(10)
+    local r = TMP_DIR .. M.random.string(10)
     if vim.fn.isdirectory(r) == 0 then
       vim.fn.mkdir(r, "p")
       return promise:resolve(r)
@@ -452,8 +463,10 @@ M.fs.relpath = function(base, target)
 end
 
 M.fs.exepath = (vim.fn.has("win32") == 1) and function(exe)
-  local ext = vim.split(vim.env.PATHEXT, ";")
-  for _, p in ipairs(vim.split(vim.env.PATH, ";")) do
+  ---@diagnostic disable-next-line: missing-parameter, param-type-mismatch
+  local ext = vim.split(M.env.PATHEXT, ";")
+  ---@diagnostic disable-next-line: param-type-mismatch
+  for _, p in ipairs(vim.split(M.env.PATH, ";")) do
     p = string.gsub(vim.fs.normalize(p .. "\\" .. exe), "\\", "/")
     if vim.uv.fs_access(p, "RX") then return p end
     for _, e in ipairs(ext) do
@@ -462,7 +475,7 @@ M.fs.exepath = (vim.fn.has("win32") == 1) and function(exe)
     end
   end
 end or function(bin)
-  for _, p in ipairs(vim.split(vim.env.PATH, ":")) do
+  for _, p in ipairs(vim.split(M.env.PATH, ":")) do
     p = vim.fs.normalize(p .. "/" .. bin)
     if vim.uv.fs_access(p, "RX") then return p end
   end
