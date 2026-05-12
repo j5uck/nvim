@@ -30,6 +30,9 @@ typst tuto
 https://github.com/Makaze/watch.nvim
 https://github.com/wsdjeg/calendar.nvim
 
+https://github.com/dense-analysis/ale
+https://github.com/jayli/vim-easycomplete
+
 replace <space>gd for lua & vim script
 lua explorer hl system
 has("clipboard")
