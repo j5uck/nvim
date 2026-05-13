@@ -146,7 +146,7 @@ vim.api.nvim_create_autocmd("FileType", {
   callback = function(ev) vim.bo[ev.buf].iskeyword = iskeyword end
 })
 
-local REGISTERS = vim.split("@0123456789-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ*/", "")
+local REGISTERS = vim.split("@0123456789-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/", "")
 vim.schedule(function()
   for _, r in ipairs(REGISTERS) do
     vim.fn.setreg(r, "")

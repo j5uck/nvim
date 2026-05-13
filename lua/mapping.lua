@@ -595,6 +595,8 @@ vim.api.nvim_create_autocmd("FileType", {
 
 map("n", "<leader>in", function()
   promisify_wrap(function(promise)
+    vim.cmd[[silent! new]]
+    vim.cmd[[silent! only]]
     vim.cmd.cd(fs.mktmp():await():unwrap())
     vim.cmd.e("new.txt")
     explorer.open()
@@ -609,6 +611,8 @@ local select = promisify_wrap(function(promise)
   local lang = LANGS[lnum]
   vim.cmd.q()
 
+  vim.cmd[[silent! new]]
+  vim.cmd[[silent! only]]
   local dir = fs.mktmp():await():unwrap()
   for name, content in pairs(lang.code) do
     local f = dir .. "/" .. name
