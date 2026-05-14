@@ -22,6 +22,7 @@ M.extensions.required = {
   -- "coc-jedi",
   "coc-json",
   -- "coc-kotlin",
+  "coc-lit-html",
   "coc-rust-analyzer",
   "coc-sh",
   "coc-snippets",
