@@ -325,7 +325,7 @@ M.sh = M.promisify_wrap(function(promise, cmd, opts)
     if o.code == 0 then
       return promise:resolve()
     else
-      return promise:reject{ code = o.code }
+      return promise:reject{ code = o.code, message = o.stderr }
     end
   end)
 end)
@@ -690,6 +690,11 @@ M.git.config = M.promisify_wrap(function(promise, o)
   M.sh({ "git", "status" }, M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })):await():unwrap()
 
   local go = M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
+  o.cwd = nil
+
+  for _, k in ipairs(M.dictionary.keys(o)) do
+    assert(M.list.contains({ "name", "email", "url" }, k), "Unknown option \"" .. k .. "\n")
+  end
 
   if o.name then
     M.sh({ "git", "config", "--local", "user.name", o.name }, go):await():unwrap()
