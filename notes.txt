@@ -43,6 +43,10 @@ http://github.com/andymass/vim-matchup
 bun build WASM plugin
 https://github.com/mastermakrela/bun-plugin-c/
 
+gh manager
+  $ gh auth status --json hosts
+  $ gh auth switch --user username
+
 https://vim.fandom.com/wiki/Regex_lookahead_and_lookbehind
 
 https://github.com/bassamsdata/namu.nvim/
