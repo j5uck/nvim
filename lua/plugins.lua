@@ -838,9 +838,9 @@ plug{
       coc.extensions.install(coc.extensions.missing())
     end)
 
-    vim.defer_fn(vim.schedule_wrap(function()
+    vim.defer_fn(function()
       pcall(vim.api.nvim_win_call, empty_window, vim.cmd.q)
-    end), 500)
+    end, 500)
   end,
   setup = vim.schedule_wrap(function()
     local coc = require("coc")

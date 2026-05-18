@@ -251,9 +251,9 @@ M.marketplace.run = function()
   end)
 
   -- TODO: check if there is only 1 window left
-  vim.defer_fn(vim.schedule_wrap(function()
+  vim.defer_fn(function()
     pcall(vim.api.nvim_win_call, empty_window, vim.cmd.q)
-  end), 500)
+  end, 500)
 end
 
 M.marketplace.show = function()

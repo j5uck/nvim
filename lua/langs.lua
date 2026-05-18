@@ -120,6 +120,25 @@ local tsconfig_json = {
   "  }",
   "}"
 }
+local bunfig_toml = {
+  "telemetry = false",
+  "",
+  "[console]",
+  "depth = 3",
+  "",
+  "[install]",
+  "auto = \"auto\"",
+  "# 1 week",
+  "minimumReleaseAge = " .. tostring(60 * 60 * 24 * 7),
+  "",
+  "[install.lockfile]",
+  "save = false",
+  "",
+  "[run]",
+  "bun = true",
+  "noOrphans = true",
+  "shell = \"bun\""
+}
 
 M.c.init = { "src/main.c" }
 M.c.code = {}
@@ -172,6 +191,7 @@ M.bun.code["package.json"] = {
   "}"
 }
 M.bun.code["tsconfig.json"] = tsconfig_json
+M.bun.code["bunfig.toml"] = bunfig_toml
 M.bun.code[".env"] = {
   "PORT=8080"
 }
