@@ -40,6 +40,8 @@ has("clipboard")
 :norm %
 http://github.com/andymass/vim-matchup
 
+https://github.com/MariaSolOs/dotfiles/tree/main/.config/nvim
+
 bun build WASM plugin
 https://github.com/mastermakrela/bun-plugin-c/
 
