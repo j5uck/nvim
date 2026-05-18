@@ -131,6 +131,13 @@ vim.api.nvim_create_autocmd("FileType", {
   callback = function() vim.wo.spell = false end
 })
 
+vim.api.nvim_create_autocmd("BufNew", {
+  pattern = { "*.hv" },
+  callback = function(ev)
+    vim.bo[ev.buf].filetype = "html"
+  end
+})
+
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "svelte" },
   callback = vim.schedule_wrap(function(ev)
