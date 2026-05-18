@@ -55,6 +55,10 @@ https://github.com/kevinhwang91/nvim-hlslens/
 https://github.com/tpope/vim-commentary
 https://github.com/simrat39/symbols-outline.nvim
 
+https://github.com/UltiRequiem/UltiVim
+https://github.com/glepnir/nvim
+https://github.com/kuator/nvim
+
 QuickFix
   https://www.youtube.com/watch?v=AuXZA-xCv04
 
