@@ -126,15 +126,14 @@ vim.g.c_syntax_for_h = 1
 ---@diagnostic disable-next-line:deprecated 
 (vim.lsp.log.set_level or vim.lsp.set_log_level)(vim.log.levels.OFF)
 
-local yank_buffer = { }
-local yank_buffer_capacity = 10
-local yank_buffer_index = yank_buffer_capacity
+local yank_buffer = { "", "", "", "", "", "", "", "", "", "" }
+local yank_buffer_index = #yank_buffer
 
 vim.api.nvim_create_autocmd("TextYankPost", {
   callback = function(_)
     local r = vim.fn.getreg[["]]
     if yank_buffer[yank_buffer_index] == r then return end
-    yank_buffer_index = (yank_buffer_index) % yank_buffer_capacity + 1
+    yank_buffer_index = (yank_buffer_index) % #yank_buffer + 1
     yank_buffer[yank_buffer_index] = r
   end
 })
