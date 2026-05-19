@@ -640,48 +640,31 @@ end)
 
 M.git.fetch = M.promisify_wrap(function(promise, o)
   if not o then o = {} end
-  if not o.cwd then o.cwd = "." end
-  M.sh({ "git", "status" }, M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })):await():unwrap()
+  local go = M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd or "." })
 
-  local cmds = {}
-  local function t(cmd) M.list.insert(cmds, cmd) end
+  M.sh({ "git", "status" }, go):await():unwrap()
 
   if not o.shallow then
-    t(function(_) return { "git", "fetch", "--all" } end)
+    M.sh({ "git", "fetch", "--all" }, go):await():unwrap()
   elseif o.commit then
-    t(function(_) return { "git", "fetch", "origin", "--depth=1", "--progress", o.commit } end)
-    t(function(_) return { "git", "reset", "--hard", o.commit } end)
+    M.sh({ "git", "fetch", "origin", "--depth=1", "--progress", o.commit }, go):await():unwrap()
+    M.sh({ "git", "reset", "--hard", o.commit }, go):await():unwrap()
   elseif o.tag then
-    t(function(_) return { "git", "fetch", "origin", "--depth=1", "--progress", "--no-tags", "refs/tags/".. o.tag ..":refs/tags/".. o.tag } end)
-    t(function(_) return { "git", "tag", "--list", o.tag, "--sort", "-version:refname" } end)
-    t(function(r) return { "git", "checkout", "tags/" .. vim.split(r.stdout, "[\r\n]+")[1] } end)
+    M.sh({ "git", "fetch", "origin", "--depth=1", "--progress", "--no-tags", "refs/tags/".. o.tag ..":refs/tags/".. o.tag }, go):await():unwrap()
+    local r = M.sh({ "git", "tag", "--list", o.tag, "--sort", "-version:refname" }, go):await()
+    r:unwrap()
+    M.sh({ "git", "checkout", "tags/" .. vim.split(r.stdout, "[\r\n]+")[1] }, go):await():unwrap()
   elseif o.branch then
-    t(function(_) return { "git", "fetch", "origin", "--depth=1", "--progress", "+refs/heads/".. o.branch ..":refs/remotes/origin/".. o.branch } end)
-    t(function(_) return { "git", "checkout", "origin/"..o.branch } end)
+    M.sh({ "git", "fetch", "origin", "--depth=1", "--progress", "+refs/heads/".. o.branch ..":refs/remotes/origin/".. o.branch }, go):await():unwrap()
+    M.sh({ "git", "checkout", "origin/"..o.branch }, go):await():unwrap()
   else
-    t(function(_) return { "git", "fetch", "origin", "--depth=1", "--progress" } end)
-    t(function(_) return { "git", "ls-remote", "--symref", "origin", "HEAD" } end)
-    t(function(r) return { "git", "switch", ({string.gsub(vim.split(r.stdout, "[ \t]")[2], ".+/(.+)$", "%1")})[1] } end)
+    M.sh({ "git", "fetch", "origin", "--depth=1", "--progress" }, go):await():unwrap()
+    local r = M.sh({ "git", "ls-remote", "--symref", "origin", "HEAD" }, go):await()
+    r:unwrap()
+    M.sh({ "git", "switch", ({string.gsub(vim.split(r.stdout, "[ \t]")[2], ".+/(.+)$", "%1")})[1] }, go):await():unwrap()
   end
 
-  if vim.fn.filereadable(o.cwd .. "/.gitmodules") == 1 then
-    t(function(_) return { "git", "submodule", "update", "--init", "--recursive", "--depth=1", "--jobs=16" } end)
-  end
-
-  local options = M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
-  local function run(r, i)
-    if r.code ~= 0 then
-      return promise:reject{ code = r.code, message = r.stderr }
-    end
-
-    local cmd = cmds[i]
-    if not cmd then
-      return promise:resolve()
-    end
-
-    vim.system(cmd(r), options, function(rr) run(rr, i+1) end)
-  end
-  run({ code = 0 }, 1)
+  return promise:resolve()
 end)
 
 M.git.config = M.promisify_wrap(function(promise, o)

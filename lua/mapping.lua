@@ -387,6 +387,15 @@ if vim.g.neoray then
   map("n", "<leader><CR>", function()
     sh({ "neoray" }, { detach = true })
   end, { desc = "open neoray instance" })
+
+  vim.api.nvim_create_autocmd("FileType", {
+    pattern = { "lua-explorer" },
+    callback = function(ev)
+      map("n", "<leader><CR>", function()
+        sh({ "neoray", "." }, { cwd = explorer.buf_get_name(), detach = true })
+      end, { buffer = ev.buf, desc = "open neoray instance" })
+    end
+  })
 end
 
 map("n", "<leader>ic", function()
