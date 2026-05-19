@@ -634,7 +634,7 @@ local select = promisify_wrap(function(promise)
     local f = dir .. "/" .. name
     fs.mkfile(f, content):await():unwrap()
     if (vim.fn.has("win32") == 0) and (vim.fn.match(content[1], "^#!") == 0) then
-      vim.system({ "chmod", "a+x", f }, { cwd = dir }):wait()
+      sh({ "chmod", "a+x", f }, { cwd = dir }):await():unwrap()
     end
   end
   for _, file in ipairs(lang.init) do

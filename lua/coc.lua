@@ -1,6 +1,6 @@
-local fs, list, notify, window = (function()
+local fs, list, promisify_wrap, sh, window = (function()
   local _ = require("_")
-  return _.fs, _.list, _.notify, _.window
+  return _.fs, _.list, _.promisify_wrap, _.sh, _.window
 end)()
 
 local M = {}
@@ -102,20 +102,6 @@ M.extensions.uninstall = function(l)
   for i=1, #l, 8 do
     vim.fn["coc#rpc#notify"]("uninstallExtension", list.slice(l, i, i+7))
   end
-end
-
-local function url(size, page)
-  return {
-    fs.exepath("bun") or fs.exepath("node"),
-    "-e",
-    "console.log(" ..
-      "await (" ..
-        "await fetch(\"" ..
-          "https://api.npms.io/v2/search?q=keywords:coc.nvim&size=" .. size .. "&from=" .. page ..
-        "\")" ..
-      ").text()" ..
-    ")"
-  }
 end
 
 local menu = window{
@@ -256,29 +242,36 @@ M.marketplace.run = function()
   end, 500)
 end
 
-M.marketplace.show = function()
+local _show = promisify_wrap(function(promise)
   if ALL_EXTENSIONS then
     menu:show()
-    return
+    return promise:resolve()
   end
 
   ALL_EXTENSIONS = {}
 
-  local node = fs.exepath("bun") or fs.exepath("node")
-  if not node then
-    return notify.error("Node not found\nCannot proceed")
+  local runtime = fs.exepath("bun") or fs.exepath("node")
+  if not runtime then
+    return promise.reject("Node not found")
   end
 
   local size = 200
   local page = 0
 
-  local function fetch(out)
-    if out.code ~= 0 then
-      notify.error("Fatal error\n" .. out.stderr)
-      return
-    end
+  while true do
+    local cmd = { runtime, "-e",
+      "console.log(" ..
+        "await (" ..
+          "await fetch(\"" ..
+            "https://api.npms.io/v2/search?q=keywords:coc.nvim&size=" .. size .. "&from=" .. page ..
+          "\")" ..
+        ").text()" ..
+      ")"
+    }
 
-    local json = vim.json.decode(out.stdout)
+    local r = sh(cmd, { text = true }):await()
+    r:unwrap()
+    local json = vim.json.decode(r.stdout)
     for _, v in ipairs(json.results) do
       list.insert(ALL_EXTENSIONS, {
         name = v.package.name,
@@ -288,13 +281,13 @@ M.marketplace.show = function()
     end
 
     page = page + size
-    if page < json.total then
-      vim.system(url(size, page), { text = true }, fetch)
-    else
-      vim.schedule(function() menu:show() end)
+    if page >= json.total then
+      menu:show()
+      return promise:resolve()
     end
   end
-  vim.system(url(size, page), { text = true }, fetch)
-end
+end)
+
+M.marketplace.show = function() _show() end
 
 return M

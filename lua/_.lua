@@ -314,18 +314,18 @@ M.sh = M.promisify_wrap(function(promise, cmd, opts)
     end
   end
 
-  vim.system(cmd, opts, function(o)
+  vim.system(cmd, opts, function(out)
     if (vim.fn.has("win32") == 1) and text then
-      promise.stdout = string.gsub(o.stdout or "", "\r\n", "\n")
-      promise.stderr = string.gsub(o.stderr or "", "\r\n", "\n")
+      promise.stdout = string.gsub(out.stdout or "", "\r\n", "\n")
+      promise.stderr = string.gsub(out.stderr or "", "\r\n", "\n")
     else
-      promise.stdout = o.stdout or ""
-      promise.stderr = o.stderr or ""
+      promise.stdout = out.stdout or ""
+      promise.stderr = out.stderr or ""
     end
-    if o.code == 0 then
+    if out.code == 0 then
       return promise:resolve()
     else
-      return promise:reject{ code = o.code, message = o.stderr }
+      return promise:reject{ code = out.code, message = out.stderr }
     end
   end)
 end)
