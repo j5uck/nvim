@@ -73,6 +73,10 @@ map("x", { "<leader>I", "<leader>A" }, "xgvI", { desc = "replace block" })
 
 map({"n", "v"}, "<leader>y", "\"+y", { desc = "[y]ank to \"+" })
 
+map("i", "<C-v>", "<C-r>+", { desc = "[p]aste from \"+" })
+map("i", "<C-V>", "<C-r>+", { desc = "[p]aste from \"+" })
+map("i", "<C-S-V>", "<C-r>+", { desc = "[p]aste from \"+" })
+
 map({"n", "v"}, "<leader>p", "\"+p", { desc = "[p]aste from \"+" })
 map({"n", "v"}, "<leader>P", "\"+P", { desc = "[P]aste from \"+" })
 
@@ -542,6 +546,9 @@ prequire("telescope", function()
     k["_func"][name] = callback
   end
   tm_i_new("<C-v>", function() vim.api.nvim_input("<C-r>+") end, "paste")
+  tm_i_new("<C-V>", function() vim.api.nvim_input("<C-r>+") end, "paste")
+  tm_i_new("<C-S-V>", function() vim.api.nvim_input("<C-r>+") end, "paste")
+  tm_i_new("<C-Space>", function() vim.api.nvim_input("<Esc>") W.term:toggle() end, "toggle floating terminal")
 
   prequire("noice", function()
     map("n", "<leader>fn", "<cmd>NoiceTelescope<cr>", { desc = "[f]ind noice [n]otification with telescope" })
@@ -609,7 +616,7 @@ LANGS = require("langs")
 local select = promisify_wrap(function(promise)
   local lnum = vim.api.nvim_win_get_cursor(0)[1]
   local lang = LANGS[lnum]
-  vim.cmd.q()
+  W.langs:hide()
 
   vim.cmd[[silent! new]]
   vim.cmd[[silent! only]]

@@ -1,6 +1,6 @@
-local dictionary, list = (function()
+local dictionary, list, notify = (function()
   local _ = require("_")
-  return _.dictionary, _.list
+  return _.dictionary, _.list, _.notify
 end)()
 
 local M = {}
@@ -422,7 +422,7 @@ vim.api.nvim_create_autocmd("BufEnter", {
       local status, msg = pcall(vim.api.nvim_win_call, id, vim.cmd.q)
       if not status then
         msg = string.gsub(vim.fn.split(msg, "\n")[1], "Error executing lua: (.*)", "%1")
-        require("_").notify.error(msg)
+        notify.error(msg)
       end
     end
   end
