@@ -126,6 +126,21 @@ vim.g.c_syntax_for_h = 1
 ---@diagnostic disable-next-line:deprecated 
 (vim.lsp.log.set_level or vim.lsp.set_log_level)(vim.log.levels.OFF)
 
+local yank_buffer = { }
+local yank_buffer_capacity = 10
+local yank_buffer_index = yank_buffer_capacity
+
+vim.api.nvim_create_autocmd("TextYankPost", {
+  callback = function(_)
+    local r = vim.fn.getreg[["]]
+    if yank_buffer[yank_buffer_index] == r then return end
+    yank_buffer_index = (yank_buffer_index) % yank_buffer_capacity + 1
+    yank_buffer[yank_buffer_index] = r
+  end
+})
+
+-- TODO: Menu to select from the yank buffer
+
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "help", "man" },
   callback = function() vim.wo.spell = false end
