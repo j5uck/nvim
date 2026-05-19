@@ -292,10 +292,10 @@ M.bun.code["build.ts"] = {
   "}"
 }
 M.bun.code["src/server.ts"] = {
-  "import assert from \"assert\";",
   "import net from \"net\";",
   "import path from \"path\";",
   "",
+  "import assert from \"@/assert.ts\";",
   "import routes from \"@/routes.ts\";",
   "import * as T from \"@/terminal.ts\";",
   "",
@@ -348,6 +348,19 @@ M.bun.code["src/routes.ts"] = {
   "  \"/\": index,",
   "  \"/*\": Response.json({ message: \"Not found\" }, { status: 404 })",
   "} satisfies Bun.Serve.Routes<undefined, string>;",
+}
+M.bun.code["src/assert.ts"] = {
+  "class AssertionError extends Error {",
+  "  constructor(message?: string) {",
+  "    super(message);",
+  "    this.name = \"AssertionError\";",
+  "  }",
+  "}",
+  "",
+  "export default (value: any, message?: string): void => {",
+  "  if(!value)",
+  "    throw new AssertionError(message as any);",
+  "}"
 }
 M.bun.code["src/terminal.ts"] = {
   "export const CLEAN: string = \"\\x1B[H\\x1B[2J\";",

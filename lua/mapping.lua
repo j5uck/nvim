@@ -384,6 +384,9 @@ map({"n", "v", "t"}, "<c-Space>", function() W.term:toggle() end, { desc = "togg
 
 if vim.g.neoray then
   vim.cmd[[NeoraySet KeyFullscreen <M-CR>]]
+  vim.cmd[[NeoraySet KeyZoomIn     <C-ScrollWheelUp>]]
+  vim.cmd[[NeoraySet KeyZoomOut    <C-ScrollWheelDown>]]
+
   map("n", "<leader><CR>", function()
     sh({ "neoray" }, { detach = true })
   end, { desc = "open neoray instance" })
