@@ -1,6 +1,6 @@
-local promisify_wrap, dictionary, list, notify, notify_once, flags, fs, open, prequire, sh, term, window = (function()
+local promisify_wrap, dictionary, list, notify, notify_once, flags, fs, open, prequire, ringbuffer, sh, term, window = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.dictionary, _.list, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.sh, _.term, _.window
+  return _.promisify_wrap, _.dictionary, _.list, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.ringbuffer, _.sh, _.term, _.window
 end)()
 local explorer = require("explorer")
 
@@ -104,6 +104,88 @@ map("n", "<leader>S", function()
   vim.opt.expandtab = true
   vim.opt.smartindent = true
 end, { desc = "tab to [S]paces" })
+
+local yank_buffer = ringbuffer(16)
+
+vim.api.nvim_create_autocmd("TextYankPost", {
+  callback = function(_)
+    local r = vim.fn.getreg[["]]
+    if yank_buffer:peek() == r then return end
+    yank_buffer:push(r)
+  end
+})
+
+local yank_win_width = 32
+local yank_win_height = 1
+
+W.yank = window{
+  on_show = function(self)
+    vim.bo.bufhidden  = "delete"
+    vim.bo.buflisted  = false
+    vim.bo.buftype    = "nofile"
+    vim.bo.filetype   = "lua-clipboard"
+    vim.bo.modifiable = true
+    vim.bo.swapfile   = false
+    vim.bo.undolevels = -1
+
+    vim.wo.concealcursor  = "nvic"
+    vim.wo.conceallevel   = 3
+    vim.wo.cursorcolumn   = false
+    vim.wo.cursorline     = false
+    vim.wo.foldcolumn     = "0"
+    vim.wo.list           = false
+    vim.wo.number         = false
+    vim.wo.relativenumber = false
+    vim.wo.scrolloff      = 0
+    vim.wo.sidescrolloff  = 0
+    vim.wo.signcolumn     = "no"
+    vim.wo.spell          = false
+    vim.wo.wrap           = false
+
+    vim.api.nvim_win_set_config(0, { title = " [clipboard] ", title_pos = "center" })
+
+    local esc = {}
+    esc["\n"] = "%n"
+    esc["\r"] = "%r"
+    esc["%"]  = "%%"
+
+    local history = list.map(function(s)
+      ---@diagnostic disable-next-line: redundant-return-value
+      return string.gsub(s, "[\n\r%%]", function(c) return esc[c] end)
+    end, yank_buffer:totable())
+
+    yank_win_width = 32
+    for _, s in ipairs(history) do
+      yank_win_width = math.min(math.max(#s, yank_win_width), 80)
+    end
+
+    if #history == 0 then
+      vim.cmd[[hi link LuaClipboardText Comment]]
+      -- TODO: better alignment
+      vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, { "             empty" })
+    else
+      vim.cmd[[syn clear LuaClipboardText]]
+      vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, history)
+    end
+
+    yank_win_height = math.max(#history, 1)
+    for _, fn in ipairs(self.on_resize) do fn(self) end
+
+    vim.bo.modifiable = false
+  end,
+  size = function()
+    return {
+      col    = math.ceil(vim.o.columns - yank_win_width) * 0.5 - 1,
+      row    = math.ceil(vim.o.lines - yank_win_height) * 0.5 - 1,
+      width  = yank_win_width,
+      height = yank_win_height
+    }
+  end,
+  focus = true,
+  border = "rounded",
+}
+
+map("n", "<leader>C", function() W.yank:show() end, { desc = "show [C]lipboard history" })
 
 local ft = {}
 ft.javascript = { "bun", "-e" }
@@ -317,7 +399,7 @@ vim.api.nvim_create_autocmd("FileType", {
   end
 })
 
-local term_buffers = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }
+local term_buffers = list.fill({}, -1, 10)
 local term_buffers_i = 1
 local term_buffers_flag = false
 W.term = window{

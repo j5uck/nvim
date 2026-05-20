@@ -38,6 +38,18 @@ M.list.uniq = function(l)
   end
   return r
 end
+M.list.fill = function(l, value, n)
+  if type(value) == "table" then
+    for i = 1, n, 1 do
+      l[i] = vim.deepcopy(value)
+    end
+  else
+    for i = 1, n, 1 do
+      l[i] = value
+    end
+  end
+  return l
+end
 M.list.remove = table.remove
 M.list.slice = vim.list_slice
 M.list.clone = function(t) return vim.list_slice(t, 1, #t) end
@@ -66,6 +78,91 @@ M.dictionary.deep_clone = vim.deepcopy
 M.dictionary.keys = vim.tbl_keys
 M.dictionary.merge = function(...) return vim.tbl_extend("force", ...) end
 M.dictionary.deep_merge = function(...) return vim.tbl_deep_extend("force", ...) end
+
+-- ------------------------- x ------------------------- --
+
+local RingBuffer = {}
+
+function RingBuffer:push(value)
+  self[self.index] = value
+  self.index = self.index % self.capacity + 1
+  if self.size < self.capacity then
+    self.size = self.size + 1
+  end
+  return self
+end
+
+function RingBuffer:pop()
+  if self.size <= 0 then return nil end
+  local index = (self.index + self.capacity - 2) % self.capacity + 1
+  local r = self[index]
+  self.index = index
+  self.size = self.size - 1
+  return r
+end
+
+function RingBuffer:peek()
+  if self.size <= 0 then return nil end
+  return self[(self.index + self.capacity - 2) % self.capacity + 1]
+end
+
+function RingBuffer:totable()
+  local start = (self.index - self.size + self.capacity - 1) % self.capacity + 1
+  local index = self.index - 1
+  if start > index then
+    local r = {}
+
+    local count = 1
+    for i = index, 1, -1 do
+      r[count] = self[i]
+      count = count + 1
+    end
+    for i = self.capacity, start, -1 do
+      r[count] = self[i]
+      count = count + 1
+    end
+
+    return r
+  else
+    local r = {}
+    local count = 1
+    for i = index, start, -1 do
+      r[count] = self[i]
+      count = count + 1
+    end
+    return r
+  end
+end
+
+function RingBuffer:fill(value)
+  for i = 1, self.capacity, 1 do
+    self[i] = value
+  end
+  self.index = 1
+  self.size = self.capacity
+  return self
+end
+
+function RingBuffer:clear()
+  for i = 1, self.capacity, 1 do
+    self[i] = nil
+  end
+  self.index = 1
+  self.size = 0
+  return self
+end
+
+M.ringbuffer = function(capacity)
+  assert(type(capacity) == "number", "Capacity must be a number")
+
+  local self = { capacity = capacity }
+
+  self.capacity = capacity
+  self.size = 0
+  self.index = 1
+
+  return setmetatable(self, { __index = RingBuffer })
+end
 
 -- ------------------------- x ------------------------- --
 
