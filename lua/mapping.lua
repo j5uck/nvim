@@ -161,8 +161,8 @@ W.yank = window{
 
     if #history == 0 then
       vim.cmd[[hi link LuaClipboardText Comment]]
-      -- TODO: better alignment
-      vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, { "             empty" })
+      local s = string.rep(" ", math.floor((yank_win_width - #"empty") / 2))
+      vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, { s .. "empty" })
     else
       vim.cmd[[syn clear LuaClipboardText]]
       vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, history)
