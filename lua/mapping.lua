@@ -121,6 +121,13 @@ local yank_win_height = 1
 
 W.yank = window{
   on_show = function(self)
+    vim.api.nvim_create_autocmd("WinLeave", {
+      callback = function() self:hide() end,
+      once = true
+    })
+
+    vim.api.nvim_win_set_config(0, { title = " [clipboard] ", title_pos = "center" })
+
     vim.bo.bufhidden  = "delete"
     vim.bo.buflisted  = false
     vim.bo.buftype    = "nofile"
@@ -142,8 +149,6 @@ W.yank = window{
     vim.wo.signcolumn     = "no"
     vim.wo.spell          = false
     vim.wo.wrap           = false
-
-    vim.api.nvim_win_set_config(0, { title = " [clipboard] ", title_pos = "center" })
 
     local esc = {}
     esc["\n"] = "%n"
@@ -348,6 +353,110 @@ for i=1, 9, 1 do
   map({ "n", "t" }, "<M-" .. i .. ">", goToTabpageWrap(i))
 end
 map({ "n", "t" }, "<M-0>", goToTabpageWrap(10))
+
+local gh_users = {}
+local gh_users_width = 0
+
+W.gh_auth = window{
+  on_show = function(self)
+    vim.api.nvim_create_autocmd("WinLeave", {
+      callback = function() self:hide() end,
+      once = true
+    })
+
+    vim.api.nvim_win_set_config(0, { title = " [gh auth] ", title_pos = "center" })
+
+    vim.bo.bufhidden  = "delete"
+    vim.bo.buflisted  = false
+    vim.bo.buftype    = "nofile"
+    vim.bo.filetype   = "lua-gh"
+    vim.bo.modifiable = true
+    vim.bo.swapfile   = false
+    vim.bo.undolevels = -1
+
+    vim.wo.concealcursor  = "nvic"
+    vim.wo.conceallevel   = 3
+    vim.wo.cursorcolumn   = false
+    vim.wo.cursorline     = false
+    vim.wo.foldcolumn     = "0"
+    vim.wo.list           = false
+    vim.wo.number         = false
+    vim.wo.relativenumber = false
+    vim.wo.scrolloff      = 0
+    vim.wo.sidescrolloff  = 0
+    vim.wo.signcolumn     = "no"
+    vim.wo.spell          = false
+    vim.wo.wrap           = false
+
+    vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, list.map(function(u)
+      return " [" .. (u.active and "✓" or " ") .. "] " .. u.username
+    end, gh_users))
+
+    vim.bo.modifiable = false
+
+    vim.api.nvim_create_autocmd({ "CursorMovedI", "CursorMoved", "ModeChanged" }, {
+      buffer = self.buf,
+      callback = function(_)
+        local y, x = unpack(vim.api.nvim_win_get_cursor(0))
+        if x ~= 2 then
+          vim.api.nvim_win_set_cursor(0, { y, 2 })
+        end
+      end
+    })
+
+    local select = promisify_wrap(function(promise)
+      local lnum = vim.api.nvim_win_get_cursor(0)[1]
+      local u = gh_users[lnum].username
+      sh({ "gh", "auth", "switch", "--user", u }, { text = true }):await():unwrap()
+      W.gh_auth:hide()
+      notify.warn("GH: User switched to \"" .. u .. "\"")
+      promise:resolve()
+    end)
+
+    map("n", "<esc>", function() W.gh_auth:hide() end, { buffer = self.buf })
+    map("n", "<CR>", function() select() end, { buffer = self.buf })
+  end,
+  size = function()
+    return {
+      col    = math.ceil(vim.o.columns - gh_users_width) * 0.5 - 1,
+      row    = math.ceil(vim.o.lines - #gh_users) * 0.5 - 1,
+      width  = gh_users_width,
+      height = #gh_users
+    }
+  end,
+  focus = true,
+  border = "rounded"
+}
+
+local gh = promisify_wrap(function(promise)
+  if not fs.exepath("gh") then
+    return promise:reject("gh not found")
+  end
+
+  local r = sh({ "gh", "auth", "status", "--json", "hosts" }, { text = true }):await()
+  r:unwrap()
+
+  local json = vim.json.decode(r.stdout)
+  if not (json.hosts and json.hosts["github.com"] and #json.hosts["github.com"] > 0) then
+    notify:warn("You are not logged into GitHub")
+    return promise:resolve()
+  end
+
+  gh_users_width = 6
+  gh_users = list.map(function(o)
+    gh_users_width = math.max(gh_users_width, #o.login + 6)
+    return { username = o.login, active = o.active }
+  end, json.hosts["github.com"])
+  gh_users = list.sort(gh_users, function(a, b)
+    return string.lower(a.username) < string.lower(b.username)
+  end)
+
+  W.gh_auth:show()
+
+  promise:resolve()
+end)
+
+map("n", "<leader>gg", function() gh() end, { desc = "[g]o to [g]ithub account selection menu" })
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "lua-plug" },
@@ -802,7 +911,7 @@ W.langs = window{
     }
   end,
   focus = true,
-  border = "rounded",
+  border = "rounded"
 }
 
 map("n", "<leader>ii", function() W.langs:show() end, { desc = "create example project" })

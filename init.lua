@@ -145,6 +145,17 @@ vim.api.nvim_create_autocmd("FileType", {
   end)
 })
 
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = { "notify" },
+  callback = vim.schedule_wrap(function(ev)
+    vim.api.nvim_buf_call(ev.buf, function()
+      if #vim.api.nvim_win_get_config(0).relative == 0 then return end
+      -- vim.wo.scrolloff = 0
+      vim.wo.sidescrolloff = 0
+    end)
+  end)
+})
+
 local iskeyword = "@,48-57,_,-,192-255"
 vim.go.iskeyword = iskeyword
 vim.bo.iskeyword = iskeyword
@@ -172,9 +183,9 @@ elseif vim.g.neoray then
   vim.cmd[[NeoraySet WindowState centered]]
 end
 
-local promisify_wrap, fs, list, notify, window = (function()
+local promisify_wrap, fs, list, notify, sh, window = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.fs, _.list, _.notify, _.window
+  return _.promisify_wrap, _.fs, _.list, _.notify, _.sh, _.window
 end)()
 
 local loc = promisify_wrap(function(promise)

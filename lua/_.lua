@@ -386,7 +386,11 @@ M.sh = M.promisify_wrap(function(promise, cmd, opts)
   local text = opts.text
   opts.text = nil
 
-  if not string.find(cmd[1], (vim.fn.has("win32") == 1) and "[\\/]" or "/") then
+  if vim.fn.isabsolutepath(cmd[1]) then
+    -- already normalized
+  elseif string.find(cmd[1], (vim.fn.has("win32") == 1) and "[\\/]" or "/") then
+    return promise:reject("Relative paths are not allowed")
+  else
     cmd[1] = M.fs.exepath(cmd[1])
   end
 

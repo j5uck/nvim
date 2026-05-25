@@ -56,7 +56,7 @@ local run = promisify_wrap(function(promise, args)
   PLUG_SYNC.run_lock = true
 
   if not fs.exepath("git") then
-    return promise:reject("Git not found")
+    return promise:reject("git not found")
   end
 
   local function set_lines(start, _end, lines)
