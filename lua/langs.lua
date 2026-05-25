@@ -1,6 +1,6 @@
-local promisify_wrap, fs, git, notify, list, prequire, sh = (function()
+local promisify_wrap, fs, git, notify, list, parse, prequire, sh = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.fs, _.git, _.notify, _.list, _.prequire, _.sh
+  return _.promisify_wrap, _.fs, _.git, _.notify, _.list, _.parse, _.prequire, _.sh
 end)()
 
 local T_GRAY  = "\x1B[1;30m"
@@ -120,25 +120,6 @@ local tsconfig_json = {
   "  }",
   "}"
 }
-local bunfig_toml = {
-  "telemetry = false",
-  "",
-  "[console]",
-  "depth = 3",
-  "",
-  "[install]",
-  "auto = \"auto\"",
-  "# 1 week",
-  "minimumReleaseAge = " .. tostring(60 * 60 * 24 * 7),
-  "",
-  "[install.lockfile]",
-  "save = false",
-  "",
-  "[run]",
-  "bun = true",
-  "noOrphans = true",
-  "shell = \"bun\""
-}
 
 M.c.init = { "src/main.c" }
 M.c.code = {}
@@ -191,9 +172,26 @@ M.bun.code["package.json"] = {
   "}"
 }
 M.bun.code["tsconfig.json"] = tsconfig_json
-M.bun.code["bunfig.toml"] = bunfig_toml
-M.bun.code[".env"] = {
-  "PORT=8080"
+M.bun.code["bunfig.toml"] = parse.table_to_toml{
+  telemetry = false,
+  console = {
+    depth = 3
+  },
+  install = {
+    auto = "auto",
+    minimumReleaseAge = 60 * 60 * 24 * 7, -- 1 week
+    lockfile = {
+      save = false
+    }
+  },
+  run = {
+    bun = true,
+    noOrphans = true,
+    shell = "bun"
+  }
+}
+M.bun.code[".env"] = parse.table_to_env{
+  PORT = 8080
 }
 M.bun.code["build.ts"] = {
   "import fs from \"fs\";",

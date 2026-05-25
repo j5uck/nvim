@@ -448,7 +448,8 @@ local gh = promisify_wrap(function(promise)
     return { username = o.login, active = o.active }
   end, json.hosts["github.com"])
   gh_users = list.sort(gh_users, function(a, b)
-    return string.lower(a.username) < string.lower(b.username)
+    local c = vim.stricmp(a.username, b.username)
+    return (c == 0) and (a.username < b.username) or (c == -1)
   end)
 
   W.gh_auth:show()

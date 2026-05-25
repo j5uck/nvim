@@ -349,6 +349,136 @@ end
 
 -- ------------------------- x ------------------------- --
 
+M.parse = {}
+
+M.parse.table_to_env = function(o)
+  local function sort(a, b)
+    local c = vim.stricmp(a[1], b[1])
+    return (c == 0) and (a[1] < b[1]) or (c == -1)
+  end
+
+  local r = {}
+  for k, v in pairs(o) do
+    assert(type(k) == "string", "Only dictionaries are allowed")
+    assert(type(v) ~= "table", "Tables are not supported")
+    M.list.insert(r, { k, vim.json.encode(v) })
+  end
+
+  return M.list.map(function(v)
+    return v[1] .. "=" .. v[2]
+  end, M.list.sort(r, sort))
+end
+
+-- local function table_to_json_tokens(o)
+--   local r = {}
+--
+--   if o[1] == nil then
+--     M.list.insert(r, "{")
+--
+--     for k, _ in pairs(o) do
+--       assert(type(k) == "string", "Table must be list or dictionary")
+--     end
+--
+--     for k, v in pairs(o) do
+--       M.list.insert(r, vim.json.encode(k))
+--       if type(v) == "table" then
+--         M.list.merge(r, table_to_json_tokens(v))
+--       else
+--         M.list.insert(r, vim.json.encode(v))
+--       end
+--     end
+--
+--     M.list.insert(r, "}")
+--   else
+--     M.list.insert(r, "[")
+--
+--     for i, _ in pairs(o) do
+--       assert(type(i) == "number",  "Table must be list or dictionary")
+--     end
+--
+--     for _, v in pairs(o) do
+--       if type(v) == "table" then
+--         M.list.merge(r, table_to_json_tokens(v))
+--       else
+--         M.list.insert(r, vim.json.encode(v))
+--       end
+--     end
+--
+--     M.list.insert(r, "]")
+--   end
+--
+--   return r
+-- end
+--
+-- M.parse.table_to_json = function(o)
+--   local tokens =  table_to_json_tokens(o)
+--   local depth = 0
+--   local r = {}
+--
+--   for i = 1, #tokens - 1, 1 do
+--     if tokens[i] == "{" then
+--       if depth > 0 then
+--         r[#r] = r[#r].. ": {"
+--       else
+--         M.list.insert(r, "{")
+--       end
+--       depth = depth + 1
+--     elseif tokens[i] == "[" then
+--     else
+--       assert(false, "Unknown token \"" .. tokens[i] .. "\"")
+--     end
+--   end
+--   -- M.list.insert()
+--
+--   return r
+-- end
+
+local function table_to_toml(o, title)
+  local primitives = {}
+  local objects = {}
+
+  for k, v in pairs(o) do
+    assert(type(k) == "string", "Only dictionaries are allowed")
+    if type(v) == "table" then
+      M.list.merge(objects, table_to_toml(v, title .. k .. "."))
+    else
+      M.list.insert(primitives, { k, vim.json.encode(v) })
+    end
+  end
+
+  return M.list.merge({ { title, primitives } }, objects)
+end
+
+M.parse.table_to_toml = function(o)
+  local function sort(a, b)
+    local c = vim.stricmp(a[1], b[1])
+    return (c == 0) and (a[1] < b[1]) or (c == -1)
+  end
+
+  local parsed = M.list.sort(table_to_toml(o, ""), sort)
+  local r = {}
+  for _, section in ipairs(parsed) do
+    local section_name = section[1]
+    local section_value = M.list.sort(section[2], sort)
+
+    if #section_name > 0 then
+      M.list.insert(r, "[" .. string.sub(section_name, 1, #section_name - 1) .. "]")
+    end
+
+    for _, item in ipairs(section_value) do
+      local key = item[1]
+      local value = item[2]
+      M.list.insert(r, key .. " = " .. value)
+    end
+    M.list.insert(r, "")
+  end
+
+  M.list.remove(r, #r)
+  return r
+end
+
+-- ------------------------- x ------------------------- --
+
 M.term = (vim.fn.has("win32") == 1) and function()
   local shell = vim.go.shell
   local shellxquote = vim.go.shellxquote
