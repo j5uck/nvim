@@ -94,7 +94,8 @@ map("n", "<leader>O", "O<esc>0\"_D", { desc = "create new line" })
 
 map("n", "<leader>gf", function()
   local p = vim.api.nvim_buf_get_name(0)
-  if p == "" then return end
+  if #p == 0 then return end
+  explorer.resume()
   vim.cmd.edit(vim.fn.fnameescape(fs.dirname(p)))
 end, { desc = "[g]o to [f]ile parent folder" })
 
