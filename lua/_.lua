@@ -439,7 +439,7 @@ M.parse.table_to_env = function(o)
   end, M.list.sort(r, sort))
 end
 
-local empty_dict_tostring = getmetatable(vim.empty_dict()).__tostring
+-- local empty_dict_tostring = getmetatable(vim.empty_dict()).__tostring
 
 -- local function table_to_json(o)
 --   local r = {}
