@@ -12,45 +12,36 @@ M.flags = {
 
 M.String = {}
 M.String.format = string.format
+M.String.startswith = function(s, prefix)
+  return string.sub(s, 1, #prefix) == prefix
+end
+M.String.endswith = function(s, suffix)
+  return string.sub(s, #s - #suffix + 1, #s) == suffix
+end
 M.String.match = function(s, pattern)
   local i = vim.fn.match(s, pattern)
   return i > -1 and (i + 1) or nil
 end
 M.String.slice = string.sub
+M.String.split = vim.split
 M.String.substitute = function(s, pattern, sub)
-  sub = type(sub) == "function" and function(e)
+  local _sub = type(sub) == "function" and function(e)
     if not e then
       return ""
     elseif type("table") then
-      return e[1]
+      return sub(e[1])
     elseif type("string") then
-      return e
+      return sub(e)
     else
       assert(false, "Unexpected type")
     end
   end or sub
-  return vim.fn.substitute(s, pattern, sub, "g")
+  return vim.fn.substitute(s, pattern, _sub, "g")
 end
 M.String.upper = string.upper
 M.String.lower = string.lower
 M.String.rep = string.rep
 M.String.reverse = string.reverse
-
--- local StringBuilder = {}
---
--- function StringBuilder:push(e)
---   table.insert(self, e)
---   return self
--- end
---
--- function StringBuilder:join(s)
---   return table.concat(self, s)
--- end
---
--- M.StringBuilder = function()
---   local self = {}
---   return setmetatable(self, { __index = StringBuilder })
--- end
 
 M.list = {}
 M.list.contains = vim.tbl_contains
@@ -622,7 +613,7 @@ M.sh = M.promisify_wrap(function(promise, cmd, opts)
 
   if vim.fn.isabsolutepath(cmd[1]) then
     -- already normalized
-  elseif string.find(cmd[1], (vim.fn.has("win32") == 1) and "[\\/]" or "/") then
+  elseif M.String.match(cmd[1], (vim.fn.has("win32") == 1) and "[\\\\/]" or "/") then
     return promise:reject("Relative paths are not allowed")
   else
     cmd[1] = M.fs.exepath(cmd[1])
@@ -669,7 +660,7 @@ end)
 
 M.random = {}
 
-local CHARS = vim.split("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", "")
+local CHARS = M.String.split("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", "")
 M.random.string = function(len)
   local buffer = ffi.new("char [?]", len)
   ffi.copy(buffer, vim.uv.random(len), len)
@@ -799,9 +790,9 @@ end
 
 M.fs.exepath = (vim.fn.has("win32") == 1) and function(exe)
   ---@diagnostic disable-next-line: missing-parameter, param-type-mismatch
-  local ext = vim.split(M.env.PATHEXT, ";")
+  local ext = M.String.split(M.env.PATHEXT, ";")
   ---@diagnostic disable-next-line: param-type-mismatch
-  for _, p in ipairs(vim.split(M.env.PATH, ";")) do
+  for _, p in ipairs(M.String.split(M.env.PATH, ";")) do
     p = string.gsub(vim.fs.normalize(p .. "\\" .. exe), "\\", "/")
     if vim.uv.fs_access(p, "RX") then return p end
     for _, e in ipairs(ext) do
@@ -810,7 +801,7 @@ M.fs.exepath = (vim.fn.has("win32") == 1) and function(exe)
     end
   end
 end or function(bin)
-  for _, p in ipairs(vim.split(M.env.PATH, ":")) do
+  for _, p in ipairs(M.String.split(M.env.PATH, ":")) do
     p = vim.fs.normalize(p .. "/" .. bin)
     if vim.uv.fs_access(p, "RX") then return p end
   end
@@ -988,7 +979,7 @@ M.git.fetch = M.promisify_wrap(function(promise, o)
     M.sh({ "git", "fetch", "origin", "--depth=1", "--progress", "--no-tags", "refs/tags/".. o.tag ..":refs/tags/".. o.tag }, go):await():unwrap()
     local r = M.sh({ "git", "tag", "--list", o.tag, "--sort", "-version:refname" }, go):await()
     r:unwrap()
-    M.sh({ "git", "checkout", "tags/" .. vim.split(r.stdout, "[\r\n]+")[1] }, go):await():unwrap()
+    M.sh({ "git", "checkout", "tags/" .. M.String.split(r.stdout, "[\r\n]+")[1] }, go):await():unwrap()
   elseif o.branch then
     M.sh({ "git", "fetch", "origin", "--depth=1", "--progress", "+refs/heads/".. o.branch ..":refs/remotes/origin/".. o.branch }, go):await():unwrap()
     M.sh({ "git", "checkout", "origin/"..o.branch }, go):await():unwrap()
@@ -996,7 +987,7 @@ M.git.fetch = M.promisify_wrap(function(promise, o)
     M.sh({ "git", "fetch", "origin", "--depth=1", "--progress" }, go):await():unwrap()
     local r = M.sh({ "git", "ls-remote", "--symref", "origin", "HEAD" }, go):await()
     r:unwrap()
-    M.sh({ "git", "switch", ({string.gsub(vim.split(r.stdout, "[ \t]")[2], ".+/(.+)$", "%1")})[1] }, go):await():unwrap()
+    M.sh({ "git", "switch", ({string.gsub(M.String.split(r.stdout, "[ \t]")[2], ".+/(.+)$", "%1")})[1] }, go):await():unwrap()
   end
 
   return promise:resolve()

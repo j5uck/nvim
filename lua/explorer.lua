@@ -29,12 +29,8 @@ vim.filetype.add{ pattern = { ["file://.*"] = { "lua-explorer", { priority = 10 
 
 local w = window{
   on_show = function(self)
-    -- local win = self.win
     vim.api.nvim_create_autocmd("WinLeave", {
-      callback = function()
-        self:hide()
-        -- pcall(vim.api.nvim_win_close, win, true)
-      end,
+      callback = function() self:hide() end,
       once = true
     })
   end,
@@ -81,16 +77,18 @@ end
 
 M.encode = function(s)
   return String.substitute(s, "[\\\\\n\r%]", function(c)
-    return ENCODE_TABLE[c]
+    return assert(ENCODE_TABLE[c])
   end)
 end
 
 M.decode = (vim.fn.has("win32") == 1) and function(s)
   return String.substitute(s, "\\(%.\\|/\\)", function(c)
-    return DECODE_TABLE[c]
+    return assert(DECODE_TABLE[c])
   end)
 end or function(s)
-  return String.substitute(s, "%.", function(c) return DECODE_TABLE[c] end)
+  return String.substitute(s, "%.", function(c)
+    return assert(DECODE_TABLE[c])
+  end)
 end
 
 local PREFIX = vim.fn.has("win32") == 1 and "file://" or "file:/"
@@ -265,7 +263,7 @@ local fn_BufReadCmd = promisify_wrap(function(promise)
         name = String.slice(name, 1, #name - 1),
         type = "directory"
       }
-    end, vim.split(ffi.string(C_BUFFER, C.GetLogicalDriveStringsA(C_BUFFER_SIZE, C_BUFFER)), "\0", { trimempty = true }))
+    end, String.split(ffi.string(C_BUFFER, C.GetLogicalDriveStringsA(C_BUFFER_SIZE, C_BUFFER)), "\0", { trimempty = true }))
 
     is_modifiable = false
   else
@@ -303,7 +301,7 @@ local fn_BufReadCmd = promisify_wrap(function(promise)
     elseif devicons then
       local icon, icon_hl = devicons.get_icon(vim.fs.normalize(e.name))
       if not icon and is_link then
-        local t = vim.split(e.link, "/", { trimempty=true })
+        local t = String.split(e.link, "/", { trimempty=true })
         icon, icon_hl = devicons.get_icon(t[#t])
       end
       add(icon and (icon.." ") or " ", icon_hl)

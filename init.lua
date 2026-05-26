@@ -143,7 +143,12 @@ vim.api.nvim_create_autocmd("FileType", {
   callback = function(ev) vim.bo[ev.buf].iskeyword = iskeyword end
 })
 
-local REGISTERS = vim.split("@0123456789-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/", "")
+local promisify_wrap, fs, list, notify, String, window = (function()
+  local _ = require("_")
+  return _.promisify_wrap, _.fs, _.list, _.notify, _.String, _.window
+end)()
+
+local REGISTERS = String.split("@0123456789-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/", "")
 vim.schedule(function()
   for _, r in ipairs(REGISTERS) do
     vim.fn.setreg(r, "")
@@ -162,20 +167,15 @@ elseif vim.g.neoray then
   vim.cmd[[NeoraySet WindowState centered]]
 end
 
-local promisify_wrap, fs, list, notify, String, window = (function()
-  local _ = require("_")
-  return _.promisify_wrap, _.fs, _.list, _.notify, _.String, _.window
-end)()
-
 -- TODO: Send patch???
 for _, line in ipairs(vim.opt.runtimepath:get()) do
   if String.match(line, "[\\/]nvim[\\/]runtime$") then
-    local magic = vim.split("^$()%.[]*+-?", "")
+    local magic = String.split("^$()%.[]*+-?", "")
 
     local p = list.join(list.map(function(c)
       if list.contains(magic, c) then return "%" .. c end
       return c
-    end, vim.split(line, "")), "") .. "/doc/.*%.txt"
+    end, String.split(line, "")), "") .. "/doc/.*%.txt"
 
     if vim.fn.has("win32") == 1 then
       p = String.substitute(p, "\\\\+", "/")

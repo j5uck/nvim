@@ -1,6 +1,6 @@
-local dictionary, list, notify = (function()
+local dictionary, list, notify, String = (function()
   local _ = require("_")
-  return _.dictionary, _.list, _.notify
+  return _.dictionary, _.list, _.notify, _.String
 end)()
 
 local M = {}
@@ -169,32 +169,32 @@ M.update = function()
 
     for _, v in pairs(u.seq_saved) do
       local i = u.seq2index[tostring(v)] + 1
-      text[i] = vim.fn.substitute(text[i], "\\zs \\ze (","s","")
+      text[i] = String.substitute(text[i], "\\zs \\ze (", "s")
     end
 
     if not dictionary.isempty(u.seq_saved) then
       local _i = u.seq_saved[tostring(u.save_last)]
       if _i then
         local i = u.seq2index[tostring(_i)] + 1
-        text[i] = vim.fn.substitute(text[i], "s","S","")
+        text[i] = String.substitute(text[i], "s", "S")
       else
-        text[1] = vim.fn.substitute(text[1], "\\zs \\ze (","S","")
+        text[1] = String.substitute(text[1], "\\zs \\ze (", "S")
       end
     end
 
     if u.seq_cur ~= -1 then
       local i = u.seq2index[tostring(u.seq_cur)] + 1
-      text[i] = vim.fn.substitute(text[i], "\\zs \\(\\d\\+\\) \\ze [sS ] ", ">\\1<", "")
+      text[i] = String.substitute(text[i], "\\zs \\(\\d\\+\\) \\ze [sS ] ", ">\\1<")
     end
 
     if u.seq_curhead ~= -1 then
       local i = u.seq2index[tostring(u.seq_curhead)] + 1
-      text[i] = vim.fn.substitute(text[i], "\\zs \\(\\d\\+\\) \\ze [sS ] ", "{\\1}", "")
+      text[i] = String.substitute(text[i], "\\zs \\(\\d\\+\\) \\ze [sS ] ", "{\\1}")
     end
 
     if u.seq_newhead ~= -1 then
       local i = u.seq2index[tostring(u.seq_newhead)] + 1
-      text[i] = vim.fn.substitute(text[i], "\\zs \\(\\d\\+\\) \\ze [sS ] ", "[\\1]", "")
+      text[i] = String.substitute(text[i], "\\zs \\(\\d\\+\\) \\ze [sS ] ", "[\\1]")
     end
 
     vim.api.nvim_buf_set_lines(0, 0, -1, true, list.reverse(text))
@@ -421,8 +421,7 @@ vim.api.nvim_create_autocmd("BufEnter", {
     for _, id in ipairs(wins) do
       local status, msg = pcall(vim.api.nvim_win_call, id, vim.cmd.q)
       if not status then
-        msg = string.gsub(vim.fn.split(msg, "\n")[1], "Error executing lua: (.*)", "%1")
-        notify.error(msg)
+        notify.error(String.substitute(String.split(msg, "\n")[1], "Error executing lua: \\(.*\\)", "\\1"))
       end
     end
   end

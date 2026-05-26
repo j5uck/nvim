@@ -1,6 +1,6 @@
-local promisify_wrap, dictionary, list, notify, notify_once, flags, fs, open, prequire, ringbuffer, sh, term, window = (function()
+local promisify_wrap, dictionary, list, notify, notify_once, flags, fs, open, prequire, ringbuffer, sh, String, term, window = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.dictionary, _.list, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.ringbuffer, _.sh, _.term, _.window
+  return _.promisify_wrap, _.dictionary, _.list, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.ringbuffer, _.sh, _.String, _.term, _.window
 end)()
 local explorer = require("explorer")
 
@@ -100,7 +100,7 @@ map("n", "<leader>gf", function()
 end, { desc = "[g]o to [f]ile parent folder" })
 
 map("n", "<leader>S", function()
-  vim.cmd("%s/\\t/" .. string.rep(" ", vim.o.tabstop) .. "/g")
+  vim.cmd("%s/\\t/" .. String.rep(" ", vim.o.tabstop) .. "/g")
   vim.opt.autoindent = true
   vim.opt.expandtab = true
   vim.opt.smartindent = true
@@ -157,7 +157,7 @@ W.yank = window{
 
     local history = list.map(function(s)
       ---@diagnostic disable-next-line: redundant-return-value
-      return string.gsub(s, "[\n\r%%]", function(c) return esc[c] end)
+      return String.substitute(s, "[\n\r%]", function(c) return esc[c] end)
     end, yank_buffer:totable())
 
     yank_win_width = 32
@@ -167,7 +167,7 @@ W.yank = window{
 
     if #history == 0 then
       vim.cmd[[hi link LuaClipboardText Comment]]
-      local s = string.rep(" ", math.floor((yank_win_width - #"empty") / 2))
+      local s = String.rep(" ", math.floor((yank_win_width - #"empty") / 2))
       vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, { s .. "empty" })
     else
       vim.cmd[[syn clear LuaClipboardText]]
@@ -199,13 +199,13 @@ ft.python = { "python", "-c" }
 ft.typescript = ft.javascript
 
 for filetype, cmd in pairs(ft) do
-  local name = string.upper(string.sub(cmd[1], 1, 1)) .. string.sub(cmd[1], 2)
+  local name = String.upper(String.slice(cmd[1], 1, 1)) .. String.slice(cmd[1], 2)
   local function run(code)
     assert(fs.exepath(cmd[1]), name .. " not found")
     sh(list.insert(list.clone(cmd), list.join(code, "\n")), {
       text = true,
-      stdout = function(s) notify.warn(string.sub(s, 1, #s - 1)) end,
-      stderr = function(s) notify.error(string.sub(s, 1, #s - 1)) end
+      stdout = function(s) notify.warn(String.slice(s, 1, #s - 1)) end,
+      stderr = function(s) notify.error(String.slice(s, 1, #s - 1)) end
     })
   end
 
@@ -836,7 +836,7 @@ local select = promisify_wrap(function(promise)
   for name, content in pairs(lang.code) do
     local f = dir .. "/" .. name
     fs.mkfile(f, content):await():unwrap()
-    if (vim.fn.has("win32") == 0) and (vim.fn.match(content[1], "^#!") == 0) then
+    if (vim.fn.has("win32") == 0) and String.match(content[1], "^#!") then
       sh({ "chmod", "a+x", f }, { cwd = dir }):await():unwrap()
     end
   end
@@ -875,7 +875,7 @@ W.langs = window{
       buffer = 0,
       callback = function()
         local y, x = unpack(vim.api.nvim_win_get_cursor(0))
-        x = math.max(x, vim.fn.match(vim.api.nvim_get_current_line(), "^ [^ ]* \\+\\zs[^ ]"))
+        x = math.max(x, String.match(vim.api.nvim_get_current_line(), "^ [^ ]* \\+\\zs[^ ]") - 1)
         vim.api.nvim_win_set_cursor(0, { y, x })
       end
     })

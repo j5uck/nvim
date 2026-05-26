@@ -1,13 +1,13 @@
-local promisify_wrap, dictionary, flags, fs, git, list, notify, notify_once, prequire_wrap, sh = (function()
+local promisify_wrap, dictionary, flags, fs, git, list, notify, notify_once, prequire_wrap, sh, String = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.dictionary, _.flags, _.fs, _.git, _.list, _.notify, _.notify_once, _.prequire_wrap, _.sh
+  return _.promisify_wrap, _.dictionary, _.flags, _.fs, _.git, _.list, _.notify, _.notify_once, _.prequire_wrap, _.sh, _.String
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
-  local r = string.gsub(list.join({...}, "\\"), "[\\/]+", "\\")
+  local r = String.substitute(list.join({...}, "\\"), "[\\\\/]+", "\\")
   return r
 end or function(...)
-  local r = string.gsub(list.join({...}, "/"), "/+", "/")
+  local r = String.substitute(list.join({...}, "/"), "/+", "/")
   return r
 end
 
@@ -19,7 +19,7 @@ local PLUG_SYNC = {}
 local function runtimepath()
   local rtp, rtp_after = vim.opt.runtimepath:get(), {}
   for i, v in ipairs(rtp) do
-    if ({string.gsub(v,"after$","%1")})[2] == 1 then
+    if String.match(v, "after$") then
       rtp, rtp_after = list.slice(rtp, 1, i-1), list.slice(rtp, i, #rtp)
       break
     end
@@ -125,7 +125,7 @@ local run = promisify_wrap(function(promise, args)
     vim.cmd.redraw()
     local answer = vim.fn.input("Delete untracked plugins? (y/N)")
 
-    if vim.fn.match(answer, "^[yY]\\([eE][sS]\\)\\?$") == 0 then
+    if String.match(answer, "^[yY]\\([eE][sS]\\)\\?$") then
       local promises = {}
       for _, u in ipairs(todo.untracked) do
         local p = fs.remove(joinpath(PLUG_HOME, u))
@@ -287,7 +287,7 @@ local run = promisify_wrap(function(promise, args)
     vim.cmd[[hi link PlugSyncDone Label]]
   end)
 
-  local seconds = string.format("%.3f", vim.trim(vim.fn.reltimestr(vim.fn.reltime(reltime))))
+  local seconds = String.format("%.3f", vim.trim(vim.fn.reltimestr(vim.fn.reltime(reltime))))
   notify.warn("[LUA-PLUG] Elapsed time: " .. seconds .. " seconds")
 
   for _, n in ipairs(todo.plugs) do
@@ -309,7 +309,7 @@ end
 vim.api.nvim_create_user_command("PlugSync", command_sync, {
   complete = function(search)
     return list.sort(list.filter(function(name)
-      return vim.fn.match(name, search) == 0
+      return String.startswith(name, search)
     end, PLUGS_ORDER))
   end,
   nargs = "*",
@@ -318,9 +318,8 @@ vim.api.nvim_create_user_command("PlugSync", command_sync, {
 
 local function plug(plugin)
   local name = plugin.as or (function()
-    local r = plugin[1]
-    r = string.gsub(r, ".+/(.+)$", "%1")
-    return string.gsub(r, "(.+)%.git$", "%1")
+    local r = String.substitute(plugin[1], ".\\+/\\(.\\+\\)$", "\\1")
+    return String.endswith(r, ".git") and String.slice(r, 1, #r - 4) or r
   end)()
 
   if not PLUGS[name] then list.insert(PLUGS_ORDER, name) end
@@ -359,7 +358,7 @@ plug{
   build = function(_) vim.cmd[[silent! colorscheme tokyonight-storm]] end,
   setup = prequire_wrap("tokyonight", function(tokyonight)
     vim.api.nvim_create_autocmd("ColorScheme", { callback = function()
-      if vim.fn.match(vim.g.colors_name, "^tokyonight-.*$") == -1 then return end
+      if not String.match(vim.g.colors_name, "^tokyonight-.*$") then return end
 
       vim.api.nvim_set_hl(0, "WinSeparator", { link = "Comment" })
       vim.api.nvim_set_hl(0, "LineNrAbove",  { link = "Comment" })
@@ -626,7 +625,7 @@ plug{
     end
 
     local function lua_explorer()
-      local url = string.gsub(vim.api.nvim_buf_get_name(0), "%%", "%%%%")
+      local url = String.substitute(vim.api.nvim_buf_get_name(0), "%", "%%")
       local a = (vim.bo.modified and "[+]" or "") ..
           (((not vim.bo.modifiable) or vim.bo.readonly) and "[-]" or "")
       return url .. ((#a == 0) and "" or (" " .. a))
