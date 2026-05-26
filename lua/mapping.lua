@@ -394,6 +394,13 @@ W.gh_auth = window{
 
     vim.bo.modifiable = false
 
+    for i=1, #gh_users, 1 do
+      if gh_users[i].active then
+        vim.api.nvim_win_set_cursor(0, { i, 2 })
+        break
+      end
+    end
+
     vim.api.nvim_create_autocmd({ "CursorMovedI", "CursorMoved", "ModeChanged" }, {
       buffer = self.buf,
       callback = function(_)
