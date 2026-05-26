@@ -10,6 +10,48 @@ M.flags = {
 
 -- ------------------------- x ------------------------- --
 
+M.String = {}
+M.String.format = string.format
+M.String.match = function(s, pattern)
+  local i = vim.fn.match(s, pattern)
+  return i > -1 and (i + 1) or nil
+end
+M.String.slice = string.sub
+M.String.substitute = function(s, pattern, sub)
+  sub = type(sub) == "function" and function(e)
+    if not e then
+      return ""
+    elseif type("table") then
+      return e[1]
+    elseif type("string") then
+      return e
+    else
+      assert(false, "Unexpected type")
+    end
+  end or sub
+  return vim.fn.substitute(s, pattern, sub, "g")
+end
+M.String.upper = string.upper
+M.String.lower = string.lower
+M.String.rep = string.rep
+M.String.reverse = string.reverse
+
+-- local StringBuilder = {}
+--
+-- function StringBuilder:push(e)
+--   table.insert(self, e)
+--   return self
+-- end
+--
+-- function StringBuilder:join(s)
+--   return table.concat(self, s)
+-- end
+--
+-- M.StringBuilder = function()
+--   local self = {}
+--   return setmetatable(self, { __index = StringBuilder })
+-- end
+
 M.list = {}
 M.list.contains = vim.tbl_contains
 M.list.join = table.concat
@@ -25,7 +67,24 @@ M.list.sort = function(l, s)
   end
 end
 M.list.reverse = vim.fn.reverse
-M.list.map = vim.tbl_map
+M.list.map = function(fn, l)
+  l = M.list.clone(l)
+  local len = 0
+  local keys = vim.tbl_keys(l)
+
+  for i = #keys, 1, -1 do
+    if type(keys[i]) == "number" then
+      len = keys[i]
+      break
+    end
+  end
+
+  for i = 1, len, 1 do
+    l[i] = fn(l[i])
+  end
+
+  return l
+end
 M.list.filter = vim.tbl_filter
 M.list.uniq = function(l)
   local r = {}
@@ -50,12 +109,21 @@ M.list.fill = function(l, value, n)
   end
   return l
 end
-M.list.remove = table.remove
 M.list.slice = vim.list_slice
 M.list.clone = function(t) return vim.list_slice(t, 1, #t) end
 M.list.insert = function(l, ...)
   table.insert(l, ...)
   return l
+end
+M.list.push = function(l, e)
+  table.insert(l, e)
+  return l
+end
+M.list.remove = table.remove
+M.list.pop = function(l)
+  local r = l[#l]
+  l[#l] = nil
+  return r
 end
 M.list.merge = function(...)
   local r = ({...})[1]
@@ -349,6 +417,17 @@ end
 
 -- ------------------------- x ------------------------- --
 
+M.once = function(fn)
+  local done = false
+  return function(...)
+    if done then return end
+    done = true
+    return fn(...)
+  end
+end
+
+-- ------------------------- x ------------------------- --
+
 M.parse = {}
 
 M.parse.table_to_env = function(o)
@@ -369,68 +448,93 @@ M.parse.table_to_env = function(o)
   end, M.list.sort(r, sort))
 end
 
--- local function table_to_json_tokens(o)
+local empty_dict_tostring = getmetatable(vim.empty_dict()).__tostring
+
+-- local function table_to_json(o)
 --   local r = {}
 --
---   if o[1] == nil then
+--   local keys = M.list.filter(function(v)
+--     return type(v) == "string"
+--   end, M.dictionary.keys(o))
+--
+--   assert(not (#keys > 0 and #o > 0), "Table must be list or dictionary")
+--
+--   if #keys > 0 then
 --     M.list.insert(r, "{")
---
---     for k, _ in pairs(o) do
---       assert(type(k) == "string", "Table must be list or dictionary")
---     end
---
---     for k, v in pairs(o) do
---       M.list.insert(r, vim.json.encode(k))
+--     for _, key in ipairs(M.list.sort(keys)) do
+--       M.list.insert(r, vim.json.encode(key))
+--       local v = o[key]
 --       if type(v) == "table" then
 --         M.list.merge(r, table_to_json_tokens(v))
 --       else
 --         M.list.insert(r, vim.json.encode(v))
 --       end
 --     end
+--     M.list.insert(r, "}")
+--   elseif #o > 0 then
+--     M.list.insert(r, "[")
 --
+--     M.list.map(function(e)
+--       return 
+--     end, M.list.slice(o, 2, #o - 1))
+--
+--     for i = 1, #o, 1 do
+--       local v = o[i]
+--       if type(v) == "table" then
+--         M.list.merge(r, table_to_json_tokens(v))
+--       else
+--         M.list.insert(r, vim.json.encode(v))
+--       end
+--     end
+--     M.list.insert(r, "]")
+--   elseif getmetatable(o).__tostring == empty_dict_tostring then
+--     M.list.insert(r, "{")
 --     M.list.insert(r, "}")
 --   else
 --     M.list.insert(r, "[")
---
---     for i, _ in pairs(o) do
---       assert(type(i) == "number",  "Table must be list or dictionary")
---     end
---
---     for _, v in pairs(o) do
---       if type(v) == "table" then
---         M.list.merge(r, table_to_json_tokens(v))
---       else
---         M.list.insert(r, vim.json.encode(v))
---       end
---     end
---
 --     M.list.insert(r, "]")
 --   end
 --
 --   return r
 -- end
---
--- M.parse.table_to_json = function(o)
---   local tokens =  table_to_json_tokens(o)
---   local depth = 0
+
+-- local function tokens_to_json(l, i)
 --   local r = {}
 --
---   for i = 1, #tokens - 1, 1 do
---     if tokens[i] == "{" then
---       if depth > 0 then
---         r[#r] = r[#r].. ": {"
+--   if l[i] == "{" then
+--     M.list.insert(r, "{")
+--
+--     while l[i] and l[i] ~= "}" do
+--       if l[i] == "{" or l[i] == "[" then
 --       else
---         M.list.insert(r, "{")
+--         -- M.list.insert(r, "  " .. )
 --       end
---       depth = depth + 1
---     elseif tokens[i] == "[" then
---     else
---       assert(false, "Unknown token \"" .. tokens[i] .. "\"")
 --     end
+--
+--     M.list.insert(r, "}")
+--   elseif l[i] == "[" then
+--     M.list.insert(r, "[")
+--
+--     while l[i] and l[i] ~= "}" do
+--       if l[i] == "{" or l[i] == "[" then
+--       else
+--         -- M.list.insert(r, "  " .. )
+--       end
+--     end
+--
+--     M.list.insert(r, "]")
+--   else
+--     assert(false, "Unexpected token \"" .. l[i] .. "\n")
 --   end
---   -- M.list.insert()
 --
 --   return r
+-- end
+
+-- M.parse.table_to_json = function(o)
+--   -- local tokens = table_to_json_tokens(o)
+--   -- local r, _ = tokens_to_json(tokens, 0)
+--   -- return r
+--   return table_to_json(o)
 -- end
 
 local function table_to_toml(o, title)

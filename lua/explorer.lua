@@ -1,6 +1,6 @@
-local promisify_wrap, dictionary, list, notify, fs, random, window = (function()
+local promisify_wrap, dictionary, list, notify, fs, random, String, window = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.dictionary, _.list, _.notify, _.fs, _.random, _.window
+  return _.promisify_wrap, _.dictionary, _.list, _.notify, _.fs, _.random, _.String, _.window
 end)()
 
 local ffi = require("ffi")
@@ -54,11 +54,9 @@ local w = window{
 }
 
 local getcwd = (vim.fn.has("win32") == 1) and function()
-  local r = string.gsub(vim.fn.getcwd() .. "\\", "\\+", "/")
-  return r
+  return String.substitute(vim.fn.getcwd() .. "\\", "\\\\\\+", "/")
 end or function()
-  local r = string.gsub(vim.fn.getcwd() .. "/", "/+", "/")
-  return r
+  return String.substitute(vim.fn.getcwd() .. "/", "/\\+", "/")
 end
 
 local M = {}
@@ -82,23 +80,23 @@ for _, c in ipairs(ESCAPE_CHARACTER) do
 end
 
 M.encode = function(s)
-  local r = string.gsub(s, "[\\\n\r%%]", function(c) return ENCODE_TABLE[c] end)
-  return r
+  return String.substitute(s, "[\\\\\n\r%]", function(c)
+    return ENCODE_TABLE[c]
+  end)
 end
 
 M.decode = (vim.fn.has("win32") == 1) and function(s)
-  return vim.fn.substitute(s, [[\(%.\|/\)]], function(c)
-    return DECODE_TABLE[c[1]]
-  end, "g")
+  return String.substitute(s, "\\(%.\\|/\\)", function(c)
+    return DECODE_TABLE[c]
+  end)
 end or function(s)
-  local r = string.gsub(s, "%%.", function(c) return DECODE_TABLE[c] end)
-  return r
+  return String.substitute(s, "%.", function(c) return DECODE_TABLE[c] end)
 end
 
 local PREFIX = vim.fn.has("win32") == 1 and "file://" or "file:/"
 local PATTERN = "file://*"
 
-M.URL_to_path = function(url) return M.decode(string.sub(url, #PREFIX + 1)) end
+M.URL_to_path = function(url) return M.decode(String.slice(url, #PREFIX + 1)) end
 M.path_to_URL = function(p) return M.encode(PREFIX .. p) end
 
 local parse__is_dir = (vim.fn.has("win32") == 1) and function(str)
@@ -119,7 +117,7 @@ M.parse = function(line)
     end
     line = right
   else
-    if string.match(line, "%%0") then return nil end
+    if String.match(line, "%0") then return nil end
   end
 
   left, right = line:match("^(.+) %%=> (.+)$")
@@ -127,14 +125,14 @@ M.parse = function(line)
     r.name = M.decode(left)
     r.link = M.decode(right)
   else
-    if string.match(line, "%%=>") then return nil end
+    if String.match(line, "%=>") then return nil end
     if line == "" then return nil end
     r.name = M.decode(line)
   end
 
   if parse__is_dir(r.name) then
     r.is_directory = true
-    r.name = string.sub(r.name, 1, #r.name - 1)
+    r.name = String.slice(r.name, 1, #r.name - 1)
   else
     r.is_directory = false
   end
@@ -144,9 +142,9 @@ end
 
 -- TODO: remove pcalls
 local _go = vim.fn.has("win32") == 1 and function(dir)
-  M.dir = string.gsub(dir, "/", "\\")
+  M.dir = String.substitute(dir, "/", "\\")
   w:show()
-  pcall(vim.cmd.edit, { vim.fn.fnameescape(M.path_to_URL(dir)) })
+  pcall(vim.cmd.edit, { vim.fn.fnameescape(M.path_to_URL(String.substitute(dir, "\\\\", "/"))) })
 end or function(dir)
   M.dir = dir
   w:show()
@@ -159,7 +157,7 @@ M.go = function(d)
 end
 
 local select__is_root = (vim.fn.has("win32") == 1) and function(str)
-  return string.match(str, "^%w:\\$")
+  return String.match(str, "^\\w:\\\\$") ~= nil
 end or function(str)
   return str == "/"
 end
@@ -264,7 +262,7 @@ local fn_BufReadCmd = promisify_wrap(function(promise)
     ls = list.map(function(name)
       return {
         is_directory = true,
-        name = string.sub(name, 1, #name - 1),
+        name = String.slice(name, 1, #name - 1),
         type = "directory"
       }
     end, vim.split(ffi.string(C_BUFFER, C.GetLogicalDriveStringsA(C_BUFFER_SIZE, C_BUFFER)), "\0", { trimempty = true }))
@@ -358,7 +356,7 @@ local function fn_BufWriteCmd__parse_buffers()
   local ENTRY_BUFFER
 
   local is_entry_dupped = (vim.fn.has("win32") == 1 or vim.fn.has("mac") == 1) and function(name)
-    name = string.lower(name)
+    name = String.lower(name)
     if ENTRY_BUFFER[name] then return true end
     ENTRY_BUFFER[name] = true
     return false
@@ -388,7 +386,7 @@ local function fn_BufWriteCmd__parse_buffers()
 
     buffer_ls = list.map(function(f)
       local t = M.parse(f)
-      if not t or string.match(t.name, "/") then
+      if not t or String.match(t.name, "/") then
         list.insert(string_builder, "  PARSING ERROR:\n    >> " .. f)
         error = true
       elseif is_entry_dupped(t.name) then
@@ -407,7 +405,7 @@ local function fn_BufWriteCmd__parse_buffers()
     end
 
     local p = M.URL_to_path(vim.api.nvim_buf_get_name(id))
-    list.insert(r, { string.sub(p, 1, #p - 1), buffer_ls, b[2] })
+    list.insert(r, { String.slice(p, 1, #p - 1), buffer_ls, b[2] })
 
     ::continue::
   end
@@ -541,7 +539,7 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
         fs.remove(t[2]):await()
         tf.gone = true
         if vim.fn.isdirectory(t[2]) == 1 then
-          local dir = string.sub(vim.fn.undofile(t[2]), #undodir + 2)
+          local dir = String.slice(vim.fn.undofile(t[2]), #undodir + 2)
           for _, f in ipairs(vim.fn.globpath(undodir, dir .. "*", 1, true, 1)) do
             -- fs.remove(f):await():unwrap()
             fs.remove(f):await()
@@ -580,10 +578,10 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
         end
         local action = tf.gone and fs.move or fs.copy
         if vim.fn.isdirectory(t[3]) == 1 then
-          local src_dir = string.sub(vim.fn.undofile(t[2]), #undodir + 2)
+          local src_dir = String.slice(vim.fn.undofile(t[2]), #undodir + 2)
           local trim_len = #undodir + 2 + #src_dir
           for _, f in ipairs(vim.fn.globpath(undodir, src_dir .. "*", 1, true, 1)) do
-            action(f, vim.fn.undofile(t[3]) .. string.sub(f, trim_len)):await():unwrap()
+            action(f, vim.fn.undofile(t[3]) .. String.slice(f, trim_len)):await():unwrap()
           end
         else
           local src_undo = vim.fn.undofile(t[2])
@@ -598,10 +596,10 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
   for _, lm in ipairs(last_move) do
     fs.move(lm[1], lm[2]):await():unwrap()
     if vim.fn.isdirectory(lm[2]) == 1 then
-      local src_dir = string.sub(vim.fn.undofile(lm[1]), #undodir + 2)
+      local src_dir = String.slice(vim.fn.undofile(lm[1]), #undodir + 2)
       local trim_len = #undodir + 2 + #src_dir
       for _, f in ipairs(vim.fn.globpath(undodir, src_dir .. "*", 1, true, 1)) do
-        fs.move(f, vim.fn.undofile(lm[2]) .. string.sub(f, trim_len)):await():unwrap()
+        fs.move(f, vim.fn.undofile(lm[2]) .. String.slice(f, trim_len)):await():unwrap()
       end
     else
       local src_undo = vim.fn.undofile(lm[1])
@@ -638,9 +636,9 @@ vim.api.nvim_create_autocmd({ "CursorMovedI", "CursorMoved", "ModeChanged" }, {
   pattern = PATTERN,
   callback = function(ev)
     local y, x = unpack(vim.api.nvim_win_get_cursor(0))
-    local padding = vim.fn.match(vim.api.nvim_buf_get_lines(ev.buf, y - 1, y, true)[1] or "","%0\\zs\\C") + 1
+    local padding = String.match(vim.api.nvim_buf_get_lines(ev.buf, y - 1, y, true)[1] or "","%0\\zs\\C")
 
-    if x < padding then
+    if padding and x < padding then
       vim.api.nvim_win_set_cursor(0, { y, padding })
     end
   end
@@ -649,10 +647,10 @@ vim.api.nvim_create_autocmd({ "CursorMovedI", "CursorMoved", "ModeChanged" }, {
 local insert_buffer = vim.fn.has("win32") == 1 and function(id)
   local b = { id, nil }
   list.insert(BUFFERS, b)
-  if (#M.dir == 0) or string.match(M.dir,"^%w:\\$") then
+  if (#M.dir == 0) or String.match(M.dir,"^\\w:\\\\$") then
     BUFFERS_BY_PATH[M.dir] = b
   else
-    BUFFERS_BY_PATH[string.sub(M.dir, 1, #M.dir -1)] = b
+    BUFFERS_BY_PATH[String.slice(M.dir, 1, #M.dir -1)] = b
   end
 end or function(id)
   local b = { id, nil }
@@ -660,7 +658,7 @@ end or function(id)
   if M.dir == "/" then
     BUFFERS_BY_PATH[M.dir] = b
   else
-    BUFFERS_BY_PATH[string.sub(M.dir, 1, #M.dir -1)] = b
+    BUFFERS_BY_PATH[String.slice(M.dir, 1, #M.dir -1)] = b
   end
 end
 
@@ -719,10 +717,14 @@ vim.api.nvim_create_autocmd("BufEnter", {
       vim.api.nvim_win_set_buf(win, vim.api.nvim_create_buf(false, true))
     end
 
-    vim.api.nvim_win_set_config(w.win, {
-      title = " " .. vim.fn.fnamemodify(M.encode(M.dir), ":~") .. " ",
-      title_pos = "center"
-    })
+    if vim.fn.has("win32") == 1 and #M.dir == 0 then
+      vim.api.nvim_win_set_config(w.win, { title = " DISKS ", title_pos = "center" })
+    else
+      vim.api.nvim_win_set_config(w.win, {
+        title = " " .. vim.fn.fnamemodify(M.encode(M.dir), ":~") .. " ",
+        title_pos = "center"
+      })
+    end
 
     M.history_push()
   end)
@@ -737,7 +739,7 @@ vim.api.nvim_create_autocmd("BufEnter", {
       vim.api.nvim_buf_set_name(0, "")
     end
     local slash = vim.fn.has("win32") == 1 and "\\" or "/"
-    M.go(string.sub(ev.file, -1) == slash and ev.file or (ev.file .. slash))
+    M.go(String.slice(ev.file, -1) == slash and ev.file or (ev.file .. slash))
   end)
 })
 
@@ -752,10 +754,10 @@ return {
   end,
 
   go_up = vim.fn.has("win32") == 1 and function()
-    if (#M.dir == 0) or string.match(M.dir,"^%w:\\$") then
+    if (#M.dir == 0) or String.match(M.dir,"^\\w:\\\\$") then
       M.go("")
     else
-      local p = string.gsub(vim.fs.normalize(M.dir .. "..") .. "/", "/+", "/")
+      local p = String.substitute(vim.fs.normalize(M.dir .. "..") .. "/", "/\\+", "/")
       M.go(p)
     end
   end or function()

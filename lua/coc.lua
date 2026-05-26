@@ -1,6 +1,6 @@
-local fs, list, promisify_wrap, sh, window = (function()
+local fs, list, promisify_wrap, sh, String, window = (function()
   local _ = require("_")
-  return _.fs, _.list, _.promisify_wrap, _.sh, _.window
+  return _.fs, _.list, _.promisify_wrap, _.sh, _.String, _.window
 end)()
 
 local M = {}
@@ -138,7 +138,7 @@ local menu = window{
     -- https://github.com/fannheyward/coc-marketplace
     local lines = list.map(function(e)
       local sign = filter[e.name] and "✓" or " "
-      return string.format("[%s] %-30s %s", sign, e.name, e.description)
+      return String.format("[%s] %-30s %s", sign, e.name, e.description)
     end, ALL_EXTENSIONS)
 
     vim.bo.modifiable = true
@@ -177,7 +177,7 @@ M.marketplace.option.toggle = function()
 
   local min, max = (function()
     local mode = vim.api.nvim_get_mode().mode
-    if mode ~= "\022" and string.lower(mode) ~= "v" then
+    if mode ~= "\022" and String.lower(mode) ~= "v" then
       local r = vim.api.nvim_win_get_cursor(0)[1]
       return r, r
     end
@@ -192,7 +192,7 @@ M.marketplace.option.toggle = function()
 
   for i = min, max, 1 do
     local l = vim.fn.getline(i)
-    local sign = string.gsub(l, "^%[(.*)%].*", "%1")
+    local sign = String.substitute(l, "^\\[\\(.*\\)\\].*", "\\1")
 
     local new_sign
     local e = ALL_EXTENSIONS[i]
@@ -205,7 +205,7 @@ M.marketplace.option.toggle = function()
 
     vim.schedule(function()
       vim.bo.modifiable = true
-      vim.fn.setline(i, string.format("[%s] %-30s %s", new_sign, e.name, e.description))
+      vim.fn.setline(i, String.format("[%s] %-30s %s", new_sign, e.name, e.description))
       vim.bo.modifiable = false
     end)
   end
@@ -217,7 +217,7 @@ M.marketplace.run = function()
   local to_install, to_uninstall = {}, {}
 
   for i, l in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, true)) do
-    local sign = string.gsub(l, "^%[(.*)%].*", "%1")
+    local sign = String.substitute(l, "^\\[\\(.*\\)\\].*", "\\1")
     if sign == "✗" then
       list.insert(to_uninstall, ALL_EXTENSIONS[i].name)
     elseif sign == "~" then

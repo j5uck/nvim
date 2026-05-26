@@ -23,27 +23,6 @@ vim.g.loaded_perl_provider = 0
 vim.g.loaded_python3_provider = 0
 vim.g.loaded_ruby_provider = 0
 
--- TODO: Send patch???
-for _, line in ipairs(vim.opt.runtimepath:get()) do
-  if vim.fn.match(line, "[\\/]nvim[\\/]runtime$") > -1 then
-    local magic = vim.split("^$()%.[]*+-?", "")
-
-    local p = string.gsub(line, ".", function(c)
-      for _, e in ipairs(magic) do
-        if e == c then return "%" .. c end
-      end
-      return c
-    end) .. "/doc/.*%.txt"
-
-    if vim.fn.has("win32") == 1 then
-      p = string.gsub(p, "\\+", "/")
-    end
-
-    vim.filetype.add{ pattern = { [p] = "help" } }
-    break
-  end
-end
-
 vim.go.shortmess = "AacCFIoOqstT"
 
 vim.cmd[[set nocompatible]]
@@ -183,10 +162,29 @@ elseif vim.g.neoray then
   vim.cmd[[NeoraySet WindowState centered]]
 end
 
-local promisify_wrap, fs, list, notify, sh, window = (function()
+local promisify_wrap, fs, list, notify, String, window = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.fs, _.list, _.notify, _.sh, _.window
+  return _.promisify_wrap, _.fs, _.list, _.notify, _.String, _.window
 end)()
+
+-- TODO: Send patch???
+for _, line in ipairs(vim.opt.runtimepath:get()) do
+  if String.match(line, "[\\/]nvim[\\/]runtime$") then
+    local magic = vim.split("^$()%.[]*+-?", "")
+
+    local p = list.join(list.map(function(c)
+      if list.contains(magic, c) then return "%" .. c end
+      return c
+    end, vim.split(line, "")), "") .. "/doc/.*%.txt"
+
+    if vim.fn.has("win32") == 1 then
+      p = String.substitute(p, "\\\\+", "/")
+    end
+
+    vim.filetype.add{ pattern = { [p] = "help" } }
+    break
+  end
+end
 
 local loc = promisify_wrap(function(promise)
   local files = {}
@@ -221,10 +219,10 @@ local loc = promisify_wrap(function(promise)
   local sb = {}
   local format = "%" .. (math.floor(math.log(total) / math.log(10)) + 1) .. "d :: %s"
   for _, f in ipairs(files) do
-    list.insert(sb, string.format(format, f[1], f[2]))
+    list.insert(sb, String.format(format, f[1], f[2]))
   end
   list.insert(sb, "")
-  list.insert(sb, string.format(format, total, "total"))
+  list.insert(sb, String.format(format, total, "total"))
 
   notify.warn(list.join(sb, "\n"))
 
@@ -241,7 +239,7 @@ vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter" }, {
     pcall(function()
       local win = vim.api.nvim_get_current_win()
 
-      if vim.fn.match(vim.api.nvim_buf_get_name(e.buf), "^term://") == 0 then
+      if String.match(vim.api.nvim_buf_get_name(e.buf), "^term://") then
         vim.api.nvim_win_set_hl_ns(win, term_ns)
       elseif vim.api.nvim_get_hl_ns({ winid = win }) == term_ns then
         vim.api.nvim_win_set_hl_ns(win, 0)
@@ -325,7 +323,7 @@ local rec = window{
     vim.wo.scrolloff = 0
     vim.wo.sidescrolloff = 0
 
-    local r = string.upper(vim.fn.reg_recording())
+    local r = String.upper(vim.fn.reg_recording())
     vim.api.nvim_buf_set_lines(self.buf, 0, -1, true, { " REC @" .. r })
   end,
   hl = function() return { Normal = { link = "ErrorMsg" }} end,
