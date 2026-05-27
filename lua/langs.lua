@@ -355,12 +355,21 @@ M.bun.code["src/assert.ts"] = {
   "  }",
   "}",
   "",
-  "export default <T>(value: T, message?: string): T => {",
-  "  if(value)",
-  "    return value;",
+  "// TODO: Add NaN",
+  "// SEE: https://github.com/Microsoft/TypeScript/issues/28682",
+  "type falsy = false | 0 | \"\" | null | undefined",
+  "",
+  "function assert(value: falsy, message?: string): never;",
+  "function assert<T>(value: T, message?: string): T;",
+  "",
+  "function assert<T>(value: T, message?: string): Exclude<T, falsy> {",
+  "  if (value)",
+  "    return value as Exclude<T, falsy>;",
   "  else",
   "    throw new AssertionError(message);",
-  "}"
+  "}",
+  "",
+  "export default assert;"
 }
 M.bun.code["src/terminal.ts"] = {
   "export const CLEAN: string = \"\\x1B[H\\x1B[2J\";",
