@@ -25,6 +25,7 @@ end
 M.String.slice = string.sub
 M.String.split = vim.split
 M.String.substitute = function(s, pattern, sub)
+  assert(type(s) == "string", "s: expected string, got " .. type(s))
   local _sub = type(sub) == "function" and function(e)
     if not e then
       return ""
@@ -43,23 +44,23 @@ M.String.lower = string.lower
 M.String.rep = string.rep
 M.String.reverse = string.reverse
 
-M.list = {}
-M.list.contains = vim.tbl_contains
-M.list.join = table.concat
-M.list.sort = function(l, s)
+M.List = {}
+M.List.contains = vim.tbl_contains
+M.List.join = table.concat
+M.List.sort = function(l, s)
   if s == nil then
     return vim.fn.sort(l, "i")
   elseif type(s) == "function" then
-    local r = M.list.clone(l)
+    local r = M.List.clone(l)
     table.sort(r, s)
     return r
   else
     assert(false, "Sorter must be a function or nil")
   end
 end
-M.list.reverse = vim.fn.reverse
-M.list.map = function(fn, l)
-  l = M.list.clone(l)
+M.List.reverse = vim.fn.reverse
+M.List.map = function(fn, l)
+  l = M.List.clone(l)
   local len = 0
   local keys = vim.tbl_keys(l)
 
@@ -76,19 +77,19 @@ M.list.map = function(fn, l)
 
   return l
 end
-M.list.filter = vim.tbl_filter
-M.list.uniq = function(l)
+M.List.filter = vim.tbl_filter
+M.List.uniq = function(l)
   local r = {}
   local d = {}
   for _, e in ipairs(l) do
     if not d[e] then
       d[e] = true
-      M.list.insert(r, e)
+      M.List.insert(r, e)
     end
   end
   return r
 end
-M.list.fill = function(l, value, n)
+M.List.fill = function(l, value, n)
   if type(value) == "table" then
     for i = 1, n, 1 do
       l[i] = vim.deepcopy(value)
@@ -100,23 +101,23 @@ M.list.fill = function(l, value, n)
   end
   return l
 end
-M.list.slice = vim.list_slice
-M.list.clone = function(t) return vim.list_slice(t, 1, #t) end
-M.list.insert = function(l, ...)
+M.List.slice = vim.list_slice
+M.List.clone = function(t) return vim.list_slice(t, 1, #t) end
+M.List.insert = function(l, ...)
   table.insert(l, ...)
   return l
 end
-M.list.push = function(l, e)
+M.List.push = function(l, e)
   table.insert(l, e)
   return l
 end
-M.list.remove = table.remove
-M.list.pop = function(l)
+M.List.remove = table.remove
+M.List.pop = function(l)
   local r = l[#l]
   l[#l] = nil
   return r
 end
-M.list.merge = function(...)
+M.List.merge = function(...)
   local r = ({...})[1]
   for _, t in ipairs{...}, {...}, 1 do
     vim.list_extend(r, t)
@@ -124,19 +125,19 @@ M.list.merge = function(...)
   return r
 end
 
-M.dictionary = {}
-M.dictionary.isempty = vim.tbl_isempty
-M.dictionary.clone = function(d)
+M.Dictionary = {}
+M.Dictionary.isempty = vim.tbl_isempty
+M.Dictionary.clone = function(d)
   local r = {}
   for _, k in ipairs(vim.tbl_keys(d)) do
     r[k] = d[k]
   end
   return r
 end
-M.dictionary.deep_clone = vim.deepcopy
-M.dictionary.keys = vim.tbl_keys
-M.dictionary.merge = function(...) return vim.tbl_extend("force", ...) end
-M.dictionary.deep_merge = function(...) return vim.tbl_deep_extend("force", ...) end
+M.Dictionary.deep_clone = vim.deepcopy
+M.Dictionary.keys = vim.tbl_keys
+M.Dictionary.merge = function(...) return vim.tbl_extend("force", ...) end
+M.Dictionary.deep_merge = function(...) return vim.tbl_deep_extend("force", ...) end
 
 -- ------------------------- x ------------------------- --
 
@@ -211,7 +212,7 @@ function RingBuffer:clear()
   return self
 end
 
-M.ringbuffer = function(capacity)
+M.RingBuffer = function(capacity)
   assert(type(capacity) == "number", "Capacity must be a number")
 
   local self = { capacity = capacity }
@@ -242,9 +243,9 @@ M.log = function(...)
   local len = select("#", ...)
   for i = 1, len, 1 do
     local e = select(i, ...)
-    M.list.insert(sb, vim.inspect(e))
+    M.List.insert(sb, vim.inspect(e))
   end
-  vim.schedule_wrap(vim.notify)(M.list.join(sb, "\n"), W)
+  vim.schedule_wrap(vim.notify)(M.List.join(sb, "\n"), W)
 end
 
 -- ------------------------- x ------------------------- --
@@ -333,7 +334,7 @@ function Promise:await()
 
   vim.schedule(function()
     if self.code == nil then
-      M.list.insert(self.awaiting, function()
+      M.List.insert(self.awaiting, function()
         coroutine.resume(co)
       end)
     else
@@ -370,7 +371,7 @@ end
 function Promise:finally(fn)
   vim.schedule(function()
     if self.code == nil then
-      M.list.insert(self.awaiting, function() fn(self) end)
+      M.List.insert(self.awaiting, function() fn(self) end)
     else
       fn(self)
     end
@@ -431,12 +432,12 @@ M.parse.table_to_env = function(o)
   for k, v in pairs(o) do
     assert(type(k) == "string", "Only dictionaries are allowed")
     assert(type(v) ~= "table", "Tables are not supported")
-    M.list.insert(r, { k, vim.json.encode(v) })
+    M.List.insert(r, { k, vim.json.encode(v) })
   end
 
-  return M.list.map(function(v)
+  return M.List.map(function(v)
     return v[1] .. "=" .. v[2]
-  end, M.list.sort(r, sort))
+  end, M.List.sort(r, sort))
 end
 
 -- local empty_dict_tostring = getmetatable(vim.empty_dict()).__tostring
@@ -444,46 +445,46 @@ end
 -- local function table_to_json(o)
 --   local r = {}
 --
---   local keys = M.list.filter(function(v)
+--   local keys = M.List.filter(function(v)
 --     return type(v) == "string"
---   end, M.dictionary.keys(o))
+--   end, M.Dictionary.keys(o))
 --
 --   assert(not (#keys > 0 and #o > 0), "Table must be list or dictionary")
 --
 --   if #keys > 0 then
---     M.list.insert(r, "{")
---     for _, key in ipairs(M.list.sort(keys)) do
---       M.list.insert(r, vim.json.encode(key))
+--     M.List.insert(r, "{")
+--     for _, key in ipairs(M.List.sort(keys)) do
+--       M.List.insert(r, vim.json.encode(key))
 --       local v = o[key]
 --       if type(v) == "table" then
---         M.list.merge(r, table_to_json_tokens(v))
+--         M.List.merge(r, table_to_json_tokens(v))
 --       else
---         M.list.insert(r, vim.json.encode(v))
+--         M.List.insert(r, vim.json.encode(v))
 --       end
 --     end
---     M.list.insert(r, "}")
+--     M.List.insert(r, "}")
 --   elseif #o > 0 then
---     M.list.insert(r, "[")
+--     M.List.insert(r, "[")
 --
---     M.list.map(function(e)
+--     M.List.map(function(e)
 --       return 
---     end, M.list.slice(o, 2, #o - 1))
+--     end, M.List.slice(o, 2, #o - 1))
 --
 --     for i = 1, #o, 1 do
 --       local v = o[i]
 --       if type(v) == "table" then
---         M.list.merge(r, table_to_json_tokens(v))
+--         M.List.merge(r, table_to_json_tokens(v))
 --       else
---         M.list.insert(r, vim.json.encode(v))
+--         M.List.insert(r, vim.json.encode(v))
 --       end
 --     end
---     M.list.insert(r, "]")
+--     M.List.insert(r, "]")
 --   elseif getmetatable(o).__tostring == empty_dict_tostring then
---     M.list.insert(r, "{")
---     M.list.insert(r, "}")
+--     M.List.insert(r, "{")
+--     M.List.insert(r, "}")
 --   else
---     M.list.insert(r, "[")
---     M.list.insert(r, "]")
+--     M.List.insert(r, "[")
+--     M.List.insert(r, "]")
 --   end
 --
 --   return r
@@ -493,27 +494,27 @@ end
 --   local r = {}
 --
 --   if l[i] == "{" then
---     M.list.insert(r, "{")
+--     M.List.insert(r, "{")
 --
 --     while l[i] and l[i] ~= "}" do
 --       if l[i] == "{" or l[i] == "[" then
 --       else
---         -- M.list.insert(r, "  " .. )
+--         -- M.List.insert(r, "  " .. )
 --       end
 --     end
 --
---     M.list.insert(r, "}")
+--     M.List.insert(r, "}")
 --   elseif l[i] == "[" then
---     M.list.insert(r, "[")
+--     M.List.insert(r, "[")
 --
 --     while l[i] and l[i] ~= "}" do
 --       if l[i] == "{" or l[i] == "[" then
 --       else
---         -- M.list.insert(r, "  " .. )
+--         -- M.List.insert(r, "  " .. )
 --       end
 --     end
 --
---     M.list.insert(r, "]")
+--     M.List.insert(r, "]")
 --   else
 --     assert(false, "Unexpected token \"" .. l[i] .. "\n")
 --   end
@@ -535,13 +536,13 @@ local function table_to_toml(o, title)
   for k, v in pairs(o) do
     assert(type(k) == "string", "Only dictionaries are allowed")
     if type(v) == "table" then
-      M.list.merge(objects, table_to_toml(v, title .. k .. "."))
+      M.List.merge(objects, table_to_toml(v, title .. k .. "."))
     else
-      M.list.insert(primitives, { k, vim.json.encode(v) })
+      M.List.insert(primitives, { k, vim.json.encode(v) })
     end
   end
 
-  return M.list.merge({ { title, primitives } }, objects)
+  return M.List.merge({ { title, primitives } }, objects)
 end
 
 M.parse.table_to_toml = function(o)
@@ -550,25 +551,25 @@ M.parse.table_to_toml = function(o)
     return (c == 0) and (a[1] < b[1]) or (c == -1)
   end
 
-  local parsed = M.list.sort(table_to_toml(o, ""), sort)
+  local parsed = M.List.sort(table_to_toml(o, ""), sort)
   local r = {}
   for _, section in ipairs(parsed) do
     local section_name = section[1]
-    local section_value = M.list.sort(section[2], sort)
+    local section_value = M.List.sort(section[2], sort)
 
     if #section_name > 0 then
-      M.list.insert(r, "[" .. string.sub(section_name, 1, #section_name - 1) .. "]")
+      M.List.insert(r, "[" .. string.sub(section_name, 1, #section_name - 1) .. "]")
     end
 
     for _, item in ipairs(section_value) do
       local key = item[1]
       local value = item[2]
-      M.list.insert(r, key .. " = " .. value)
+      M.List.insert(r, key .. " = " .. value)
     end
-    M.list.insert(r, "")
+    M.List.insert(r, "")
   end
 
-  M.list.remove(r, #r)
+  M.List.remove(r, #r)
   return r
 end
 
@@ -767,10 +768,15 @@ M.fs.remove = M.promisify_wrap(function(promise, src)
   end
 end)
 
-M.fs.readfile = M.promisify_wrap(function(promise, file, type)
-  local status, result = pcall(vim.fn.readfile, file, type)
+M.fs.readfile = M.promisify_wrap(function(promise, file, opts)
+  opts = opts or {}
+  local status, result = pcall(vim.fn.readblob, file, opts.offset or 0, opts.size or -1)
   if status then
-    return promise:resolve(result)
+    if opts.raw then
+      return promise:resolve(result)
+    else
+      return promise:resolve(M.String.split(result, "\r?\n"))
+    end
   else
     return promise:reject(result)
   end
@@ -819,12 +825,12 @@ M.fs.ls = M.promisify_wrap(function(promise, path)
 
   local content = vim.uv.fs_readdir(fd) or {}
   for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
-    M.list.merge(content, t)
+    M.List.merge(content, t)
   end
   vim.uv.fs_closedir(fd)
 
   if vim.fn.has("win32") == 1 then
-    content = M.list.filter(function(e) return e.type ~= "link" end, content)
+    content = M.List.filter(function(e) return e.type ~= "link" end, content)
   end
 
   for _, e in ipairs(content) do
@@ -840,7 +846,7 @@ M.fs.ls = M.promisify_wrap(function(promise, path)
     ::continue::
   end
 
-  return promise:resolve(M.list.sort(content, function(a, b)
+  return promise:resolve(M.List.sort(content, function(a, b)
     if a.is_directory ~= b.is_directory then return a.is_directory end
 
     local fa, fb = string.sub(a.name, 1, 1) == ".", string.sub(b.name, 1, 1) == "."
@@ -866,9 +872,9 @@ M.fs.find = M.promisify_wrap((function()
         if e.type == "directory" then
           local f = find(promise, regex, path .. "/" .. e.name)
           if not f then return nil end
-          M.list.merge(r, f)
+          M.List.merge(r, f)
         elseif vim.fn.match(e.name, regex) > -1 then
-          M.list.insert(r, path .. "/" .. e.name)
+          M.List.insert(r, path .. "/" .. e.name)
         end
       end
     end
@@ -889,7 +895,7 @@ M.fs.find = M.promisify_wrap((function()
     local f = find(promise, regex, path)
     if not f then return nil end
 
-    return promise:resolve(M.list.map(function(e)
+    return promise:resolve(M.List.map(function(e)
       return string.sub(e, pre)
     end, f))
   end
@@ -932,10 +938,10 @@ M.git.init = M.promisify_wrap(function(promise, o)
   if not o then o = {} end
   if not o.cwd then o.cwd = "." end
 
-  local go = M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
+  local go = M.Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
   local ls = M.fs.ls(o.cwd):await():unwrap()
 
-  if #M.list.filter(function(e) return e.name == ".git" and e.is_directory end, ls) == 1 then
+  if #M.List.filter(function(e) return e.name == ".git" and e.is_directory end, ls) == 1 then
     M.git.config(o):await():unwrap()
     M.notify.warn("Repository already inited")
     return promise:resolve()
@@ -960,13 +966,13 @@ M.git.clone = M.promisify_wrap(function(promise, o)
   local cmd = o.shallow and
     { "git", "clone", "--shallow-submodules", "--depth=1", "--progress", "--", o.url, o.cwd } or
     { "git", "clone", "--shallow-submodules", "--progress", "--", o.url, o.cwd }
-  M.sh(cmd, M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })):await():unwrap()
+  M.sh(cmd, M.Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })):await():unwrap()
   return promise:resolve()
 end)
 
 M.git.fetch = M.promisify_wrap(function(promise, o)
   if not o then o = {} end
-  local go = M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd or "." })
+  local go = M.Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd or "." })
 
   M.sh({ "git", "status" }, go):await():unwrap()
 
@@ -996,13 +1002,13 @@ end)
 M.git.config = M.promisify_wrap(function(promise, o)
   if not o then o = {} end
   if not o.cwd then o.cwd = "." end
-  M.sh({ "git", "status" }, M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })):await():unwrap()
+  M.sh({ "git", "status" }, M.Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })):await():unwrap()
 
-  local go = M.dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
+  local go = M.Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
   o.cwd = nil
 
-  for _, k in ipairs(M.dictionary.keys(o)) do
-    assert(M.list.contains({ "name", "email", "url" }, k), "Unknown option \"" .. k .. "\n")
+  for _, k in ipairs(M.Dictionary.keys(o)) do
+    assert(M.List.contains({ "name", "email", "url" }, k), "Unknown option \"" .. k .. "\n")
   end
 
   if o.name then
@@ -1031,7 +1037,7 @@ function Window:show()
     self.buf = vim.api.nvim_create_buf(false, true)
   end
 
-  self.win = vim.api.nvim_open_win(self.buf, self.focus, M.dictionary.merge({
+  self.win = vim.api.nvim_open_win(self.buf, self.focus, M.Dictionary.merge({
     relative = "editor",
     style = "minimal",
     border = self.border,
@@ -1060,7 +1066,7 @@ function Window:toggle()
   end
 end
 
-M.window = function(conf)
+M.Window = function(conf)
   assert(conf.size, "Size is missing!")
 
   local self = {}
@@ -1071,7 +1077,7 @@ M.window = function(conf)
   self.size = conf.size
   self.on_show = { conf.on_show }
   self.on_resize = { conf.on_resize }
-  M.list.insert(self.on_resize, function(_)
+  M.List.insert(self.on_resize, function(_)
     local s = self.size()
     s.relative = "editor"
     vim.api.nvim_win_set_config(self.win, s)
@@ -1088,7 +1094,7 @@ M.window = function(conf)
       end
     end }
 
-    M.list.insert(self.on_show, function()
+    M.List.insert(self.on_show, function()
       vim.api.nvim_win_set_hl_ns(self.win, self.ns)
       for _, fn in ipairs(self.on_colorscheme) do fn(self) end
     end)

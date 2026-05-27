@@ -1,13 +1,13 @@
-local promisify_wrap, dictionary, flags, fs, git, list, notify, notify_once, prequire_wrap, sh, String = (function()
+local promisify_wrap, Dictionary, flags, fs, git, List, notify, notify_once, prequire_wrap, sh, String = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.dictionary, _.flags, _.fs, _.git, _.list, _.notify, _.notify_once, _.prequire_wrap, _.sh, _.String
+  return _.promisify_wrap, _.Dictionary, _.flags, _.fs, _.git, _.List, _.notify, _.notify_once, _.prequire_wrap, _.sh, _.String
 end)()
 
 local joinpath = vim.fn.has("win32") == 1 and function(...)
-  local r = String.substitute(list.join({...}, "\\"), "[\\\\/]+", "\\")
+  local r = String.substitute(List.join({...}, "\\"), "[\\\\/]+", "\\")
   return r
 end or function(...)
-  local r = String.substitute(list.join({...}, "/"), "/+", "/")
+  local r = String.substitute(List.join({...}, "/"), "/+", "/")
   return r
 end
 
@@ -20,7 +20,7 @@ local function runtimepath()
   local rtp, rtp_after = vim.opt.runtimepath:get(), {}
   for i, v in ipairs(rtp) do
     if String.match(v, "after$") then
-      rtp, rtp_after = list.slice(rtp, 1, i-1), list.slice(rtp, i, #rtp)
+      rtp, rtp_after = List.slice(rtp, 1, i-1), List.slice(rtp, i, #rtp)
       break
     end
   end
@@ -33,13 +33,13 @@ local function runtimepath()
   for _, name in ipairs(PLUGS_ORDER) do
     local d = joinpath(PLUG_HOME, name)
     if (not exists[d]) and vim.fn.isdirectory(d) == 1 then
-      list.insert(rtp, d)
+      List.insert(rtp, d)
       local a = vim.fn.globpath(d, "after")
-      if #a > 0 then list.insert(rtp_after, a) end
+      if #a > 0 then List.insert(rtp_after, a) end
     end
   end
 
-  vim.opt.runtimepath = list.merge(rtp, rtp_after)
+  vim.opt.runtimepath = List.merge(rtp, rtp_after)
 end
 
 PLUG_SYNC.fn = {}
@@ -70,16 +70,16 @@ local run = promisify_wrap(function(promise, args)
 
   local todo = { errors = false }
   if #args.fargs == 0 then
-    todo.plugs = list.slice(PLUGS_ORDER, 1, #PLUGS_ORDER)
+    todo.plugs = List.slice(PLUGS_ORDER, 1, #PLUGS_ORDER)
   else
     local missing = {}
     for _, name in ipairs(args.fargs) do
       if not PLUGS[name] then
-        list.insert(missing, name)
+        List.insert(missing, name)
       end
     end
     if #missing > 0 then
-      return promise:reject("Plugin" .. (#missing == 1 and "" or "s") .. " not configured:\n  >>" .. list.join(missing, "\n  >>"))
+      return promise:reject("Plugin" .. (#missing == 1 and "" or "s") .. " not configured:\n  >>" .. List.join(missing, "\n  >>"))
     end
 
     todo.plugs = args.fargs
@@ -109,18 +109,18 @@ local run = promisify_wrap(function(promise, args)
   todo.untracked = (function()
     local l = fs.ls(PLUG_HOME):await():unwrap()
 
-    local u = list.map(function(e)
+    local u = List.map(function(e)
       return e.name
     end, l)
 
-    return list.filter(function(name)
+    return List.filter(function(name)
       return PLUGS[name] == nil
     end, u)
   end)()
 
   if (#args.fargs == 0) and (#todo.untracked > 0) then
     set_lines(0, -1, { "", "", "", "", "" })
-    set_lines(5, -1, list.map(function(v) return "- "..v end, todo.untracked))
+    set_lines(5, -1, List.map(function(v) return "- "..v end, todo.untracked))
 
     vim.cmd.redraw()
     local answer = vim.fn.input("Delete untracked plugins? (y/N)")
@@ -130,7 +130,7 @@ local run = promisify_wrap(function(promise, args)
       for _, u in ipairs(todo.untracked) do
         local p = fs.remove(joinpath(PLUG_HOME, u))
         p.meta = { untracked = u }
-        list.insert(promises, p)
+        List.insert(promises, p)
       end
       for _, p in ipairs(promises) do
         if p:await().code ~= 0 then
@@ -143,15 +143,15 @@ local run = promisify_wrap(function(promise, args)
   todo.untracked = (#args.fargs > 0) and {} or (function()
     local l = fs.ls(PLUG_HOME):await():unwrap()
 
-    local u = list.map(function(e)
+    local u = List.map(function(e)
       return e.name
     end, l)
 
-    return list.filter(function(name)
+    return List.filter(function(name)
       return PLUGS[name] == nil
     end, u)
   end)()
-  todo.plugs = list.sort(list.merge(todo.plugs, todo.untracked))
+  todo.plugs = List.sort(List.merge(todo.plugs, todo.untracked))
   todo.untracked = nil
 
   vim.api.nvim_buf_call(PLUG_SYNC.buf, function()
@@ -188,7 +188,7 @@ local run = promisify_wrap(function(promise, args)
         todo.errors = true
       end
     end)
-    list.insert(todo.promises, p)
+    List.insert(todo.promises, p)
 
     ::continue::
   end
@@ -226,7 +226,7 @@ local run = promisify_wrap(function(promise, args)
         todo.errors = true
       end
     end)
-    list.insert(todo.promises, p)
+    List.insert(todo.promises, p)
 
     ::continue::
   end
@@ -255,7 +255,7 @@ local run = promisify_wrap(function(promise, args)
     if not build then goto continue end
 
     set_lines(i-1, i, { "+ " .. name .. ": Building..." })
-    list.insert(todo.build, { name = name, i = i, build = build })
+    List.insert(todo.build, { name = name, i = i, build = build })
 
     ::continue::
   end
@@ -308,7 +308,7 @@ end
 
 vim.api.nvim_create_user_command("PlugSync", command_sync, {
   complete = function(search)
-    return list.sort(list.filter(function(name)
+    return List.sort(List.filter(function(name)
       return String.startswith(name, search)
     end, PLUGS_ORDER))
   end,
@@ -322,7 +322,7 @@ local function plug(plugin)
     return String.endswith(r, ".git") and String.slice(r, 1, #r - 4) or r
   end)()
 
-  if not PLUGS[name] then list.insert(PLUGS_ORDER, name) end
+  if not PLUGS[name] then List.insert(PLUGS_ORDER, name) end
 
   PLUGS[name] = {
     url = plugin[1],
@@ -475,7 +475,7 @@ plug{
       },
       extensions = {
         ["ui-select"] = {
-          dictionary.deep_merge(require("telescope.themes").get_dropdown(), {
+          Dictionary.deep_merge(require("telescope.themes").get_dropdown(), {
             borderchars = {
               prompt  = { "─", "│", "─", "│", "╭", "╮", "╯", "╰" },
               results = { "─", "│", "─", "│", "╭", "╮", "╯", "╰" },
@@ -599,7 +599,7 @@ plug{
     local function ll(filetype, sl, sr)
       sl = sl or {}
       sr = sr or {}
-      list.insert(extensions, {
+      List.insert(extensions, {
         sections = {
           lualine_a = sl[1] and { sl[1] } or nil,
           lualine_b = sl[2] and { sl[2] } or nil,

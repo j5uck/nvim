@@ -1,6 +1,6 @@
-local promisify_wrap, dictionary, list, notify, notify_once, flags, fs, open, prequire, ringbuffer, sh, String, term, window = (function()
+local promisify_wrap, Dictionary, List, notify, notify_once, flags, fs, open, prequire, RingBuffer, sh, String, term, Window = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.dictionary, _.list, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.ringbuffer, _.sh, _.String, _.term, _.window
+  return _.promisify_wrap, _.Dictionary, _.List, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.RingBuffer, _.sh, _.String, _.term, _.Window
 end)()
 local explorer = require("explorer")
 
@@ -9,7 +9,7 @@ local W = {}
 vim.g.mapleader = " "
 
 local function unmap(modes, lhs, opts)
-  opts = dictionary.merge({ noremap = true, silent = true }, opts or {})
+  opts = Dictionary.merge({ noremap = true, silent = true }, opts or {})
 
   for _, l in ipairs(type(lhs) == "string" and { lhs } or lhs) do
     vim.keymap.set(modes, l, l, opts)
@@ -17,7 +17,7 @@ local function unmap(modes, lhs, opts)
 end
 
 local function map(modes, lhs, rhs, opts)
-  opts = dictionary.merge({ noremap = true, silent = true }, opts or {})
+  opts = Dictionary.merge({ noremap = true, silent = true }, opts or {})
 
   for _, l in ipairs(type(lhs) == "string" and { lhs } or lhs) do
     vim.keymap.set(modes, l, rhs, opts)
@@ -106,7 +106,7 @@ map("n", "<leader>S", function()
   vim.opt.smartindent = true
 end, { desc = "tab to [S]paces" })
 
-local yank_buffer = ringbuffer(16)
+local yank_buffer = RingBuffer(16)
 
 vim.api.nvim_create_autocmd("TextYankPost", {
   callback = function(_)
@@ -119,7 +119,7 @@ vim.api.nvim_create_autocmd("TextYankPost", {
 local yank_win_width = 32
 local yank_win_height = 1
 
-W.yank = window{
+W.yank = Window{
   on_show = function(self)
     vim.api.nvim_create_autocmd("WinLeave", {
       callback = function() self:hide() end,
@@ -155,7 +155,7 @@ W.yank = window{
     esc["\r"] = "%r"
     esc["%"]  = "%%"
 
-    local history = list.map(function(s)
+    local history = List.map(function(s)
       ---@diagnostic disable-next-line: redundant-return-value
       return String.substitute(s, "[\n\r%]", function(c) return esc[c] end)
     end, yank_buffer:totable())
@@ -202,7 +202,7 @@ for filetype, cmd in pairs(ft) do
   local name = String.upper(String.slice(cmd[1], 1, 1)) .. String.slice(cmd[1], 2)
   local function run(code)
     assert(fs.exepath(cmd[1]), name .. " not found")
-    sh(list.insert(list.clone(cmd), list.join(code, "\n")), {
+    sh(List.insert(List.clone(cmd), List.join(code, "\n")), {
       text = true,
       stdout = function(s) notify.warn(String.slice(s, 1, #s - 1)) end,
       stderr = function(s) notify.error(String.slice(s, 1, #s - 1)) end
@@ -357,7 +357,7 @@ map({ "n", "t" }, "<M-0>", goToTabpageWrap(10))
 local gh_users = {}
 local gh_users_width = 0
 
-W.gh_auth = window{
+W.gh_auth = Window{
   on_show = function(self)
     vim.api.nvim_create_autocmd("WinLeave", {
       callback = function() self:hide() end,
@@ -388,7 +388,7 @@ W.gh_auth = window{
     vim.wo.spell          = false
     vim.wo.wrap           = false
 
-    vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, list.map(function(u)
+    vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, List.map(function(u)
       return " [" .. (u.active and "✓" or " ") .. "] " .. u.username
     end, gh_users))
 
@@ -450,11 +450,11 @@ local gh = promisify_wrap(function(promise)
   end
 
   gh_users_width = 6
-  gh_users = list.map(function(o)
+  gh_users = List.map(function(o)
     gh_users_width = math.max(gh_users_width, #o.login + 6)
     return { username = o.login, active = o.active }
   end, json.hosts["github.com"])
-  gh_users = list.sort(gh_users, function(a, b)
+  gh_users = List.sort(gh_users, function(a, b)
     local c = vim.stricmp(a.username, b.username)
     return (c == 0) and (a.username < b.username) or (c == -1)
   end)
@@ -464,6 +464,7 @@ local gh = promisify_wrap(function(promise)
   promise:resolve()
 end)
 
+-- TODO: make it more responsive
 map("n", "<leader>gg", function() gh() end, { desc = "[g]o to [g]ithub account selection menu" })
 
 vim.api.nvim_create_autocmd("FileType", {
@@ -517,10 +518,10 @@ vim.api.nvim_create_autocmd("FileType", {
   end
 })
 
-local term_buffers = list.fill({}, -1, 10)
+local term_buffers = List.fill({}, -1, 10)
 local term_buffers_i = 1
 local term_buffers_flag = false
-W.term = window{
+W.term = Window{
   on_show = function(self)
     pcall(function()
       vim.api.nvim_win_set_buf(self.win, term_buffers[term_buffers_i])
@@ -854,7 +855,7 @@ local select = promisify_wrap(function(promise)
   return promise:resolve()
 end)
 
-W.langs = window{
+W.langs = Window{
   on_show = function(self)
     vim.bo.bufhidden  = "hide"
     vim.bo.buftype    = "nofile"

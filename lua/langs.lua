@@ -1,6 +1,6 @@
-local promisify_wrap, fs, git, notify, list, parse, prequire, sh = (function()
+local promisify_wrap, fs, git, notify, List, parse, prequire, sh = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.fs, _.git, _.notify, _.list, _.parse, _.prequire, _.sh
+  return _.promisify_wrap, _.fs, _.git, _.notify, _.List, _.parse, _.prequire, _.sh
 end)()
 
 local T_GRAY  = "\x1B[1;30m"
@@ -9,14 +9,14 @@ local T_RESET = "\x1B[0m"
 local build = { cwd = vim.fn.getcwd() }
 
 function build:cmd(cmd)
-  io.stdout:write(T_GRAY .. ">>" .. T_RESET .. " "  .. list.join(cmd, " ") .. "\n")
+  io.stdout:write(T_GRAY .. ">>" .. T_RESET .. " "  .. List.join(cmd, " ") .. "\n")
 
   local job = vim.fn.jobstart(cmd, { cwd = self.cwd, on_stdout = function(_, strings, _)
     if #strings == 1 then return end
-    io.stdout:write(list.join(strings, "\n"))
+    io.stdout:write(List.join(strings, "\n"))
   end, on_stderr = function(_, strings, _)
     if #strings == 1 then return end
-    io.stderr:write(list.join(strings, "\n"))
+    io.stderr:write(List.join(strings, "\n"))
   end })
 
   return vim.fn.jobwait{job}[1] == 0 and self or os.exit(1)
@@ -509,11 +509,11 @@ M.java.code["build.lua"] = {
   "require(\"langs\").java.build()"
 }
 M.java.build = promisify_wrap(function(promise)
-  local javas = list.uniq(list.insert(fs.find("\\.java$"):await():unwrap(), 1, "src/Main.java"))
+  local javas = List.uniq(List.insert(fs.find("\\.java$"):await():unwrap(), 1, "src/Main.java"))
   build
-    :cmd(list.merge({ fs.exepath("javac"), "-d", "build" }, javas))
+    :cmd(List.merge({ fs.exepath("javac"), "-d", "build" }, javas))
     :cd("build")
-    :cmd(list.merge({ fs.exepath("jar"), "-cfe", "Main.jar", "src/Main" }, fs.find("\\.class$", "build"):await():unwrap()))
+    :cmd(List.merge({ fs.exepath("jar"), "-cfe", "Main.jar", "src/Main" }, fs.find("\\.class$", "build"):await():unwrap()))
     :cmd{ fs.exepath("java"), "-jar", "Main.jar" }
   promise:resolve()
 end)
@@ -530,9 +530,9 @@ M.kotlin.code["build.lua"] = {
   "require(\"langs\").kotlin.build()"
 }
 M.kotlin.build = promisify_wrap(function(promise)
-  local kts = list.uniq(list.insert(fs.find("\\.kt$"):await():unwrap(), 1, "src/Main.kt"))
+  local kts = List.uniq(List.insert(fs.find("\\.kt$"):await():unwrap(), 1, "src/Main.kt"))
   build
-    :cmd(list.merge({ fs.exepath("kotlinc"), "-Wextra", "-d", "build/Main.jar" }, kts))
+    :cmd(List.merge({ fs.exepath("kotlinc"), "-Wextra", "-d", "build/Main.jar" }, kts))
     :cmd{ fs.exepath("java"), "-jar", "build/Main.jar" }
   promise:resolve()
 end)

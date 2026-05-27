@@ -1,6 +1,6 @@
-local promisify_wrap, dictionary, list, notify, fs, random, String, window = (function()
+local promisify_wrap, Dictionary, List, notify, fs, random, String, Window = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.dictionary, _.list, _.notify, _.fs, _.random, _.String, _.window
+  return _.promisify_wrap, _.Dictionary, _.List, _.notify, _.fs, _.random, _.String, _.Window
 end)()
 
 local ffi = require("ffi")
@@ -27,7 +27,7 @@ local NS = vim.api.nvim_create_namespace("")
 
 vim.filetype.add{ pattern = { ["file://.*"] = { "lua-explorer", { priority = 10 } } } }
 
-local w = window{
+local w = Window{
   on_show = function(self)
     vim.api.nvim_create_autocmd("WinLeave", {
       callback = function() self:hide() end,
@@ -200,7 +200,7 @@ vim.api.nvim_create_autocmd("BufHidden", {
   nested = true,
   callback = vim.schedule_wrap(function()
     if vim.api.nvim_win_is_valid(w.win) then return end
-    local bufs = list.filter(vim.api.nvim_buf_is_loaded, list.map(function(b)
+    local bufs = List.filter(vim.api.nvim_buf_is_loaded, List.map(function(b)
       return b[1]
     end, BUFFERS))
 
@@ -257,7 +257,7 @@ local fn_BufReadCmd = promisify_wrap(function(promise)
   local ls, is_modifiable
 
   if #M.dir == 0 and (vim.fn.has("win32") == 1) then
-    ls = list.map(function(name)
+    ls = List.map(function(name)
       return {
         is_directory = true,
         name = String.slice(name, 1, #name - 1),
@@ -279,7 +279,7 @@ local fn_BufReadCmd = promisify_wrap(function(promise)
     local line_len = 0
     local function add(txt, hl)
       if hl then
-        list.insert(hls, {
+        List.insert(hls, {
           line = _i,
           col_start = line_len,
           end_col = line_len + #txt,
@@ -287,10 +287,10 @@ local fn_BufReadCmd = promisify_wrap(function(promise)
         })
       end
       line_len = line_len + #txt + 1
-      list.insert(line, txt)
+      List.insert(line, txt)
     end
 
-    list.insert(PATHS, M.dir .. e.name)
+    List.insert(PATHS, M.dir .. e.name)
     add(("/%016d"):format(#PATHS))
     e.id = #PATHS
 
@@ -319,7 +319,7 @@ local fn_BufReadCmd = promisify_wrap(function(promise)
       add(e.link, e.link_exists and HL.LINK or HL.LINK_ORPHAN)
     end
 
-    list.insert(text, list.join(line, " "))
+    List.insert(text, List.join(line, " "))
   end
 
   vim.api.nvim_buf_set_lines(w.buf, 0, -1, false, text)
@@ -378,17 +378,17 @@ local function fn_BufWriteCmd__parse_buffers()
     local string_builder = {}
     ENTRY_BUFFER = {}
 
-    local buffer_ls = list.filter(function(v)
+    local buffer_ls = List.filter(function(v)
       return v ~= ""
     end, vim.api.nvim_buf_get_lines(id, 0, -1, true))
 
-    buffer_ls = list.map(function(f)
+    buffer_ls = List.map(function(f)
       local t = M.parse(f)
       if not t or String.match(t.name, "/") then
-        list.insert(string_builder, "  PARSING ERROR:\n    >> " .. f)
+        List.insert(string_builder, "  PARSING ERROR:\n    >> " .. f)
         error = true
       elseif is_entry_dupped(t.name) then
-        list.insert(string_builder, "  ENTRY ALREADY EXISTS:\n    >> " .. f)
+        List.insert(string_builder, "  ENTRY ALREADY EXISTS:\n    >> " .. f)
         error = true
       else
         return t
@@ -397,13 +397,13 @@ local function fn_BufWriteCmd__parse_buffers()
 
     if error then
       if #string_builder > 0 then
-        notify.error(vim.api.nvim_buf_get_name(id) .. "\n" .. list.join(string_builder, "\n"))
+        notify.error(vim.api.nvim_buf_get_name(id) .. "\n" .. List.join(string_builder, "\n"))
       end
       goto continue
     end
 
     local p = M.URL_to_path(vim.api.nvim_buf_get_name(id))
-    list.insert(r, { String.slice(p, 1, #p - 1), buffer_ls, b[2] })
+    List.insert(r, { String.slice(p, 1, #p - 1), buffer_ls, b[2] })
 
     ::continue::
   end
@@ -431,15 +431,15 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
       else
         TASK_FILES[args[2]].copy = TASK_FILES[args[2]].copy + 1
       end
-      list.insert(TASKS, args)
+      List.insert(TASKS, args)
     elseif args[1] == TASK.REMOVE then
       if not TASK_FILES[args[2]] then
         TASK_FILES[args[2]] = { copy = 0 }
       end
       TASK_FILES[args[2]].remove = true
-      list.insert(TASKS, args)
+      List.insert(TASKS, args)
     else
-      list.insert(TASKS, args)
+      List.insert(TASKS, args)
     end
   end
 
@@ -450,7 +450,7 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
 
   for _, b in ipairs(buffers_ls) do
     -- b => { name, new_info, old_info }
-    local buffer_name, cached_info = b[1], dictionary.clone(b[3])
+    local buffer_name, cached_info = b[1], Dictionary.clone(b[3])
 
     for _, entry in ipairs(b[2]) do
       local entry_path = PATHS[entry.id]
@@ -554,7 +554,7 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
           local tmp_path = dest .. ".tmp_" .. random.string(10) .. ".bak"
           if vim.fn.isdirectory(tmp_path) == 0 then
             t[#t] = tmp_path
-            list.insert(last_move, { tmp_path, dest })
+            List.insert(last_move, { tmp_path, dest })
             break
           end
         end
@@ -644,7 +644,7 @@ vim.api.nvim_create_autocmd({ "CursorMovedI", "CursorMoved", "ModeChanged" }, {
 
 local insert_buffer = vim.fn.has("win32") == 1 and function(id)
   local b = { id, nil }
-  list.insert(BUFFERS, b)
+  List.insert(BUFFERS, b)
   if (#M.dir == 0) or String.match(M.dir,"^\\w:\\\\$") then
     BUFFERS_BY_PATH[M.dir] = b
   else
@@ -652,7 +652,7 @@ local insert_buffer = vim.fn.has("win32") == 1 and function(id)
   end
 end or function(id)
   local b = { id, nil }
-  list.insert(BUFFERS, b)
+  List.insert(BUFFERS, b)
   if M.dir == "/" then
     BUFFERS_BY_PATH[M.dir] = b
   else

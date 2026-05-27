@@ -143,9 +143,9 @@ vim.api.nvim_create_autocmd("FileType", {
   callback = function(ev) vim.bo[ev.buf].iskeyword = iskeyword end
 })
 
-local promisify_wrap, fs, list, notify, String, window = (function()
+local promisify_wrap, fs, List, notify, String, Window = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.fs, _.list, _.notify, _.String, _.window
+  return _.promisify_wrap, _.fs, _.List, _.notify, _.String, _.Window
 end)()
 
 local REGISTERS = String.split("@0123456789-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/", "")
@@ -172,8 +172,8 @@ for _, line in ipairs(vim.opt.runtimepath:get()) do
   if String.match(line, "[\\/]nvim[\\/]runtime$") then
     local magic = String.split("^$()%.[]*+-?", "")
 
-    local p = list.join(list.map(function(c)
-      if list.contains(magic, c) then return "%" .. c end
+    local p = List.join(List.map(function(c)
+      if List.contains(magic, c) then return "%" .. c end
       return c
     end, String.split(line, "")), "") .. "/doc/.*%.txt"
 
@@ -199,14 +199,14 @@ local loc = promisify_wrap(function(promise)
       elseif vim.endswith(e.name, ".vim") or vim.endswith(e.name, ".lua") then
         local n = #fs.readfile(config .. s .. e.name):await():unwrap()
         total = total + n
-        list.insert(files, { n, s .. e.name })
+        List.insert(files, { n, s .. e.name })
       end
     end
   end
 
   loc("")
 
-  files = list.reverse(list.sort(files, function(a, b)
+  files = List.reverse(List.sort(files, function(a, b)
     local na = a[1]
     local nb = b[1]
     if na == nb then
@@ -219,12 +219,12 @@ local loc = promisify_wrap(function(promise)
   local sb = {}
   local format = "%" .. (math.floor(math.log(total) / math.log(10)) + 1) .. "d :: %s"
   for _, f in ipairs(files) do
-    list.insert(sb, String.format(format, f[1], f[2]))
+    List.insert(sb, String.format(format, f[1], f[2]))
   end
-  list.insert(sb, "")
-  list.insert(sb, String.format(format, total, "total"))
+  List.insert(sb, "")
+  List.insert(sb, String.format(format, total, "total"))
 
-  notify.warn(list.join(sb, "\n"))
+  notify.warn(List.join(sb, "\n"))
 
   return promise:resolve()
 end)
@@ -312,7 +312,7 @@ vim.api.nvim_create_autocmd("BufFilePost", {
   end)
 })
 
-local rec = window{
+local rec = Window{
   on_show = function(self)
     vim.bo.bufhidden  = "hide"
     vim.bo.buftype    = "nofile"
@@ -342,5 +342,6 @@ vim.api.nvim_create_autocmd("RecordingLeave", { callback = function() rec:hide()
 
 require("undotree")
 require("explorer")
+require("sqlite")
 require("plugins")
 require("mapping")
