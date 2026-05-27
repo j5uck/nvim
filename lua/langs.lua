@@ -355,9 +355,11 @@ M.bun.code["src/assert.ts"] = {
   "  }",
   "}",
   "",
-  "export default (value: any, message?: string): void => {",
-  "  if(!value)",
-  "    throw new AssertionError(message as any);",
+  "export default <T>(value: T, message?: string): T => {",
+  "  if(value)",
+  "    return value;",
+  "  else",
+  "    throw new AssertionError(message);",
   "}"
 }
 M.bun.code["src/terminal.ts"] = {
