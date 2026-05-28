@@ -491,7 +491,7 @@ local sh = promisify_wrap(function(promise, cmd, opts)
     end
   end
 
-  vim.system(cmd, opts, function(out)
+  vim.system(cmd, opts, vim.schedule_wrap(function(out)
     if (vim.fn.has("win32") == 1) and text then
       promise.stdout = String.substitute(out.stdout or "", "\r\n", "\n")
       promise.stderr = String.substitute(out.stderr or "", "\r\n", "\n")
@@ -504,7 +504,7 @@ local sh = promisify_wrap(function(promise, cmd, opts)
     else
       return promise:reject{ code = out.code, message = out.stderr }
     end
-  end)
+  end))
 end)
 
 -- ------------------------- x ------------------------- --
@@ -883,9 +883,19 @@ function Window:show()
     focusable = self.focus,
   }, self.size()))
 
-  vim.api.nvim_buf_call(self.buf, function()
+  vim.api.nvim_win_call(self.win, function()
     for _, fn in ipairs(self.on_show) do fn(self) end
   end)
+end
+
+function Window:reshow()
+  if vim.api.nvim_win_is_valid(self.win) then
+    vim.api.nvim_win_call(self.win, function()
+      for _, fn in ipairs(self.on_show) do fn(self) end
+    end)
+  else
+    self:show()
+  end
 end
 
 function Window:hide()

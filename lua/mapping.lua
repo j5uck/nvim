@@ -1,6 +1,6 @@
-local promisify_wrap, Dictionary, List, notify, notify_once, flags, fs, open, prequire, RingBuffer, sh, String, term, Window = (function()
+local env, promisify_wrap, Dictionary, List, notify, notify_once, flags, fs, open, prequire, RingBuffer, sh, String, term, Window = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.Dictionary, _.List, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.RingBuffer, _.sh, _.String, _.term, _.Window
+  return _.env, _.promisify_wrap, _.Dictionary, _.List, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.RingBuffer, _.sh, _.String, _.term, _.Window
 end)()
 local explorer = require("explorer")
 
@@ -354,7 +354,7 @@ for i=1, 9, 1 do
 end
 map({ "n", "t" }, "<M-0>", goToTabpageWrap(10))
 
-local gh_users = {}
+local gh_users = { "" }
 local gh_users_width = 0
 
 W.gh_auth = Window{
@@ -438,6 +438,42 @@ W.gh_auth = Window{
 local gh = promisify_wrap(function(promise)
   if not fs.exepath("gh") then
     return promise:reject("gh not found")
+  end
+
+  if 1 then
+    require("_").log(env.APPDATA)
+
+
+local f
+
+if env.GH_CONFIG_DIR then
+  f = env.GH_CONFIG_DIR .. "/hosts.yml"
+elseif vim.fn.has("win32") == 1 then
+  f = env.APPDATA .. "\\GitHub CLI\\hosts.yml"
+else
+  f = "TODO"
+end
+
+for _, l in ipairs(fs.readfile(f):await():unwrap()) do
+  if String.match(l, "^ \\+users:") then
+  elseif String.match(l, "^ \\+user:") then
+  end
+end
+
+promise:resolve()
+
+--[[
+
+GH_CONFIG_DIR: the directory where gh will store configuration files. If not specified, the default value will be one of the following paths (in order of precedence):
+
+$XDG_CONFIG_HOME/gh (if $XDG_CONFIG_HOME is set),
+$AppData/GitHub CLI (on Windows if $AppData is set), or
+$HOME/.config/gh.
+
+]]--
+
+
+    if 1 then return end
   end
 
   local r = sh({ "gh", "auth", "status", "--json", "hosts" }, { text = true }):await()
@@ -550,7 +586,7 @@ W.term = Window{
     local function go_wrap(i)
       return function()
         term_buffers_i = i
-        for _, fn in ipairs(self.on_show) do fn(self) end
+        self:reshow()
       end
     end
 
