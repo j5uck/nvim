@@ -42,13 +42,12 @@ end
 local M = {
   c      = { name = "C",      icon = "", hl = "DevIconC" },
   bun    = { name = "Bun",    icon = "", hl = "DevIconBunLockfile" },
-  sqlite = { name = "SQLite", icon = "", hl = "DevIconSql" },
   java   = { name = "Java",   icon = "", hl = "DevIconJava" },
   kotlin = { name = "Kotlin", icon = "", hl = "DevIconKotlin" },
   lua    = { name = "Lua",    icon = "", hl = "DevIconLua" },
 }
 
-for i, l in ipairs{ "c", "bun", "sqlite", "java", "kotlin", "lua" } do
+for i, l in ipairs{ "c", "bun", "java", "kotlin", "lua" } do
   M[i] = M[l]
 end
 
@@ -172,26 +171,26 @@ M.bun.code["package.json"] = {
   "}"
 }
 M.bun.code["tsconfig.json"] = tsconfig_json
-M.bun.code["bunfig.toml"] = parse.table_to_toml{
-  telemetry = false,
-  console = {
-    depth = 3
-  },
-  install = {
-    auto = "auto",
-    minimumReleaseAge = 60 * 60 * 24 * 7, -- 1 week
-    lockfile = {
-      save = false
-    }
-  },
-  run = {
-    bun = true,
-    noOrphans = true,
-    shell = "bun"
-  }
+M.bun.code["bunfig.toml"] = {
+  "telemetry = false",
+  "",
+  "[console]",
+  "depth = 3",
+  "",
+  "[install]",
+  "auto = \"auto\"",
+  "minimumReleaseAge = " .. 60 * 60 * 24 * 7, -- 1 week,
+  "",
+  "[install.lockfile]",
+  "save = false",
+  "",
+  "[run]",
+  "bun = true",
+  "noOrphans = true",
+  "shell = \"bun\""
 }
-M.bun.code[".env"] = parse.table_to_env{
-  PORT = 8080
+M.bun.code[".env"] = {
+  "PORT = 8080"
 }
 M.bun.code["build.ts"] = {
   "import fs from \"fs\";",
@@ -455,43 +454,6 @@ M.bun.code["src/view/message/e.css"] = {
   "}"
 }
 M.bun.code[".gitignore"] = gitignore
-
-M.sqlite.init = { "script.ts" }
-M.sqlite.post = promisify_wrap(function(promise)
-  sh({ "bun", "i" }, { timeout = (20 * 1000) }):finally(function(p)
-    if p.code ~= 0 then notify.error(p.message) end
-  end)
-
-  promise:resolve()
-end)
-M.sqlite.code = {}
-M.sqlite.code["package.json"] = {
-  "{",
-  "  \"type\": \"module\",",
-  "  \"scripts\": {",
-  "    \"dev\": \"bun script.ts\"",
-  "  },",
-  "  \"devDependencies\": {",
-  "    \"@types/bun\": \"*\"",
-  "  }",
-  "}"
-}
-M.sqlite.code["script.ts"] = {
-  "import * as sqlite from \"bun:sqlite\";",
-  "",
-  "const db = new sqlite.Database(\"db.sqlite3\");",
-  "",
-  "process.stdout.write(\">>> \");",
-  "for await (const line of console) {",
-  "  try {",
-  "    console.log(db.prepare(line).all());",
-  "  } catch (error) {",
-  "    console.error(error.toString())",
-  "  }",
-  "  process.stdout.write(\">>> \");",
-  "}"
-}
-M.sqlite.code[".gitignore"] = gitignore
 
 M.java.init = { "src/Main.java" }
 M.java.code = {}

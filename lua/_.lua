@@ -509,7 +509,6 @@ end)
 
 -- ------------------------- x ------------------------- --
 
-
 local CHARS = String.split("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", "")
 random.string = function(len)
   local buffer = ffi.new("char [?]", len)
