@@ -24,7 +24,7 @@ end
 
 function build:cd(dir)
   io.stdout:write(T_GRAY .. ">>" .. T_RESET .. " cd " .. dir .. "\n")
-  if vim.fn.isabsolutepath(dir) == 1 then
+  if fs.isabsolutepath(dir) then
     self.cwd = dir
   else
     self.cwd = vim.fs.normalize(self.cwd .. "/" .. dir)

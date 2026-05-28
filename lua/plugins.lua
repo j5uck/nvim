@@ -32,7 +32,7 @@ local function runtimepath()
 
   for _, name in ipairs(PLUGS_ORDER) do
     local d = joinpath(PLUG_HOME, name)
-    if (not exists[d]) and vim.fn.isdirectory(d) == 1 then
+    if (not exists[d]) and fs.isdirectory(d) then
       List.insert(rtp, d)
       local a = vim.fn.globpath(d, "after")
       if #a > 0 then List.insert(rtp_after, a) end
@@ -171,7 +171,7 @@ local run = promisify_wrap(function(promise, args)
     end
 
     local cwd = joinpath(PLUG_HOME, name)
-    if vim.fn.isdirectory(joinpath(cwd, ".git")) == 1 then
+    if fs.isdirectory(joinpath(cwd, ".git")) then
       set_lines(i-1, i, { "- " .. name .. ": Cloning... Done!" })
       goto continue
     else
@@ -592,29 +592,6 @@ plug{ github("nvim-tree/nvim-web-devicons") }
 plug{
   github("nvim-lualine/lualine.nvim"),
   setup = prequire_wrap("lualine", function(lualine)
-    local extensions = { "man" }
-
-    local PROGRESS, LOCATION = "progress", "location"
-
-    local function ll(filetype, sl, sr)
-      sl = sl or {}
-      sr = sr or {}
-      List.insert(extensions, {
-        sections = {
-          lualine_a = sl[1] and { sl[1] } or nil,
-          lualine_b = sl[2] and { sl[2] } or nil,
-          lualine_c = sl[3] and { sl[3] } or nil,
-          lualine_x = sr[1] and { sr[1] } or nil,
-          lualine_y = sr[2] and { sr[2] } or nil,
-          lualine_z = sr[3] and { sr[3] } or nil
-        },
-        filetypes = { filetype }
-      })
-    end
-    local function fn(o)
-      return function() return o end
-    end
-
     local function undotree()
       local target = vim.t.undotree.b.target
       local n = vim.api.nvim_buf_get_name(target)
@@ -631,33 +608,52 @@ plug{
       return url .. ((#a == 0) and "" or (" " .. a))
     end
 
-    ll("help", { fn("NEOVIM HELP"), { "filename", file_status = false } }, { nil, PROGRESS, LOCATION })
-    ll("checkhealth", { fn("CHECK HEALTH") }, { nil, PROGRESS, LOCATION })
-    ll("TelescopePrompt", { fn("TELESCOPE") })
-    ll("undotree", { fn("UNDOTREE"), nil, undotree }, { nil, PROGRESS, LOCATION })
+    local function lua_sqlite()
+      return vim.api.nvim_buf_get_name(0)
+    end
 
-    ll("coc-marketplace", { fn("COC-MARKETPLACE")  }, { nil, PROGRESS, LOCATION })
-    ll("coc-nvim", { fn("COC-NVIM") }, { nil, PROGRESS, LOCATION })
-    ll("lua-plug", { fn("LUA-PLUG") }, { nil, PROGRESS, LOCATION })
-    ll("lua-explorer", { fn("LUA-EXPLORER"), nil, lua_explorer }, { nil, PROGRESS, LOCATION })
-
-    local o = {
-      section_separators   = { left = "",  right = ""  },
-      component_separators = { left = "|", right = "|" },
-
-      -- section_separators   = { left = "", right = "" },
-      -- component_separators = { left = "╲", right = "╱" },
-
-      -- section_separators   = { left = "", right = "" },
-      -- component_separators = { left = "", right = "" },
-
-      icons_enabled = true,
-      theme = "auto"
-    }
+    local e = {}
+    e["checkhealth"] = { function() return "CHECKHEALTH" end, nil, nil, nil, "progress", "location"}
+    e["help"] = { function() return "NEOVIM HELP" end, { "filename", file_status = false }, nil, nil, "progress", "location"}
+    e["TelescopePrompt"] = { function() return "TELESCOPE" end}
+    e["undotree"] = { function() return "UNDOTREE" end, nil, undotree, nil, "progress", "location"}
+    e["coc-marketplace"] = { function() return "COC-MARKETPLACE" end, nil, nil, nil, "progress", "location"}
+    e["coc-nvim"] = { function() return "COC-NVIM" end, nil, nil, nil, "progress", "location"}
+    e["lua-explorer"] = { function() return "LUA-EXPLORER" end, nil, lua_explorer, nil, "progress", "location"}
+    e["lua-gh"] = { function() return "LUA-GH" end, nil, nil, nil, "progress", "location"}
+    e["lua-plug"] = { function() return "LUA-PLUG" end, nil, nil, nil, "progress", "location"}
+    e["lua-sqlite"] = { function() return "LUA-SQLITE" end, nil, lua_sqlite, nil, "progress", "location"}
+    e = List.map(function(filetype)
+      local s = e[filetype]
+      return {
+        sections = {
+          lualine_a = s[1] and { s[1] } or nil,
+          lualine_b = s[2] and { s[2] } or nil,
+          lualine_c = s[3] and { s[3] } or nil,
+          lualine_x = s[4] and { s[4] } or nil,
+          lualine_y = s[5] and { s[5] } or nil,
+          lualine_z = s[6] and { s[6] } or nil
+        },
+        filetypes = { filetype }
+      }
+    end, Dictionary.keys(e))
+    List.insert(e, "man")
 
     lualine.setup{
-      options = o,
-      extensions = extensions
+      extensions = e,
+      options = {
+        section_separators   = { left = "",  right = ""  },
+        component_separators = { left = "|", right = "|" },
+
+        -- section_separators   = { left = "", right = "" },
+        -- component_separators = { left = "╲", right = "╱" },
+
+        -- section_separators   = { left = "", right = "" },
+        -- component_separators = { left = "", right = "" },
+
+        icons_enabled = true,
+        theme = "auto"
+      }
     }
   end)
 }

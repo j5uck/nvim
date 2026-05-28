@@ -252,7 +252,7 @@ local _show = promisify_wrap(function(promise)
 
   local runtime = fs.exepath("bun") or fs.exepath("node")
   if not runtime then
-    return promise.reject("Neither node or bun not found")
+    return promise.reject("No node or bun found")
   end
 
   local size = 200

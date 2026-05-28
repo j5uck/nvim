@@ -168,7 +168,7 @@ M.select = function()
   local entry = M.parse(line)
   if not entry then return end
 
-  local link = entry.link and (vim.fn.isabsolutepath(entry.link) == 1 and entry.link or (M.dir .. entry.link))
+  local link = entry.link and (fs.isabsolutepath(entry.link) and entry.link or (M.dir .. entry.link))
   local url = link or (M.dir .. entry.name)
 
   ---@diagnostic disable-next-line: param-type-mismatch
@@ -477,7 +477,7 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
       local full_path = buffer_name .. slash .. entry.name
       if not entry.id then
         if entry.link then
-          if vim.fn.isabsolutepath(entry.link) then
+          if fs.isabsolutepath(entry.link) then
             APPENT_TASK{ TASK.MKLINK, entry.link, full_path }
           else
             APPENT_TASK{ TASK.MKLINK, buffer_name .. slash .. entry.link, full_path }
@@ -498,7 +498,7 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
           APPENT_TASK{ TASK.COPY, PATHS[entry.id], full_path }
         else
           APPENT_TASK{ TASK.REMOVE, PATHS[entry.id] }
-          if vim.fn.isabsolutepath(entry.link) then
+          if fs.isabsolutepath(entry.link) then
             APPENT_TASK{ TASK.MKLINK, entry.link, full_path }
           else
             APPENT_TASK{ TASK.MKLINK, buffer_name .. slash .. entry.link, full_path }
@@ -536,7 +536,7 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
         -- fs.remove(t[2]):await():unwrap()
         fs.remove(t[2]):await()
         tf.gone = true
-        if vim.fn.isdirectory(t[2]) == 1 then
+        if fs.isdirectory(t[2]) then
           local dir = String.slice(vim.fn.undofile(t[2]), #undodir + 2)
           for _, f in ipairs(vim.fn.globpath(undodir, dir .. "*", 1, true, 1)) do
             -- fs.remove(f):await():unwrap()
@@ -552,7 +552,7 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
       if vim.uv.fs_stat(dest) then
         while true do
           local tmp_path = dest .. ".tmp_" .. random.string(10) .. ".bak"
-          if vim.fn.isdirectory(tmp_path) == 0 then
+          if fs.isdirectory(tmp_path) then
             t[#t] = tmp_path
             List.insert(last_move, { tmp_path, dest })
             break
@@ -575,7 +575,7 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
           fs.copy(t[2], t[3]):await():unwrap()
         end
         local action = tf.gone and fs.move or fs.copy
-        if vim.fn.isdirectory(t[3]) == 1 then
+        if fs.isdirectory(t[3]) then
           local src_dir = String.slice(vim.fn.undofile(t[2]), #undodir + 2)
           local trim_len = #undodir + 2 + #src_dir
           for _, f in ipairs(vim.fn.globpath(undodir, src_dir .. "*", 1, true, 1)) do
@@ -593,7 +593,7 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
 
   for _, lm in ipairs(last_move) do
     fs.move(lm[1], lm[2]):await():unwrap()
-    if vim.fn.isdirectory(lm[2]) == 1 then
+    if fs.isdirectory(lm[2]) then
       local src_dir = String.slice(vim.fn.undofile(lm[1]), #undodir + 2)
       local trim_len = #undodir + 2 + #src_dir
       for _, f in ipairs(vim.fn.globpath(undodir, src_dir .. "*", 1, true, 1)) do
@@ -733,7 +733,7 @@ vim.api.nvim_create_autocmd("BufEnter", {
 vim.api.nvim_create_autocmd("BufEnter", {
   pattern = (vim.fn.has("win32") == 0) and "/*" or "[A-Z]:/*",
   callback = vim.schedule_wrap(function(ev)
-    if vim.fn.isdirectory(ev.file) == 0 then return end
+    if not fs.isdirectory(ev.file) then return end
     vim.cmd[[exe "norm \<c-o>"]]
     if ev.file == vim.api.nvim_buf_get_name(0) then
       vim.api.nvim_buf_set_name(0, "")
@@ -744,7 +744,6 @@ vim.api.nvim_create_autocmd("BufEnter", {
 })
 
 return {
-  -- go = function(dir) M.go(vim.fs.normalize(dir) .. "/") end,
   open = function() M.go(getcwd()) end,
   resume = function() M.go(M.dir) end,
   select = M.select,

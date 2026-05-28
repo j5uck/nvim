@@ -427,18 +427,14 @@ end
 
 local term = (vim.fn.has("win32") == 1) and function()
   local shell = vim.go.shell
-  local shellxquote = vim.go.shellxquote
-  local shellcmdflag = vim.go.shellcmdflag
 
   local bb = fs.exepath("busybox")
   if bb then
     vim.go.shell = "\"" .. bb .. "\" env \"HOME=" .. env.USERPROFILE .. "\" bash"
-    vim.go.shellxquote = ""
-    vim.go.shellcmdflag = "-c"
   else
     local ps = fs.exepath("powershell")
     if ps then
-      vim.go.shell = ps
+      vim.go.shell = "\"" .. ps .. "\""
     end
   end
 
@@ -448,8 +444,6 @@ local term = (vim.fn.has("win32") == 1) and function()
   end)
 
   vim.go.shell = shell
-  vim.go.shellxquote = shellxquote
-  vim.go.shellcmdflag = shellcmdflag
 end or function()
   vim.cmd.term()
   vim.cmd[[silent! startinsert]]
@@ -462,19 +456,25 @@ local sh = promisify_wrap(function(promise, cmd, opts)
   local text = opts.text
   opts.text = nil
 
-  if vim.fn.isabsolutepath(cmd[1]) then
-    -- already normalized
+  if fs.isabsolutepath(cmd[1]) then
+    if not vim.uv.fs_access(cmd[1], "RX") then
+      return promise:reject(cmd[1] .. " not found")
+    end
   elseif String.match(cmd[1], (vim.fn.has("win32") == 1) and "[\\\\/]" or "/") then
     return promise:reject("Relative paths are not allowed")
   else
-    cmd[1] = fs.exepath(cmd[1])
+    local p = fs.exepath(cmd[1])
+    if not p then
+      return promise:reject(cmd[1] .. " not found")
+    end
+    cmd[1] = p
   end
 
   if opts.stdout then
     local stdout = opts.stdout
     opts.stdout = (vim.fn.has("win32") == 1) and function(_, data)
       if data then
-        return stdout(text and string.gsub(data, "\r\n", "\n") or data)
+        return stdout(text and String.substitute(data, "\r\n", "\n") or data)
       end
     end or function(_, data)
       if data then return stdout(data) end
@@ -484,7 +484,7 @@ local sh = promisify_wrap(function(promise, cmd, opts)
     local stderr = opts.stderr
     opts.stderr = (vim.fn.has("win32") == 1) and function(_, data)
       if data then
-        return stderr(text and string.gsub(data, "\r\n", "\n") or data)
+        return stderr(text and String.substitute(data, "\r\n", "\n") or data)
       end
     end or function(_, data)
       if data then return stderr(data) end
@@ -493,8 +493,8 @@ local sh = promisify_wrap(function(promise, cmd, opts)
 
   vim.system(cmd, opts, function(out)
     if (vim.fn.has("win32") == 1) and text then
-      promise.stdout = string.gsub(out.stdout or "", "\r\n", "\n")
-      promise.stderr = string.gsub(out.stderr or "", "\r\n", "\n")
+      promise.stdout = String.substitute(out.stdout or "", "\r\n", "\n")
+      promise.stderr = String.substitute(out.stderr or "", "\r\n", "\n")
     else
       promise.stdout = out.stdout or ""
       promise.stderr = out.stderr or ""
@@ -536,12 +536,12 @@ end
 
 local TMP_DIR = vim.fn.has("win32") == 0 and
   (env.XDG_RUNTIME_DIR or "/tmp") .. "/tmp." or
-  string.gsub(vim.fs.dirname(env.APPDATA) .. "/Local/Temp/tmp.", "/", "\\")
+  String.substitute(vim.fs.dirname(env.APPDATA) .. "/Local/Temp/tmp.", "/", "\\")
 
 fs.mktmp = promisify_wrap(function(promise)
   while true do
     local r = TMP_DIR .. random.string(10)
-    if vim.fn.isdirectory(r) == 0 then
+    if not fs.isdirectory(r) then
       vim.fn.mkdir(r, "p")
       return promise:resolve(r)
     end
@@ -617,11 +617,19 @@ fs.readfile = promisify_wrap(function(promise, file, opts)
   end
 end)
 
+fs.isdirectory = function(d)
+  return vim.fn.isdirectory(d) == 1
+end
+
+fs.isabsolutepath = function(p)
+  return vim.fn.isabsolutepath(p) == 1
+end
+
 fs.basename = vim.fs.basename
 
 fs.dirname = vim.fn.has("win32") == 1 and function(file)
   local r = vim.fs.dirname(file)
-  r = string.gsub(r, "/", "\\")
+  r = String.substitute(r, "/", "\\")
   return r
 end or vim.fs.dirname
 
@@ -634,7 +642,7 @@ fs.exepath = (vim.fn.has("win32") == 1) and function(exe)
   local ext = String.split(env.PATHEXT, ";")
   ---@diagnostic disable-next-line: param-type-mismatch
   for _, p in ipairs(String.split(env.PATH, ";")) do
-    p = string.gsub(vim.fs.normalize(p .. "\\" .. exe), "\\", "/")
+    p = String.substitute(vim.fs.normalize(p .. "\\" .. exe), "[\\\\/]\\+", "\\")
     if vim.uv.fs_access(p, "RX") then return p end
     for _, e in ipairs(ext) do
       local pe = p .. e
@@ -673,10 +681,10 @@ fs.ls = promisify_wrap(function(promise, path)
     if e.is_directory or (e.type ~= "link") then goto continue end
 
     e.link = ffi.string(C_BUFFER, C.readlink(path..e.name, C_BUFFER, C_BUFFER_SIZE))
-    local link_full = vim.fs.normalize(vim.fn.isabsolutepath(e.link) == 1 and e.link or (path .. "/" .. e.link))
+    local link_full = vim.fs.normalize(fs.isabsolutepath(e.link) and e.link or (path .. "/" .. e.link))
 
     e.link_exists = C.stat(link_full, C_BUFFER) == 0
-    e.is_directory = e.link_exists and vim.fn.isdirectory(link_full) == 1
+    e.is_directory = e.link_exists and fs.isdirectory(link_full)
 
     ::continue::
   end
@@ -720,7 +728,7 @@ fs.find = promisify_wrap((function()
 
   return function(promise, regex, path)
     path = path or ""
-    if vim.fn.isabsolutepath(path) == 1 then
+    if fs.isabsolutepath(path) then
       path = vim.fs.normalize(path)
     else
       path = vim.fs.normalize(vim.fn.getcwd() .. "/" .. path)
@@ -824,7 +832,7 @@ git.fetch = promisify_wrap(function(promise, o)
     sh({ "git", "fetch", "origin", "--depth=1", "--progress" }, go):await():unwrap()
     local r = sh({ "git", "ls-remote", "--symref", "origin", "HEAD" }, go):await()
     r:unwrap()
-    sh({ "git", "switch", ({string.gsub(String.split(r.stdout, "[ \t]")[2], ".+/(.+)$", "%1")})[1] }, go):await():unwrap()
+    sh({ "git", "switch", String.split(String.slice(r.stdout, #"ref: refs/heads/" + 1), "\t")[1] }, go):await():unwrap()
   end
 
   return promise:resolve()

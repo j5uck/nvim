@@ -127,6 +127,7 @@ vim.api.nvim_create_autocmd("FileType", {
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "notify" },
   callback = vim.schedule_wrap(function(ev)
+    if not vim.api.nvim_buf_is_valid(ev.buf) then return end
     vim.api.nvim_buf_call(ev.buf, function()
       if #vim.api.nvim_win_get_config(0).relative == 0 then return end
       -- vim.wo.scrolloff = 0
