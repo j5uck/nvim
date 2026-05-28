@@ -1,30 +1,54 @@
 local ffi = require("ffi")
 local C = ffi.C
 
-local M = {}
+local Dictionary = {}
+local flags = {}
+local fs = {}
+local git = {}
+local List = {}
+local notify = {}
+local notify_once = {}
+local open = {}
+local random = {}
+local String = {}
 
-M.flags = {
-  warn_missing_lsp = true,
-  warn_missing_module = true,
-}
+local Promise = {}
+local RingBuffer = {}
+local Window = {}
 
 -- ------------------------- x ------------------------- --
 
-M.String = {}
-M.String.format = string.format
-M.String.startswith = function(s, prefix)
+flags.warn_missing_lsp = true
+flags.warn_missing_module = true
+
+-- ------------------------- x ------------------------- --
+
+local ENV_BUFFER_SIZE = math.pow(2, 15)
+local env = setmetatable({}, {
+  __index = function(_, key)
+    return vim.uv.os_getenv(key, ENV_BUFFER_SIZE)
+  end,
+  __newindex = function(_, key, value)
+    return vim.uv.os_setenv(key, value)
+  end,
+})
+
+-- ------------------------- x ------------------------- --
+
+String.format = string.format
+String.startswith = function(s, prefix)
   return string.sub(s, 1, #prefix) == prefix
 end
-M.String.endswith = function(s, suffix)
+String.endswith = function(s, suffix)
   return string.sub(s, #s - #suffix + 1, #s) == suffix
 end
-M.String.match = function(s, pattern)
+String.match = function(s, pattern)
   local i = vim.fn.match(s, pattern)
   return i > -1 and (i + 1) or nil
 end
-M.String.slice = string.sub
-M.String.split = vim.split
-M.String.substitute = function(s, pattern, sub)
+String.slice = string.sub
+String.split = vim.split
+String.substitute = function(s, pattern, sub)
   assert(type(s) == "string", "s: expected string, got " .. type(s))
   local _sub = type(sub) == "function" and function(e)
     if not e then
@@ -39,28 +63,27 @@ M.String.substitute = function(s, pattern, sub)
   end or sub
   return vim.fn.substitute(s, pattern, _sub, "g")
 end
-M.String.upper = string.upper
-M.String.lower = string.lower
-M.String.rep = string.rep
-M.String.reverse = string.reverse
+String.upper = string.upper
+String.lower = string.lower
+String.rep = string.rep
+String.reverse = string.reverse
 
-M.List = {}
-M.List.contains = vim.tbl_contains
-M.List.join = table.concat
-M.List.sort = function(l, s)
+List.contains = vim.tbl_contains
+List.join = table.concat
+List.sort = function(l, s)
   if s == nil then
     return vim.fn.sort(l, "i")
   elseif type(s) == "function" then
-    local r = M.List.clone(l)
+    local r = List.clone(l)
     table.sort(r, s)
     return r
   else
     assert(false, "Sorter must be a function or nil")
   end
 end
-M.List.reverse = vim.fn.reverse
-M.List.map = function(fn, l)
-  l = M.List.clone(l)
+List.reverse = vim.fn.reverse
+List.map = function(fn, l)
+  l = List.clone(l)
   local len = 0
   local keys = vim.tbl_keys(l)
 
@@ -77,19 +100,19 @@ M.List.map = function(fn, l)
 
   return l
 end
-M.List.filter = vim.tbl_filter
-M.List.uniq = function(l)
+List.filter = vim.tbl_filter
+List.uniq = function(l)
   local r = {}
   local d = {}
   for _, e in ipairs(l) do
     if not d[e] then
       d[e] = true
-      M.List.insert(r, e)
+      List.insert(r, e)
     end
   end
   return r
 end
-M.List.fill = function(l, value, n)
+List.fill = function(l, value, n)
   if type(value) == "table" then
     for i = 1, n, 1 do
       l[i] = vim.deepcopy(value)
@@ -101,23 +124,23 @@ M.List.fill = function(l, value, n)
   end
   return l
 end
-M.List.slice = vim.list_slice
-M.List.clone = function(t) return vim.list_slice(t, 1, #t) end
-M.List.insert = function(l, ...)
+List.slice = vim.list_slice
+List.clone = function(t) return vim.list_slice(t, 1, #t) end
+List.insert = function(l, ...)
   table.insert(l, ...)
   return l
 end
-M.List.push = function(l, e)
+List.push = function(l, e)
   table.insert(l, e)
   return l
 end
-M.List.remove = table.remove
-M.List.pop = function(l)
+List.remove = table.remove
+List.pop = function(l)
   local r = l[#l]
   l[#l] = nil
   return r
 end
-M.List.merge = function(...)
+List.merge = function(...)
   local r = ({...})[1]
   for _, t in ipairs{...}, {...}, 1 do
     vim.list_extend(r, t)
@@ -125,23 +148,20 @@ M.List.merge = function(...)
   return r
 end
 
-M.Dictionary = {}
-M.Dictionary.isempty = vim.tbl_isempty
-M.Dictionary.clone = function(d)
+Dictionary.isempty = vim.tbl_isempty
+Dictionary.clone = function(d)
   local r = {}
   for _, k in ipairs(vim.tbl_keys(d)) do
     r[k] = d[k]
   end
   return r
 end
-M.Dictionary.deep_clone = vim.deepcopy
-M.Dictionary.keys = vim.tbl_keys
-M.Dictionary.merge = function(...) return vim.tbl_extend("force", ...) end
-M.Dictionary.deep_merge = function(...) return vim.tbl_deep_extend("force", ...) end
+Dictionary.deep_clone = vim.deepcopy
+Dictionary.keys = vim.tbl_keys
+Dictionary.merge = function(...) return vim.tbl_extend("force", ...) end
+Dictionary.deep_merge = function(...) return vim.tbl_deep_extend("force", ...) end
 
 -- ------------------------- x ------------------------- --
-
-local RingBuffer = {}
 
 function RingBuffer:push(value)
   self[self.index] = value
@@ -212,7 +232,7 @@ function RingBuffer:clear()
   return self
 end
 
-M.RingBuffer = function(capacity)
+local RingBuffer_constructor = function(capacity)
   assert(type(capacity) == "number", "Capacity must be a number")
 
   local self = { capacity = capacity }
@@ -226,51 +246,47 @@ end
 
 -- ------------------------- x ------------------------- --
 
-local WRAP = vim.schedule_wrap
 local I, W, E = vim.log.levels.INFO, vim.log.levels.WARN, vim.log.levels.ERROR
 
-M.notify = {}
-M.notify.info  = WRAP(function(s) vim.notify(s, I) end)
-M.notify.warn  = WRAP(function(s) vim.notify(s, W) end)
-M.notify.error = WRAP(function(s) vim.notify(s, E) end)
-M.notify_once = {}
-M.notify_once.info  = WRAP(function(s) vim.notify_once(s, I) end)
-M.notify_once.warn  = WRAP(function(s) vim.notify_once(s, W) end)
-M.notify_once.error = WRAP(function(s) vim.notify_once(s, E) end)
+notify.info  = vim.schedule_wrap(function(s) vim.notify(s, I) end)
+notify.warn  = vim.schedule_wrap(function(s) vim.notify(s, W) end)
+notify.error = vim.schedule_wrap(function(s) vim.notify(s, E) end)
 
-M.log = function(...)
+notify_once.info  = vim.schedule_wrap(function(s) vim.notify_once(s, I) end)
+notify_once.warn  = vim.schedule_wrap(function(s) vim.notify_once(s, W) end)
+notify_once.error = vim.schedule_wrap(function(s) vim.notify_once(s, E) end)
+
+local log = function(...)
   local sb = {}
   local len = select("#", ...)
   for i = 1, len, 1 do
     local e = select(i, ...)
-    M.List.insert(sb, vim.inspect(e))
+    List.insert(sb, vim.inspect(e))
   end
-  vim.schedule_wrap(vim.notify)(M.List.join(sb, "\n"), W)
+  vim.schedule_wrap(vim.notify)(List.join(sb, "\n"), W)
 end
 
 -- ------------------------- x ------------------------- --
 
-M.prequire = function(name, fn)
+local prequire = function(name, fn)
   local status, plugin = pcall(require, name)
 
   if status then return fn and fn(plugin) end
 
-  if M.flags.warn_missing_module then
-    M.notify_once.warn("Module '" .. name .. "' not found")
+  if flags.warn_missing_module then
+    notify_once.warn("Module '" .. name .. "' not found")
   end
 end
 
-M.prequire_wrap = function(name, fn)
-  return function() return M.prequire(name, fn) end
+local prequire_wrap = function(name, fn)
+  return function() return prequire(name, fn) end
 end
 
 -- ------------------------- x ------------------------- --
 
-local Promise = {}
-
 function Promise:resolve(...)
   if not (self.code == nil) then
-    return M.notify.warn("Promise already finished!")
+    return notify.warn("Promise already finished!")
   end
 
   self.code = 0
@@ -301,7 +317,7 @@ function Promise:reject(reason)
 
     if self.parent_coroutine and coroutine.status(self.parent_coroutine) ~= "dead" then
     else
-      M.notify.error(self.message)
+      notify.error(self.message)
     end
 
     for _, fn in ipairs(self.awaiting) do fn() end
@@ -334,7 +350,7 @@ function Promise:await()
 
   vim.schedule(function()
     if self.code == nil then
-      M.List.insert(self.awaiting, function()
+      List.insert(self.awaiting, function()
         coroutine.resume(co)
       end)
     else
@@ -371,14 +387,14 @@ end
 function Promise:finally(fn)
   vim.schedule(function()
     if self.code == nil then
-      M.List.insert(self.awaiting, function() fn(self) end)
+      List.insert(self.awaiting, function() fn(self) end)
     else
       fn(self)
     end
   end)
 end
 
-M.promisify = function(fn, ...)
+local promisify = function(fn, ...)
   local self = {}
   setmetatable(self, { __index = Promise })
 
@@ -401,192 +417,26 @@ M.promisify = function(fn, ...)
   return self
 end
 
-M.promisify_wrap = function(fn)
+local promisify_wrap = function(fn)
   return function(...)
-    return M.promisify(fn, ...)
+    return promisify(fn, ...)
   end
 end
 
 -- ------------------------- x ------------------------- --
 
-M.once = function(fn)
-  local done = false
-  return function(...)
-    if done then return end
-    done = true
-    return fn(...)
-  end
-end
-
--- ------------------------- x ------------------------- --
-
-M.parse = {}
-
-M.parse.table_to_env = function(o)
-  local function sort(a, b)
-    local c = vim.stricmp(a[1], b[1])
-    return (c == 0) and (a[1] < b[1]) or (c == -1)
-  end
-
-  local r = {}
-  for k, v in pairs(o) do
-    assert(type(k) == "string", "Only dictionaries are allowed")
-    assert(type(v) ~= "table", "Tables are not supported")
-    M.List.insert(r, { k, vim.json.encode(v) })
-  end
-
-  return M.List.map(function(v)
-    return v[1] .. "=" .. v[2]
-  end, M.List.sort(r, sort))
-end
-
--- local empty_dict_tostring = getmetatable(vim.empty_dict()).__tostring
-
--- local function table_to_json(o)
---   local r = {}
---
---   local keys = M.List.filter(function(v)
---     return type(v) == "string"
---   end, M.Dictionary.keys(o))
---
---   assert(not (#keys > 0 and #o > 0), "Table must be list or dictionary")
---
---   if #keys > 0 then
---     M.List.insert(r, "{")
---     for _, key in ipairs(M.List.sort(keys)) do
---       M.List.insert(r, vim.json.encode(key))
---       local v = o[key]
---       if type(v) == "table" then
---         M.List.merge(r, table_to_json_tokens(v))
---       else
---         M.List.insert(r, vim.json.encode(v))
---       end
---     end
---     M.List.insert(r, "}")
---   elseif #o > 0 then
---     M.List.insert(r, "[")
---
---     M.List.map(function(e)
---       return 
---     end, M.List.slice(o, 2, #o - 1))
---
---     for i = 1, #o, 1 do
---       local v = o[i]
---       if type(v) == "table" then
---         M.List.merge(r, table_to_json_tokens(v))
---       else
---         M.List.insert(r, vim.json.encode(v))
---       end
---     end
---     M.List.insert(r, "]")
---   elseif getmetatable(o).__tostring == empty_dict_tostring then
---     M.List.insert(r, "{")
---     M.List.insert(r, "}")
---   else
---     M.List.insert(r, "[")
---     M.List.insert(r, "]")
---   end
---
---   return r
--- end
-
--- local function tokens_to_json(l, i)
---   local r = {}
---
---   if l[i] == "{" then
---     M.List.insert(r, "{")
---
---     while l[i] and l[i] ~= "}" do
---       if l[i] == "{" or l[i] == "[" then
---       else
---         -- M.List.insert(r, "  " .. )
---       end
---     end
---
---     M.List.insert(r, "}")
---   elseif l[i] == "[" then
---     M.List.insert(r, "[")
---
---     while l[i] and l[i] ~= "}" do
---       if l[i] == "{" or l[i] == "[" then
---       else
---         -- M.List.insert(r, "  " .. )
---       end
---     end
---
---     M.List.insert(r, "]")
---   else
---     assert(false, "Unexpected token \"" .. l[i] .. "\n")
---   end
---
---   return r
--- end
-
--- M.parse.table_to_json = function(o)
---   -- local tokens = table_to_json_tokens(o)
---   -- local r, _ = tokens_to_json(tokens, 0)
---   -- return r
---   return table_to_json(o)
--- end
-
-local function table_to_toml(o, title)
-  local primitives = {}
-  local objects = {}
-
-  for k, v in pairs(o) do
-    assert(type(k) == "string", "Only dictionaries are allowed")
-    if type(v) == "table" then
-      M.List.merge(objects, table_to_toml(v, title .. k .. "."))
-    else
-      M.List.insert(primitives, { k, vim.json.encode(v) })
-    end
-  end
-
-  return M.List.merge({ { title, primitives } }, objects)
-end
-
-M.parse.table_to_toml = function(o)
-  local function sort(a, b)
-    local c = vim.stricmp(a[1], b[1])
-    return (c == 0) and (a[1] < b[1]) or (c == -1)
-  end
-
-  local parsed = M.List.sort(table_to_toml(o, ""), sort)
-  local r = {}
-  for _, section in ipairs(parsed) do
-    local section_name = section[1]
-    local section_value = M.List.sort(section[2], sort)
-
-    if #section_name > 0 then
-      M.List.insert(r, "[" .. string.sub(section_name, 1, #section_name - 1) .. "]")
-    end
-
-    for _, item in ipairs(section_value) do
-      local key = item[1]
-      local value = item[2]
-      M.List.insert(r, key .. " = " .. value)
-    end
-    M.List.insert(r, "")
-  end
-
-  M.List.remove(r, #r)
-  return r
-end
-
--- ------------------------- x ------------------------- --
-
-M.term = (vim.fn.has("win32") == 1) and function()
+local term = (vim.fn.has("win32") == 1) and function()
   local shell = vim.go.shell
   local shellxquote = vim.go.shellxquote
   local shellcmdflag = vim.go.shellcmdflag
 
-  local bb = M.fs.exepath("busybox")
+  local bb = fs.exepath("busybox")
   if bb then
-    vim.go.shell = "\"" .. bb .. "\" env \"HOME=" .. M.env.USERPROFILE .. "\" bash"
+    vim.go.shell = "\"" .. bb .. "\" env \"HOME=" .. env.USERPROFILE .. "\" bash"
     vim.go.shellxquote = ""
     vim.go.shellcmdflag = "-c"
   else
-    local ps = M.fs.exepath("powershell")
+    local ps = fs.exepath("powershell")
     if ps then
       vim.go.shell = ps
     end
@@ -607,17 +457,17 @@ end
 
 -- ------------------------- x ------------------------- --
 
-M.sh = M.promisify_wrap(function(promise, cmd, opts)
+local sh = promisify_wrap(function(promise, cmd, opts)
   opts = opts or {}
   local text = opts.text
   opts.text = nil
 
   if vim.fn.isabsolutepath(cmd[1]) then
     -- already normalized
-  elseif M.String.match(cmd[1], (vim.fn.has("win32") == 1) and "[\\\\/]" or "/") then
+  elseif String.match(cmd[1], (vim.fn.has("win32") == 1) and "[\\\\/]" or "/") then
     return promise:reject("Relative paths are not allowed")
   else
-    cmd[1] = M.fs.exepath(cmd[1])
+    cmd[1] = fs.exepath(cmd[1])
   end
 
   if opts.stdout then
@@ -659,10 +509,9 @@ end)
 
 -- ------------------------- x ------------------------- --
 
-M.random = {}
 
-local CHARS = M.String.split("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", "")
-M.random.string = function(len)
+local CHARS = String.split("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", "")
+random.string = function(len)
   local buffer = ffi.new("char [?]", len)
   ffi.copy(buffer, vim.uv.random(len), len)
 
@@ -672,13 +521,13 @@ M.random.string = function(len)
   return ffi.string(buffer, len)
 end
 
-M.random.int = function()
+random.int = function()
   local buffer = ffi.new("int32_t [1]")
   ffi.copy(buffer, vim.uv.random(4), 4)
   return buffer[0]
 end
 
-M.random.uint = function()
+random.uint = function()
   local buffer = ffi.new("uint32_t [1]")
   ffi.copy(buffer, vim.uv.random(4), 4)
   return buffer[0]
@@ -686,27 +535,13 @@ end
 
 -- ------------------------- x ------------------------- --
 
-local ENV_BUFFER_SIZE = math.pow(2, 15)
-M.env = setmetatable({}, {
-  __index = function(_, key)
-    return vim.uv.os_getenv(key, ENV_BUFFER_SIZE)
-  end,
-  __newindex = function(_, key, value)
-    return vim.uv.os_setenv(key, value)
-  end,
-})
-
--- ------------------------- x ------------------------- --
-
-M.fs = {}
-
 local TMP_DIR = vim.fn.has("win32") == 0 and
-  (M.env.XDG_RUNTIME_DIR or "/tmp") .. "/tmp." or
-  string.gsub(vim.fs.dirname(M.env.APPDATA) .. "/Local/Temp/tmp.", "/", "\\")
+  (env.XDG_RUNTIME_DIR or "/tmp") .. "/tmp." or
+  string.gsub(vim.fs.dirname(env.APPDATA) .. "/Local/Temp/tmp.", "/", "\\")
 
-M.fs.mktmp = M.promisify_wrap(function(promise)
+fs.mktmp = promisify_wrap(function(promise)
   while true do
-    local r = TMP_DIR .. M.random.string(10)
+    local r = TMP_DIR .. random.string(10)
     if vim.fn.isdirectory(r) == 0 then
       vim.fn.mkdir(r, "p")
       return promise:resolve(r)
@@ -714,7 +549,7 @@ M.fs.mktmp = M.promisify_wrap(function(promise)
   end
 end)
 
-M.fs.mkdir = M.promisify_wrap(function(promise, dir)
+fs.mkdir = promisify_wrap(function(promise, dir)
   local status, result = pcall(vim.fn.mkdir, dir, "p")
   if status then
     return promise:resolve()
@@ -723,10 +558,11 @@ M.fs.mkdir = M.promisify_wrap(function(promise, dir)
   end
 end)
 
-M.fs.mkfile = M.promisify_wrap(function(promise, file, content, flags)
-  flags = flags or ""
-  M.fs.mkdir(M.fs.dirname(file)):await():unwrap()
-  local status, result = pcall(vim.fn.writefile, content or {}, file, flags)
+fs.mkfile = promisify_wrap(function(promise, file, content, opts)
+  -- TODO: opts as object
+  opts = opts or ""
+  fs.mkdir(fs.dirname(file)):await():unwrap()
+  local status, result = pcall(vim.fn.writefile, content or {}, file, opts)
   if status then
     return promise:resolve()
   else
@@ -734,22 +570,22 @@ M.fs.mkfile = M.promisify_wrap(function(promise, file, content, flags)
   end
 end)
 
-M.fs.mklink = M.promisify_wrap(vim.fn.has("win32") == 1 and function(_, _, _)
+fs.mklink = promisify_wrap(vim.fn.has("win32") == 1 and function(_, _, _)
   assert(false, "Unsupported platform")
 end or function(promise, target, link_name)
-  M.sh{ "ln", "--symbolic", target, link_name }:await():unwrap()
+  sh{ "ln", "--symbolic", target, link_name }:await():unwrap()
   return promise:resolve()
 end)
 
-M.fs.copy = M.promisify_wrap(vim.fn.has("win32") == 1 and function(promise, src, dest)
-  M.sh{ "powershell", "Copy-Item", "-recurse", src, "-destination", dest }:await():unwrap()
+fs.copy = promisify_wrap(vim.fn.has("win32") == 1 and function(promise, src, dest)
+  sh{ "powershell", "Copy-Item", "-recurse", src, "-destination", dest }:await():unwrap()
   return promise:resolve()
 end or function(promise, src, dest)
-  M.sh{ "cp", "--recursive", src, dest }:await():unwrap()
+  sh{ "cp", "--recursive", src, dest }:await():unwrap()
   return promise:resolve()
 end)
 
-M.fs.move = M.promisify_wrap(function(promise, src, dest)
+fs.move = promisify_wrap(function(promise, src, dest)
   local status, result = pcall(vim.fn.rename, src, dest)
   if status then
     return promise:resolve()
@@ -758,7 +594,7 @@ M.fs.move = M.promisify_wrap(function(promise, src, dest)
   end
 end)
 
-M.fs.remove = M.promisify_wrap(function(promise, src)
+fs.remove = promisify_wrap(function(promise, src)
   -- local status, result = pcall(vim.fs.rm, src, { recursive = true, force = true })
   local status, result = pcall(vim.fn.delete, src, "rf")
   if status then
@@ -768,37 +604,37 @@ M.fs.remove = M.promisify_wrap(function(promise, src)
   end
 end)
 
-M.fs.readfile = M.promisify_wrap(function(promise, file, opts)
+fs.readfile = promisify_wrap(function(promise, file, opts)
   opts = opts or {}
   local status, result = pcall(vim.fn.readblob, file, opts.offset or 0, opts.size or -1)
   if status then
     if opts.raw then
       return promise:resolve(result)
     else
-      return promise:resolve(M.String.split(result, "\r?\n"))
+      return promise:resolve(String.split(result, "\r?\n"))
     end
   else
     return promise:reject(result)
   end
 end)
 
-M.fs.basename = vim.fs.basename
+fs.basename = vim.fs.basename
 
-M.fs.dirname = vim.fn.has("win32") == 1 and function(file)
+fs.dirname = vim.fn.has("win32") == 1 and function(file)
   local r = vim.fs.dirname(file)
   r = string.gsub(r, "/", "\\")
   return r
 end or vim.fs.dirname
 
-M.fs.relpath = function(base, target)
+fs.relpath = function(base, target)
   return vim.fs.relpath(base, target, {})
 end
 
-M.fs.exepath = (vim.fn.has("win32") == 1) and function(exe)
+fs.exepath = (vim.fn.has("win32") == 1) and function(exe)
   ---@diagnostic disable-next-line: missing-parameter, param-type-mismatch
-  local ext = M.String.split(M.env.PATHEXT, ";")
+  local ext = String.split(env.PATHEXT, ";")
   ---@diagnostic disable-next-line: param-type-mismatch
-  for _, p in ipairs(M.String.split(M.env.PATH, ";")) do
+  for _, p in ipairs(String.split(env.PATH, ";")) do
     p = string.gsub(vim.fs.normalize(p .. "\\" .. exe), "\\", "/")
     if vim.uv.fs_access(p, "RX") then return p end
     for _, e in ipairs(ext) do
@@ -807,13 +643,13 @@ M.fs.exepath = (vim.fn.has("win32") == 1) and function(exe)
     end
   end
 end or function(bin)
-  for _, p in ipairs(M.String.split(M.env.PATH, ":")) do
+  for _, p in ipairs(String.split(env.PATH, ":")) do
     p = vim.fs.normalize(p .. "/" .. bin)
     if vim.uv.fs_access(p, "RX") then return p end
   end
 end
 
-M.fs.ls = M.promisify_wrap(function(promise, path)
+fs.ls = promisify_wrap(function(promise, path)
   local C_BUFFER_SIZE = 8192
   local C_BUFFER = ffi.new("char [?]", C_BUFFER_SIZE)
 
@@ -825,12 +661,12 @@ M.fs.ls = M.promisify_wrap(function(promise, path)
 
   local content = vim.uv.fs_readdir(fd) or {}
   for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
-    M.List.merge(content, t)
+    List.merge(content, t)
   end
   vim.uv.fs_closedir(fd)
 
   if vim.fn.has("win32") == 1 then
-    content = M.List.filter(function(e) return e.type ~= "link" end, content)
+    content = List.filter(function(e) return e.type ~= "link" end, content)
   end
 
   for _, e in ipairs(content) do
@@ -846,7 +682,7 @@ M.fs.ls = M.promisify_wrap(function(promise, path)
     ::continue::
   end
 
-  return promise:resolve(M.List.sort(content, function(a, b)
+  return promise:resolve(List.sort(content, function(a, b)
     if a.is_directory ~= b.is_directory then return a.is_directory end
 
     local fa, fb = string.sub(a.name, 1, 1) == ".", string.sub(b.name, 1, 1) == "."
@@ -857,7 +693,7 @@ M.fs.ls = M.promisify_wrap(function(promise, path)
   end))
 end)
 
-M.fs.find = M.promisify_wrap((function()
+fs.find = promisify_wrap((function()
   local function find(promise, regex, path)
     ---@diagnostic disable-next-line: param-type-mismatch
     local fd, message, _ = vim.uv.fs_opendir(path, nil, 16384) -- 1 << 14
@@ -872,9 +708,9 @@ M.fs.find = M.promisify_wrap((function()
         if e.type == "directory" then
           local f = find(promise, regex, path .. "/" .. e.name)
           if not f then return nil end
-          M.List.merge(r, f)
+          List.merge(r, f)
         elseif vim.fn.match(e.name, regex) > -1 then
-          M.List.insert(r, path .. "/" .. e.name)
+          List.insert(r, path .. "/" .. e.name)
         end
       end
     end
@@ -895,7 +731,7 @@ M.fs.find = M.promisify_wrap((function()
     local f = find(promise, regex, path)
     if not f then return nil end
 
-    return promise:resolve(M.List.map(function(e)
+    return promise:resolve(List.map(function(e)
       return string.sub(e, pre)
     end, f))
   end
@@ -903,23 +739,21 @@ end)())
 
 -- ------------------------- x ------------------------- --
 
-M.open = {}
-
-M.open.browser = (vim.fn.has("win32") == 1) and function(url)
-  return vim.uv.spawn(M.fs.exepath("rundll32"), { args = { "url.dll,FileProtocolHandler", url }, detached = true })
+open.browser = (vim.fn.has("win32") == 1) and function(url)
+  return vim.uv.spawn(fs.exepath("rundll32"), { args = { "url.dll,FileProtocolHandler", url }, detached = true })
 end or ((vim.fn.has("mac") == 1) and function(url)
   return vim.uv.spawn("open", { args = { url }, detached = true })
 end or function(url)
   return vim.uv.spawn("xdg-open", { args = { url }, detached = true })
 end)
 
-M.open.explorer = (vim.fn.has("win32") == 1) and function(path)
-  vim.uv.spawn(M.fs.exepath("explorer"), { args = { path }, detached = true })
+open.explorer = (vim.fn.has("win32") == 1) and function(path)
+  vim.uv.spawn(fs.exepath("explorer"), { args = { path }, detached = true })
 end or ((vim.fn.has("mac") == 1) and function(path)
-  vim.uv.spawn(M.fs.exepath("open"), { args = { path }, detached = true })
+  vim.uv.spawn(fs.exepath("open"), { args = { path }, detached = true })
 end or function(path)
   for _, e in ipairs{ "xdg-open", "thunar", "dolphin", "nautilus" } do
-    local ep = M.fs.exepath(e)
+    local ep = fs.exepath(e)
     if ep then
       return vim.uv.spawn(ep, { args = { path }, detached = true })
     end
@@ -932,103 +766,99 @@ local GIT_DEFAULT_BRANCH = "master"
 local GIT_INIT_COMMIT = "init"
 local GIT_OPTIONS = { text = true, clear_env = true, timeout = (3 * 60 * 1000) }
 
-M.git = {}
-
-M.git.init = M.promisify_wrap(function(promise, o)
+git.init = promisify_wrap(function(promise, o)
   if not o then o = {} end
   if not o.cwd then o.cwd = "." end
 
-  local go = M.Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
-  local ls = M.fs.ls(o.cwd):await():unwrap()
+  local go = Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
+  local ls = fs.ls(o.cwd):await():unwrap()
 
-  if #M.List.filter(function(e) return e.name == ".git" and e.is_directory end, ls) == 1 then
-    M.git.config(o):await():unwrap()
-    M.notify.warn("Repository already inited")
+  if #List.filter(function(e) return e.name == ".git" and e.is_directory end, ls) == 1 then
+    git.config(o):await():unwrap()
+    notify.warn("Repository already inited")
     return promise:resolve()
   end
 
-  M.sh({ "git", "init", "-b", GIT_DEFAULT_BRANCH }, go):await():unwrap()
-  M.git.config(o):await():unwrap()
+  sh({ "git", "init", "-b", GIT_DEFAULT_BRANCH }, go):await():unwrap()
+  git.config(o):await():unwrap()
 
   if #ls > 0 then
-    M.sh({ "git", "add", "-A" }, go):await():unwrap()
-    M.sh({ "git", "commit", "-m", GIT_INIT_COMMIT }, go):await():unwrap()
+    sh({ "git", "add", "-A" }, go):await():unwrap()
+    sh({ "git", "commit", "-m", GIT_INIT_COMMIT }, go):await():unwrap()
   end
 
   return promise:resolve()
 end)
 
-M.git.clone = M.promisify_wrap(function(promise, o)
+git.clone = promisify_wrap(function(promise, o)
   if not o then o = {} end
   if not o.cwd then o.cwd = "." end
 
-  M.fs.mkdir(o.cwd):await():unwrap()
+  fs.mkdir(o.cwd):await():unwrap()
   local cmd = o.shallow and
     { "git", "clone", "--shallow-submodules", "--depth=1", "--progress", "--", o.url, o.cwd } or
     { "git", "clone", "--shallow-submodules", "--progress", "--", o.url, o.cwd }
-  M.sh(cmd, M.Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })):await():unwrap()
+  sh(cmd, Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })):await():unwrap()
   return promise:resolve()
 end)
 
-M.git.fetch = M.promisify_wrap(function(promise, o)
+git.fetch = promisify_wrap(function(promise, o)
   if not o then o = {} end
-  local go = M.Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd or "." })
+  local go = Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd or "." })
 
-  M.sh({ "git", "status" }, go):await():unwrap()
+  sh({ "git", "status" }, go):await():unwrap()
 
   if not o.shallow then
-    M.sh({ "git", "fetch", "--all" }, go):await():unwrap()
+    sh({ "git", "fetch", "--all" }, go):await():unwrap()
   elseif o.commit then
-    M.sh({ "git", "fetch", "origin", "--depth=1", "--progress", o.commit }, go):await():unwrap()
-    M.sh({ "git", "reset", "--hard", o.commit }, go):await():unwrap()
+    sh({ "git", "fetch", "origin", "--depth=1", "--progress", o.commit }, go):await():unwrap()
+    sh({ "git", "reset", "--hard", o.commit }, go):await():unwrap()
   elseif o.tag then
-    M.sh({ "git", "fetch", "origin", "--depth=1", "--progress", "--no-tags", "refs/tags/".. o.tag ..":refs/tags/".. o.tag }, go):await():unwrap()
-    local r = M.sh({ "git", "tag", "--list", o.tag, "--sort", "-version:refname" }, go):await()
+    sh({ "git", "fetch", "origin", "--depth=1", "--progress", "--no-tags", "refs/tags/".. o.tag ..":refs/tags/".. o.tag }, go):await():unwrap()
+    local r = sh({ "git", "tag", "--list", o.tag, "--sort", "-version:refname" }, go):await()
     r:unwrap()
-    M.sh({ "git", "checkout", "tags/" .. M.String.split(r.stdout, "[\r\n]+")[1] }, go):await():unwrap()
+    sh({ "git", "checkout", "tags/" .. String.split(r.stdout, "[\r\n]+")[1] }, go):await():unwrap()
   elseif o.branch then
-    M.sh({ "git", "fetch", "origin", "--depth=1", "--progress", "+refs/heads/".. o.branch ..":refs/remotes/origin/".. o.branch }, go):await():unwrap()
-    M.sh({ "git", "checkout", "origin/"..o.branch }, go):await():unwrap()
+    sh({ "git", "fetch", "origin", "--depth=1", "--progress", "+refs/heads/".. o.branch ..":refs/remotes/origin/".. o.branch }, go):await():unwrap()
+    sh({ "git", "checkout", "origin/"..o.branch }, go):await():unwrap()
   else
-    M.sh({ "git", "fetch", "origin", "--depth=1", "--progress" }, go):await():unwrap()
-    local r = M.sh({ "git", "ls-remote", "--symref", "origin", "HEAD" }, go):await()
+    sh({ "git", "fetch", "origin", "--depth=1", "--progress" }, go):await():unwrap()
+    local r = sh({ "git", "ls-remote", "--symref", "origin", "HEAD" }, go):await()
     r:unwrap()
-    M.sh({ "git", "switch", ({string.gsub(M.String.split(r.stdout, "[ \t]")[2], ".+/(.+)$", "%1")})[1] }, go):await():unwrap()
+    sh({ "git", "switch", ({string.gsub(String.split(r.stdout, "[ \t]")[2], ".+/(.+)$", "%1")})[1] }, go):await():unwrap()
   end
 
   return promise:resolve()
 end)
 
-M.git.config = M.promisify_wrap(function(promise, o)
+git.config = promisify_wrap(function(promise, o)
   if not o then o = {} end
   if not o.cwd then o.cwd = "." end
-  M.sh({ "git", "status" }, M.Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })):await():unwrap()
+  sh({ "git", "status" }, Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })):await():unwrap()
 
-  local go = M.Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
+  local go = Dictionary.merge(GIT_OPTIONS, { cwd = o.cwd })
   o.cwd = nil
 
-  for _, k in ipairs(M.Dictionary.keys(o)) do
-    assert(M.List.contains({ "name", "email", "url" }, k), "Unknown option \"" .. k .. "\n")
+  for _, k in ipairs(Dictionary.keys(o)) do
+    assert(List.contains({ "name", "email", "url" }, k), "Unknown option \"" .. k .. "\n")
   end
 
   if o.name then
-    M.sh({ "git", "config", "--local", "user.name", o.name }, go):await():unwrap()
+    sh({ "git", "config", "--local", "user.name", o.name }, go):await():unwrap()
   end
 
   if o.email then
-    M.sh({ "git", "config", "--local", "user.email", o.email }, go):await():unwrap()
+    sh({ "git", "config", "--local", "user.email", o.email }, go):await():unwrap()
   end
 
   if o.url then
-    M.sh({ "git", "config", "--local", "remote.origin.url", o.url }, go):await():unwrap()
+    sh({ "git", "config", "--local", "remote.origin.url", o.url }, go):await():unwrap()
   end
 
   return promise:resolve()
 end)
 
 -- ------------------------- x ------------------------- --
-
-local Window = {}
 
 function Window:show()
   if vim.api.nvim_win_is_valid(self.win) then return end
@@ -1037,7 +867,7 @@ function Window:show()
     self.buf = vim.api.nvim_create_buf(false, true)
   end
 
-  self.win = vim.api.nvim_open_win(self.buf, self.focus, M.Dictionary.merge({
+  self.win = vim.api.nvim_open_win(self.buf, self.focus, Dictionary.merge({
     relative = "editor",
     style = "minimal",
     border = self.border,
@@ -1066,7 +896,7 @@ function Window:toggle()
   end
 end
 
-M.Window = function(conf)
+local Window_constructor = function(conf)
   assert(conf.size, "Size is missing!")
 
   local self = {}
@@ -1077,7 +907,7 @@ M.Window = function(conf)
   self.size = conf.size
   self.on_show = { conf.on_show }
   self.on_resize = { conf.on_resize }
-  M.List.insert(self.on_resize, function(_)
+  List.insert(self.on_resize, function(_)
     local s = self.size()
     s.relative = "editor"
     vim.api.nvim_win_set_config(self.win, s)
@@ -1094,7 +924,7 @@ M.Window = function(conf)
       end
     end }
 
-    M.List.insert(self.on_show, function()
+    List.insert(self.on_show, function()
       vim.api.nvim_win_set_hl_ns(self.win, self.ns)
       for _, fn in ipairs(self.on_colorscheme) do fn(self) end
     end)
@@ -1114,4 +944,25 @@ end
 
 -- ------------------------- x ------------------------- --
 
-return M
+return {
+  Dictionary = Dictionary,
+  env = env,
+  flags = flags,
+  fs = fs,
+  git = git,
+  List = List,
+  log = log,
+  notify = notify,
+  notify_once = notify_once,
+  open = open,
+  prequire = prequire,
+  prequire_wrap = prequire_wrap,
+  promisify = promisify,
+  promisify_wrap = promisify_wrap,
+  random = random,
+  RingBuffer = RingBuffer_constructor,
+  sh = sh,
+  String = String,
+  term = term,
+  Window = Window_constructor,
+}

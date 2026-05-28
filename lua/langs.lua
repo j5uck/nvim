@@ -1,6 +1,6 @@
-local promisify_wrap, fs, git, notify, List, parse, prequire, sh = (function()
+local promisify_wrap, fs, git, notify, List, prequire, sh = (function()
   local _ = require("_")
-  return _.promisify_wrap, _.fs, _.git, _.notify, _.List, _.parse, _.prequire, _.sh
+  return _.promisify_wrap, _.fs, _.git, _.notify, _.List, _.prequire, _.sh
 end)()
 
 local T_GRAY  = "\x1B[1;30m"

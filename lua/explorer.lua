@@ -620,7 +620,9 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
   PATHS = {}
 
   M.history.skip = true
-  vim.schedule_wrap(M.go)(M.dir)
+
+  promise:schedule()
+  M.go(M.dir)
 
   return promise:resolve()
 end)
