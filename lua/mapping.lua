@@ -354,7 +354,7 @@ for i=1, 9, 1 do
 end
 map({ "n", "t" }, "<M-0>", goToTabpageWrap(10))
 
-local gh_users = { "" }
+local gh_users = {}
 local gh_users_width = 0
 
 W.gh_auth = Window{
@@ -411,17 +411,19 @@ W.gh_auth = Window{
       end
     })
 
-    local select = promisify_wrap(function(promise)
+    local select = function()
       local lnum = vim.api.nvim_win_get_cursor(0)[1]
       local u = gh_users[lnum].username
-      sh({ "gh", "auth", "switch", "--user", u }, { text = true }):await():unwrap()
+
       W.gh_auth:hide()
-      notify.warn("GH: User switched to \"" .. u .. "\"")
-      promise:resolve()
-    end)
+
+      sh{ "gh", "auth", "switch", "--user", u }:finally(function(_p)
+        if _p.code == 0 then notify.warn("GH: User switched to \"" .. u .. "\"") end
+      end)
+    end
 
     map("n", "<esc>", function() W.gh_auth:hide() end, { buffer = self.buf })
-    map("n", "<CR>", function() select() end, { buffer = self.buf })
+    map("n", "<CR>", select, { buffer = self.buf })
   end,
   size = function()
     return {
@@ -440,75 +442,64 @@ local gh = promisify_wrap(function(promise)
     return promise:reject("gh not found")
   end
 
-  if 1 then
-    require("_").log(env.APPDATA)
+  local f
 
-
-local f
-
-if env.GH_CONFIG_DIR then
-  f = env.GH_CONFIG_DIR .. "/hosts.yml"
-elseif vim.fn.has("win32") == 1 then
-  f = env.APPDATA .. "\\GitHub CLI\\hosts.yml"
-else
-  f = "TODO"
-end
-
-for _, l in ipairs(fs.readfile(f):await():unwrap()) do
-  if String.match(l, "^ \\+users:") then
-  elseif String.match(l, "^ \\+user:") then
-  end
-end
-
-promise:resolve()
-
---[[
-
-GH_CONFIG_DIR: the directory where gh will store configuration files. If not specified, the default value will be one of the following paths (in order of precedence):
-
-$XDG_CONFIG_HOME/gh (if $XDG_CONFIG_HOME is set),
-$AppData/GitHub CLI (on Windows if $AppData is set), or
-$HOME/.config/gh.
-
-]]--
-
-
-    if 1 then return end
+  if env.GH_CONFIG_DIR then
+    f = env.GH_CONFIG_DIR .. "/hosts.yml"
+  elseif env.XDG_CONFIG_HOME then
+    f = env.XDG_CONFIG_HOME .. "/gh/hosts.yml"
+  elseif vim.fn.has("win32") == 1 then
+    f = env.APPDATA .. "\\GitHub CLI\\hosts.yml"
+  elseif env.HOME then
+    f = env.HOME .. "/.config/gh/hosts.yml"
+  else
+    assert(false)
   end
 
-  local r = sh({ "gh", "auth", "status", "--json", "hosts" }, { text = true }):await()
-  r:unwrap()
+  if not vim.uv.fs_access(f, "R") then
+    notify.warn("You are not logged into GitHub")
+    return promise:resolve()
+  end
+  local lines = fs.readfile(f):await():unwrap()
 
-  local json = vim.json.decode(r.stdout)
-  if not (json.hosts and json.hosts["github.com"] and #json.hosts["github.com"] > 0) then
-    notify:warn("You are not logged into GitHub")
+  local active
+  gh_users = {}
+
+  for i = 0, #lines, 1 do
+    if String.match(lines[i], "^    user: ") then
+      active = String.slice(lines[i], #"    user: " + 1)
+    elseif String.match(lines[i], "^    users:$") then
+      i = i + 1
+      while String.match(lines[i], "^        ") and i <= #lines do
+        List.insert(gh_users, String.substitute(lines[i], "^ \\+\\(.*\\):.*", "\\1"))
+        i = i + 1
+      end
+      i = i - 1
+    end
+  end
+
+  if #gh_users == 0 then
+    notify.warn("You are not logged into GitHub")
     return promise:resolve()
   end
 
   gh_users_width = 6
-  gh_users = List.map(function(o)
-    gh_users_width = math.max(gh_users_width, #o.login + 6)
-    return { username = o.login, active = o.active }
-  end, json.hosts["github.com"])
-  gh_users = List.sort(gh_users, function(a, b)
-    local c = vim.stricmp(a.username, b.username)
-    return (c == 0) and (a.username < b.username) or (c == -1)
-  end)
+  gh_users = List.map(function(u)
+    gh_users_width = math.max(gh_users_width, #u + 6)
+    return { username = u, active = u == active }
+  end, List.sort(gh_users))
 
   W.gh_auth:show()
 
   promise:resolve()
 end)
 
--- TODO: make it more responsive
 map("n", "<leader>gg", function() gh() end, { desc = "[g]o to [g]ithub account selection menu" })
 
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "lua-plug" },
   callback = function(ev)
-    for _, v in ipairs{ "<CR>", "x", "X", "d", "dd", "i", "I", "a", "A", "o", "O", "r", "R" } do
-      map("n", v, "<Nop>", { buffer = ev.buf })
-    end
+    map("n", { "<CR>", "x", "X", "d", "dd", "i", "I", "a", "A", "o", "O", "r", "R" }, "<Nop>", { buffer = ev.buf })
   end
 })
 

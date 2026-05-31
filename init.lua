@@ -40,6 +40,8 @@ vim.opt.mouse = { n = true, v = true, i = true }
 
 vim.cmd[[silent! set maxsearchcount=0]]
 
+vim.opt.scrollback = 20480
+
 vim.opt.laststatus = 3
 
 vim.opt.termguicolors = true

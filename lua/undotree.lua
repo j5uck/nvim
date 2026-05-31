@@ -6,9 +6,11 @@ end)()
 local M = {}
 
 M.new = function()
-  return vim.api.nvim_win_call(0, function()
+  local w
+  vim.api.nvim_win_call(0, function()
+    vim.cmd("let t:undotree.w.target = " .. vim.api.nvim_get_current_win())
     vim.cmd[[noautocmd silent topleft vertical 25 split undotree://]]
-    local w = vim.api.nvim_get_current_win()
+    w = vim.api.nvim_get_current_win()
 
     vim.cmd("let t:undotree.w.undo = " .. w)
     vim.cmd("let t:undotree.b.target = -1") -- force update
@@ -36,10 +38,8 @@ M.new = function()
     vim.b.is_undotree = true
 
     vim.cmd.clearjumps()
-
-    ---@diagnostic disable-next-line: redundant-return-value
-    return w
   end)
+  return w
 end
 
 M.toggle = function()
@@ -55,7 +55,7 @@ M.toggle = function()
   else
     if vim.o.filetype == "undotree" then
       for _, w in ipairs(wins) do
-        if vim.api.nvim_win_get_buf(w) == vim.t.undotree.b.target then
+        if w == vim.t.undotree.w.target then
           vim.api.nvim_set_current_win(w)
           break
         end
@@ -118,6 +118,7 @@ M.update = function()
 
   if changes then
     t_undotree.b.target = buf
+    t_undotree.w.target = vim.api.nvim_get_current_win()
     t_undotree.seq_last = t_undotree.rawtree.seq_last
     t_undotree.seq_cur = -1
     t_undotree.seq_curhead = -1
