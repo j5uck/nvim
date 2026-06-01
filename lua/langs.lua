@@ -165,7 +165,7 @@ M.bun.code["package.json"] = {
   "    \"bin\": \"bun build.ts -- bin\"",
   "  },",
   "  \"devDependencies\": {",
-  "    \"@types/bun\": \"*\",",
+  "    \"@types/bun\": \"1.3.14\",",
   "    \"typescript\": \"*\"",
   "  }",
   "}"

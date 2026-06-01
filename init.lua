@@ -151,11 +151,12 @@ local promisify_wrap, fs, List, notify, String, Window = (function()
   return _.promisify_wrap, _.fs, _.List, _.notify, _.String, _.Window
 end)()
 
-local REGISTERS = String.split("@0123456789-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/", "")
+local REGISTERS = String.split("@0123456789-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", "")
 vim.schedule(function()
   for _, r in ipairs(REGISTERS) do
     vim.fn.setreg(r, "")
   end
+  vim.fn.setreg("/", nil)
 end)
 
 if vim.g.nvy then
