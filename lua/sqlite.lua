@@ -16,7 +16,11 @@ local function sqlite(db, sql)
   return vim.json.decode(r.stdout)
 end
 
-local fn_BufReadCmd = promisify_wrap(function(promise, file)
+local fn_BufReadCmd = promisify_wrap(function(promise, o)
+  local file = o.file
+  local window = o.window
+  local buffer = o.buffer
+
   local header = fs.readfile(file, { size = 16, raw = true }):await():unwrap()
 
   if header ~= "SQLite format 3\0" then
@@ -41,7 +45,11 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
     vim.bo[ev.buf].filetype = "lua-sqlite"
 
     local file = String.split(ev.file, "//")[2]
-    fn_BufReadCmd(vim.fn.has("win32") == 1 and file or ("/" .. file))
+    fn_BufReadCmd{
+      buffer = ev.buf,
+      window = vim.api.nvim_get_current_win(),
+      file = vim.fn.has("win32") == 1 and file or ("/" .. file)
+    }
   end
 })
 
