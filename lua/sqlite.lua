@@ -5,6 +5,8 @@ end)()
 
 local log = require("_").log
 
+vim.filetype.add{ pattern = { ["sqlite://.*"] = { "lua-sqlite", { priority = 10 } } } }
+
 local function sqlite(db, sql)
   local js =
     "import * as sqlite from \"bun:sqlite\";" ..
@@ -44,23 +46,34 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
   callback = function(ev)
     vim.bo[ev.buf].filetype = "lua-sqlite"
 
-    local file = String.split(ev.file, "//")[2]
+    local _, file, path = unpack(String.split(ev.file, "//"))
+
     fn_BufReadCmd{
       buffer = ev.buf,
       window = vim.api.nvim_get_current_win(),
-      file = vim.fn.has("win32") == 1 and file or ("/" .. file)
+      file = vim.fn.has("win32") == 1 and file or ("/" .. file),
+      path = #path == 0 and String.split(path, "/") or {}
     }
   end
 })
+
+-- TODO: fix known error
+--  doesnt load when ":e foo.sqlite" for 2º time
 
 vim.api.nvim_create_autocmd("BufReadCmd", {
   pattern = { "*.db", "*.db3", "*.sqlite", "*.sqlite3" },
   nested = true,
   callback = function(ev)
+    local p = fs.getabsolutepath(ev.file)
     if vim.fn.has("win32") == 1 then
-      vim.cmd.e("sqlite://" .. String.substitute(ev.file, "\\\\", "/") .. "//")
+      p = String.slice(p, 1, 1) .. "/" .. String.slice(p, 4)
+      vim.cmd.e("sqlite://" .. String.substitute(p, "\\\\", "/") .. "//")
     else
-      vim.cmd.e("sqlite:/" .. ev.file .. "//")
+      vim.cmd.e("sqlite:/" .. p .. "//")
     end
+    vim.schedule(function()
+      vim.bo[ev.buf].modified = false
+      vim.bo[ev.buf].modifiable = false
+    end)
   end
 })

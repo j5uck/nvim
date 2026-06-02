@@ -625,6 +625,22 @@ fs.isabsolutepath = function(p)
   return vim.fn.isabsolutepath(p) == 1
 end
 
+fs.getabsolutepath = vim.fn.has("win32") == 1 and function(p)
+  local r = vim.fs.normalize(fs.isabsolutepath(p) and p or (vim.fn.getcwd() .. "/" .. p))
+  if String.match(p, "[\\\\/]") then
+    return r .. "\\"
+  else
+    return r
+  end
+end or function(p)
+  local r = vim.fs.normalize(fs.isabsolutepath(p) and p or (vim.fn.getcwd() .. "/" .. p))
+  if String.endswith(p, "/") then
+    return r .. "/"
+  else
+    return r
+  end
+end
+
 fs.basename = vim.fs.basename
 
 fs.dirname = vim.fn.has("win32") == 1 and function(file)
@@ -700,49 +716,47 @@ fs.ls = promisify_wrap(function(promise, path)
   end))
 end)
 
-fs.find = promisify_wrap((function()
-  local function find(promise, regex, path)
-    ---@diagnostic disable-next-line: param-type-mismatch
-    local fd, message, _ = vim.uv.fs_opendir(path, nil, 16384) -- 1 << 14
-    if not fd then
-      promise:reject{ message = message }
-      return nil
-    end
+local function find(promise, regex, path)
+  ---@diagnostic disable-next-line: param-type-mismatch
+  local fd, message, _ = vim.uv.fs_opendir(path, nil, 16384) -- 1 << 14
+  if not fd then
+    promise:reject{ message = message }
+    return nil
+  end
 
-    local r = {}
-    for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
-      for _, e in ipairs(t) do
-        if e.type == "directory" then
-          local f = find(promise, regex, path .. "/" .. e.name)
-          if not f then return nil end
-          List.merge(r, f)
-        elseif vim.fn.match(e.name, regex) > -1 then
-          List.insert(r, path .. "/" .. e.name)
-        end
+  local r = {}
+  for _, t in ipairs(vim.iter(function() return vim.uv.fs_readdir(fd) end):totable()) do
+    for _, e in ipairs(t) do
+      if e.type == "directory" then
+        local f = find(promise, regex, path .. "/" .. e.name)
+        if not f then return nil end
+        List.merge(r, f)
+      elseif vim.fn.match(e.name, regex) > -1 then
+        List.insert(r, path .. "/" .. e.name)
       end
     end
-    vim.uv.fs_closedir(fd)
-
-    return r
   end
+  vim.uv.fs_closedir(fd)
 
-  return function(promise, regex, path)
-    path = path or ""
-    if fs.isabsolutepath(path) then
-      path = vim.fs.normalize(path)
-    else
-      path = vim.fs.normalize(vim.fn.getcwd() .. "/" .. path)
-    end
-    local pre = #path + 2
+  return r
+end
 
-    local f = find(promise, regex, path)
-    if not f then return nil end
-
-    return promise:resolve(List.map(function(e)
-      return string.sub(e, pre)
-    end, f))
+fs.find = promisify_wrap(function(promise, regex, path)
+  path = path or ""
+  if fs.isabsolutepath(path) then
+    path = vim.fs.normalize(path)
+  else
+    path = vim.fs.normalize(vim.fn.getcwd() .. "/" .. path)
   end
-end)())
+  local pre = #path + 2
+
+  local f = find(promise, regex, path)
+  if not f then return nil end
+
+  return promise:resolve(List.map(function(e)
+    return string.sub(e, pre)
+  end, f))
+end)
 
 -- ------------------------- x ------------------------- --
 
