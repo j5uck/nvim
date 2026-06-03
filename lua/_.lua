@@ -627,18 +627,10 @@ end
 
 fs.getabsolutepath = vim.fn.has("win32") == 1 and function(p)
   local r = vim.fs.normalize(fs.isabsolutepath(p) and p or (vim.fn.getcwd() .. "/" .. p))
-  if String.match(p, "[\\\\/]") then
-    return r .. "\\"
-  else
-    return r
-  end
+  return String.match(String.slice(p, #p), "[\\\\/]") and (r .. "/") or r
 end or function(p)
   local r = vim.fs.normalize(fs.isabsolutepath(p) and p or (vim.fn.getcwd() .. "/" .. p))
-  if String.endswith(p, "/") then
-    return r .. "/"
-  else
-    return r
-  end
+  return String.endswith(p, "/") and (r .. "/") or r
 end
 
 fs.basename = vim.fs.basename

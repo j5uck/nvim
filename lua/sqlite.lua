@@ -41,19 +41,34 @@ local fn_BufReadCmd = promisify_wrap(function(promise, o)
   promise:resolve()
 end)
 
+vim.api.nvim_create_autocmd("BufEnter", {
+  pattern = { "sqlite://*" },
+  callback = function(ev)
+    -- log(ev)
+  end
+})
+
 vim.api.nvim_create_autocmd("BufReadCmd", {
   pattern = { "sqlite://*" },
   callback = function(ev)
+    -- log(ev)
     vim.bo[ev.buf].filetype = "lua-sqlite"
 
     local _, file, path = unpack(String.split(ev.file, "//"))
+    if vim.fn.has("win32") == 1 then
+      file = String.slice(file, 1, 1) .. ":\\" .. String.slice(file, 3)
+      file = String.substitute(file, "/",  "\\")
+    else
+      file = "/" .. file
+    end
+    log(file)
 
-    fn_BufReadCmd{
-      buffer = ev.buf,
-      window = vim.api.nvim_get_current_win(),
-      file = vim.fn.has("win32") == 1 and file or ("/" .. file),
-      path = #path == 0 and String.split(path, "/") or {}
-    }
+    -- fn_BufReadCmd{
+    --   buffer = ev.buf,
+    --   window = vim.api.nvim_get_current_win(),
+    --   file = file,
+    --   path = #path == 0 and String.split(path, "/") or {}
+    -- }
   end
 })
 
@@ -67,10 +82,9 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
     local p = fs.getabsolutepath(ev.file)
     if vim.fn.has("win32") == 1 then
       p = String.slice(p, 1, 1) .. "/" .. String.slice(p, 4)
-      vim.cmd.e("sqlite://" .. String.substitute(p, "\\\\", "/") .. "//")
-    else
-      vim.cmd.e("sqlite:/" .. p .. "//")
+      p = String.substitute(p, "\\\\", "/")
     end
+    vim.cmd.e("sqlite:/" .. p .. "//")
     vim.schedule(function()
       vim.bo[ev.buf].modified = false
       vim.bo[ev.buf].modifiable = false
