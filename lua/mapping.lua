@@ -3,6 +3,7 @@ local env, promisify_wrap, Dictionary, List, notify, notify_once, flags, fs, ope
   return _.env, _.promisify_wrap, _.Dictionary, _.List, _.notify, _.notify_once, _.flags, _.fs, _.open, _.prequire, _.RingBuffer, _.sh, _.String, _.term, _.Window
 end)()
 local explorer = require("explorer")
+local sqlite = require("sqlite")
 
 local W = {}
 
@@ -95,6 +96,10 @@ map("n", "<leader>O", "O<esc>0\"_D", { desc = "create new line" })
 map("n", "<leader>gf", function()
   local p = vim.api.nvim_buf_get_name(0)
   if #p == 0 then return end
+
+  if String.match(p, "^\\w\\+://") then
+    return notify.warn("URL are not supported")
+  end
   explorer.resume()
   vim.cmd.edit(vim.fn.fnameescape(fs.dirname(p)))
 end, { desc = "[g]o to [f]ile parent folder" })
@@ -542,6 +547,13 @@ vim.api.nvim_create_autocmd("FileType", {
       vim.fn.setreg([["]], b)
       vim.fn.setreg([[+]], b)
     end, { buffer = ev.buf, desc = "copy buffer path" })
+  end
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = { "lua-sqlite" },
+  callback = function(ev)
+    map("n", "<CR>", sqlite.select, { buffer = ev.buf })
   end
 })
 

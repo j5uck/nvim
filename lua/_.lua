@@ -35,6 +35,12 @@ local env = setmetatable({}, {
 
 -- ------------------------- x ------------------------- --
 
+local function defer_fn_wrap(fn, milliseconds)
+  return function() vim.defer_fn(fn, milliseconds) end
+end
+
+-- ------------------------- x ------------------------- --
+
 String.format = string.format
 String.startswith = function(s, prefix)
   return string.sub(s, 1, #prefix) == prefix
@@ -263,7 +269,35 @@ local log = function(...)
     local e = select(i, ...)
     List.insert(sb, vim.inspect(e))
   end
-  vim.schedule_wrap(vim.notify)(List.join(sb, "\n"), W)
+  notify.warn(List.join(sb, "\n"))
+end
+
+do
+  local ni = notify.info
+  local nw = notify.warn
+  local ne = notify.error
+
+  local noi = notify_once.info
+  local now = notify_once.warn
+  local noe = notify_once.error
+
+  notify.info  = vim.schedule_wrap(ni)
+  notify.warn  = vim.schedule_wrap(nw)
+  notify.error = vim.schedule_wrap(ne)
+
+  notify_once.info  = vim.schedule_wrap(noi)
+  notify_once.warn  = vim.schedule_wrap(now)
+  notify_once.error = vim.schedule_wrap(noe)
+
+  vim.schedule(function()
+    notify.info  = ni
+    notify.warn  = nw
+    notify.error = ne
+
+    notify_once.info  = noi
+    notify_once.warn  = now
+    notify_once.error = noe
+  end)
 end
 
 -- ------------------------- x ------------------------- --
@@ -493,8 +527,8 @@ local sh = promisify_wrap(function(promise, cmd, opts)
 
   vim.system(cmd, opts, vim.schedule_wrap(function(out)
     if (vim.fn.has("win32") == 1) and text then
-      promise.stdout = String.substitute(out.stdout or "", "\r\n", "\n")
-      promise.stderr = String.substitute(out.stderr or "", "\r\n", "\n")
+      promise.stdout = out.stdout and String.substitute(out.stdout, "\r\n", "\n") or ""
+      promise.stderr = out.stderr and String.substitute(out.stderr, "\r\n", "\n") or ""
     else
       promise.stdout = out.stdout or ""
       promise.stderr = out.stderr or ""
@@ -723,7 +757,7 @@ local function find(promise, regex, path)
         local f = find(promise, regex, path .. "/" .. e.name)
         if not f then return nil end
         List.merge(r, f)
-      elseif vim.fn.match(e.name, regex) > -1 then
+      elseif String.match(e.name, regex) then
         List.insert(r, path .. "/" .. e.name)
       end
     end
@@ -968,6 +1002,7 @@ end
 -- ------------------------- x ------------------------- --
 
 return {
+  defer_fn_wrap = defer_fn_wrap,
   Dictionary = Dictionary,
   env = env,
   flags = flags,

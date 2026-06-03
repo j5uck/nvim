@@ -5,6 +5,8 @@ end)()
 
 local log = require("_").log
 
+local M = {}
+
 vim.filetype.add{ pattern = { ["sqlite://.*"] = { "lua-sqlite", { priority = 10 } } } }
 
 local function sqlite(db, sql)
@@ -20,8 +22,8 @@ end
 
 local fn_BufReadCmd = promisify_wrap(function(promise, o)
   local file = o.file
-  local window = o.window
   local buffer = o.buffer
+  local path = o.path
 
   local header = fs.readfile(file, { size = 16, raw = true }):await():unwrap()
 
@@ -30,50 +32,53 @@ local fn_BufReadCmd = promisify_wrap(function(promise, o)
     return promise:resolve()
   end
 
-  -- local query = sqlite(file, "SELECT name FROM sqlite_master WHERE type = \"table\"")
-  -- local query = sqlite(file, "SELECT name, type FROM sqlite_master")
   local query = sqlite(file, "SELECT * FROM sqlite_master")
-  log(List.sort(List.map(function(e) return e end, query)))
-  -- log(sqlite(file, "SELECT name FROM sqlite_master WHERE type = \"table\""))
 
-  -- sqlite(file, "CREATE VIEW a AS SELECT * FROM sqlite_master")
+  local target_table = path[1]
+  if not target_table then
+    vim.bo[buffer].modifiable = true
+    vim.api.nvim_buf_set_lines(buffer, 0, -1, true, List.sort(List.map(function(e)
+      return e.name
+    end, query)))
+    vim.bo[buffer].modifiable = false
+
+    return promise:resolve()
+  end
+
+  -- local tables = {}
+  -- local views = {}
+  -- for _, e in ipairs(db_content) do
+  --   -- if e.type = 
+  -- end
 
   promise:resolve()
 end)
 
-vim.api.nvim_create_autocmd("BufEnter", {
-  pattern = { "sqlite://*" },
-  callback = function(ev)
-    -- log(ev)
-  end
-})
-
 vim.api.nvim_create_autocmd("BufReadCmd", {
   pattern = { "sqlite://*" },
   callback = function(ev)
-    -- log(ev)
-    vim.bo[ev.buf].filetype = "lua-sqlite"
+    vim.bo[ev.buf].bufhidden  = "delete"
+    vim.bo[ev.buf].buflisted  = false
+    vim.bo[ev.buf].buftype    = "nofile"
+    vim.bo[ev.buf].filetype   = "lua-sqlite"
+    vim.bo[ev.buf].modifiable = false
+    vim.bo[ev.buf].swapfile   = false
+    vim.bo[ev.buf].undolevels = -1
 
     local _, file, path = unpack(String.split(ev.file, "//"))
     if vim.fn.has("win32") == 1 then
-      file = String.slice(file, 1, 1) .. ":\\" .. String.slice(file, 3)
-      file = String.substitute(file, "/",  "\\")
+      file = String.slice(file, 1, 1) .. ":\\" .. String.substitute(String.slice(file, 3), "/",  "\\")
     else
       file = "/" .. file
     end
-    log(file)
 
-    -- fn_BufReadCmd{
-    --   buffer = ev.buf,
-    --   window = vim.api.nvim_get_current_win(),
-    --   file = file,
-    --   path = #path == 0 and String.split(path, "/") or {}
-    -- }
+    fn_BufReadCmd{
+      buffer = ev.buf,
+      file = file,
+      path = #path == 0 and {} or String.split(path, "/")
+    }
   end
 })
-
--- TODO: fix known error
---  doesnt load when ":e foo.sqlite" for 2º time
 
 vim.api.nvim_create_autocmd("BufReadCmd", {
   pattern = { "*.db", "*.db3", "*.sqlite", "*.sqlite3" },
@@ -83,11 +88,57 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
     if vim.fn.has("win32") == 1 then
       p = String.slice(p, 1, 1) .. "/" .. String.slice(p, 4)
       p = String.substitute(p, "\\\\", "/")
+      vim.cmd.e("sqlite://" .. p .. "//")
+    else
+      vim.cmd.e("sqlite:/" .. p .. "//")
     end
-    vim.cmd.e("sqlite:/" .. p .. "//")
     vim.schedule(function()
       vim.bo[ev.buf].modified = false
       vim.bo[ev.buf].modifiable = false
     end)
   end
 })
+
+M.select = function()
+  assert(vim.bo.filetype == "lua-sqlite")
+  local lnum = vim.api.nvim_win_get_cursor(0)[1]
+  local line = vim.api.nvim_buf_get_lines(0, lnum - 1, lnum, true)[1]
+  if not line then return end
+
+  log(line)
+  -- local entry = M.parse(line)
+end
+
+local icons = {
+  db =      "󰆼",
+  table =   "",
+  view =    "",
+}
+
+local _icons = {
+  db =               "󰆼",
+  buffers =          "",
+  saved_queries =    "",
+  schemas =          "",
+  schema =           "󰙅",
+  tables =           "󰓱",
+  table =            "",
+  saved_query =      "",
+  new_query =        "󰓰",
+  tables =           "󰓫",
+  buffers =          "",
+  add_connection =   "󰆺",
+  connection_ok =    "✓",
+  connection_error = "✗",
+}
+
+--[[--
+-- " " "󰀬 " "󱨏 " "󰟢 "
+-- "󱘥 " "󱘦 " "󱘧 " "󱘨 "
+-- " " " " "󱕵 "
+-- https://www.nerdfonts.com/cheat-sheet
+--]]--
+
+return {
+  select = M.select
+}

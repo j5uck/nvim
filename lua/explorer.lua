@@ -163,11 +163,7 @@ end
 M.select = function()
   local lnum = vim.api.nvim_win_get_cursor(w.win)[1]
   local line = vim.api.nvim_buf_get_lines(w.buf, lnum - 1, lnum, true)[1]
-  if not line then return end
-
-  local entry = M.parse(line)
-  if not entry then return end
-
+  local entry = assert(M.parse(assert(line)))
   local link = entry.link and (fs.isabsolutepath(entry.link) and entry.link or (M.dir .. entry.link))
   local url = link or (M.dir .. entry.name)
 
