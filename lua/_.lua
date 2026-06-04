@@ -52,6 +52,7 @@ String.match = function(s, pattern)
   local i = vim.fn.match(s, pattern)
   return i > -1 and (i + 1) or nil
 end
+String.compare = vim.stricmp
 String.slice = string.sub
 String.split = vim.split
 String.substitute = function(s, pattern, sub)
@@ -59,9 +60,9 @@ String.substitute = function(s, pattern, sub)
   local _sub = type(sub) == "function" and function(e)
     if not e then
       return ""
-    elseif type("table") then
+    elseif type(e) == "table" then
       return sub(e[1])
-    elseif type("string") then
+    elseif type(e) == "string" then
       return sub(e)
     else
       assert(false, "Unexpected type")
@@ -76,16 +77,17 @@ String.reverse = string.reverse
 
 List.contains = vim.tbl_contains
 List.join = table.concat
+---@param l table
+---@param s? fun(a: any, b: any):boolean
+---@return table
 List.sort = function(l, s)
-  if s == nil then
-    return vim.fn.sort(l, "i")
-  elseif type(s) == "function" then
-    local r = List.clone(l)
-    table.sort(r, s)
-    return r
-  else
-    assert(false, "Sorter must be a function or nil")
-  end
+  assert((not s) or (type(s) == "function"), "Sorter must be a function or nil")
+  local r = List.clone(l)
+  table.sort(r, s or function(a, b)
+    local c = String.compare(a, b)
+    return (c == 0) and (a < b) or (c == -1)
+  end)
+  return r
 end
 List.reverse = vim.fn.reverse
 List.map = function(fn, l)
@@ -325,6 +327,7 @@ function Promise:resolve(...)
 
   self.code = 0
   self.result = { ... }
+  self.result_n = select("#", ...)
 
   vim.schedule(function()
     for _, fn in ipairs(self.awaiting) do fn() end
@@ -402,7 +405,7 @@ function Promise:unwrap()
   if self.code ~= 0 then
     assert(false,  debug.traceback("", 2).. "\n" .. self.message)
   end
-  return unpack(self.result)
+  return unpack(self.result, 1, self.result_n)
 end
 
 function Promise:sleep(milliseconds)
@@ -680,9 +683,7 @@ fs.relpath = function(base, target)
 end
 
 fs.exepath = (vim.fn.has("win32") == 1) and function(exe)
-  ---@diagnostic disable-next-line: missing-parameter, param-type-mismatch
   local ext = String.split(env.PATHEXT, ";")
-  ---@diagnostic disable-next-line: param-type-mismatch
   for _, p in ipairs(String.split(env.PATH, ";")) do
     p = String.substitute(vim.fs.normalize(p .. "\\" .. exe), "[\\\\/]\\+", "\\")
     if vim.uv.fs_access(p, "RX") then return p end
@@ -737,7 +738,7 @@ fs.ls = promisify_wrap(function(promise, path)
     local fa, fb = string.sub(a.name, 1, 1) == ".", string.sub(b.name, 1, 1) == "."
     if fa ~= fb then return fb end
 
-    local c = vim.stricmp(a.name, b.name)
+    local c = String.compare(a.name, b.name)
     return (c == 0) and (a.name < b.name) or (c == -1)
   end))
 end)

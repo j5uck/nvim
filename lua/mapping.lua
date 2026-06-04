@@ -161,7 +161,6 @@ W.yank = Window{
     esc["%"]  = "%%"
 
     local history = List.map(function(s)
-      ---@diagnostic disable-next-line: redundant-return-value
       return String.substitute(s, "[\n\r%]", function(c) return esc[c] end)
     end, yank_buffer:totable())
 
@@ -894,6 +893,7 @@ local select = promisify_wrap(function(promise)
   return promise:resolve()
 end)
 
+local NS_LANGS = vim.api.nvim_create_namespace("")
 W.langs = Window{
   on_show = function(self)
     vim.bo.bufhidden  = "hide"
@@ -910,7 +910,6 @@ W.langs = Window{
     if vim.b.is_menu_loaded then return end
     vim.b.is_menu_loaded = true
 
-    local NS = vim.api.nvim_create_namespace("")
     vim.api.nvim_create_autocmd("CursorMoved", {
       buffer = 0,
       callback = function()
@@ -932,7 +931,7 @@ W.langs = Window{
         " " .. lang.icon .. "  " .. lang.name
       })
 
-      vim.api.nvim_buf_set_extmark(0, NS, i-1, 1, {
+      vim.api.nvim_buf_set_extmark(0, NS_LANGS, i-1, 1, {
         end_col = #lang.icon + 2,
         hl_group = lang.hl,
         strict = false,

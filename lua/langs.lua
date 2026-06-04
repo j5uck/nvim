@@ -359,7 +359,7 @@ M.bun.code["src/assert.ts"] = {
   "type falsy = false | 0 | \"\" | null | undefined",
   "",
   "function assert(value: falsy, message?: string): never;",
-  "function assert<T>(value: T, message?: string): T;",
+  "function assert<T>(value: Exclude<T, falsy>, message?: string): T;",
   "",
   "function assert<T>(value: T, message?: string): Exclude<T, falsy> {",
   "  if (value)",
