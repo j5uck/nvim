@@ -126,3 +126,48 @@ local wrap = function(fn, ...)
     return fn(unpack(t, 1, len))
   end
 end
+
+-- ------------------------- x ------------------------- --
+
+local List = require("_").List
+local log = require("_").log
+local promisify = require("_").promisify
+local sh = require("_").sh
+local String = require("_").String
+
+local txt = {
+  '<tr class="e"><td><a href="tcc-0.9.27-win64-bin.zip">tcc-0.9.27-win64-bin.zip</a></td><td>   478K</td><td>17-Dec-2017 08:27</td></tr>',
+  '<tr class="o"><td><a href="tcc-0.9.26-win64-bin.zip">tcc-0.9.26-win64-bin.zip</a></td><td>   389K</td><td>15-Feb-2013 15:24</td></tr>',
+}
+
+local url = "https://download.savannah.nongnu.org/releases/tinycc/"
+
+promisify(function(promise)
+  -- local p = sh{ "curl", url }:await()
+  -- p:unwrap()
+  local files = {}
+  -- for _, l in ipairs(String.split(p.stdout, "\r?\n")) do
+  for _, l in ipairs(txt) do
+    if String.match(l, "href=\"tcc-\\d\\+\\.\\d\\+\\.\\d\\+-win64-bin\\.zip\">") then
+      List.insert(files, String.split(l, "-")[2])
+    end
+  end
+
+  assert(#files > 0)
+
+  local latest = "0.0.0"
+  for _, l in ipairs(files) do
+    if vim.version.cmp(vim.version.parse(l), vim.version.parse(latest)) > 0 then
+      latest = l
+    end
+  end
+
+  log(url .. "tcc-" .. latest ..  "-win64-bin.zip")
+
+  promise:resolve()
+end)
+
+-- on windows
+-- tar -xf archive.zip
+
+-- ------------------------- x ------------------------- --
