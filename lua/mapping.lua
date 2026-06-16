@@ -426,7 +426,7 @@ W.gh_auth = Window{
       end)
     end
 
-    map("n", "<esc>", function() W.gh_auth:hide() end, { buffer = self.buf })
+    map("n", { "<esc>", "q" }, function() W.gh_auth:hide() end, { buffer = self.buf })
     map("n", "<CR>", select, { buffer = self.buf })
   end,
   size = function()

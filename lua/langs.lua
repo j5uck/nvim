@@ -388,10 +388,11 @@ M.bun.code["src/view/global.d.ts"] = {
 }
 M.bun.code["src/view/index.html"] = {
   "<!DOCTYPE html>",
-  "<html lang=\"en\">",
+  "<html lang=\"en-US\" translate=\"no\">",
   "  <head>",
   "    <meta charset=\"UTF-8\">",
-  "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+  "    <meta name=\"google\" content=\"notranslate\" />",
+  "    <meta name=\"viewport\" content=\"initial-scale=1.0,maximum-scale=1,minimum-scale=1.0,user-scalable=no,width=device-width,viewport-fit=cover\">",
   "    <title>" .. MESSAGE .. "</title>",
   "    <style>html, body { background-color: #222222; }</style>",
   "    <script lang=\"ts\" type=\"module\" src=\"script.ts\"></script>",
