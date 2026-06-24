@@ -15,6 +15,9 @@ ripgrep (for telescope) => https://github.com/BurntSushi/ripgrep
 
 TODO:
 
+versioning for custom express.js
+https://gist.github.com/jonlabelle/706b28d50ba75bf81d40782aa3c84b3e
+
 EXPLORER PREVIEW CHANGES !!!!!
 
 REPLACE TELESCOPE ASAP !!!!!

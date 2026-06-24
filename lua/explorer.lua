@@ -473,11 +473,7 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
       local full_path = buffer_name .. slash .. entry.name
       if not entry.id then
         if entry.link then
-          if fs.isabsolutepath(entry.link) then
-            APPENT_TASK{ TASK.MKLINK, entry.link, full_path }
-          else
-            APPENT_TASK{ TASK.MKLINK, buffer_name .. slash .. entry.link, full_path }
-          end
+          APPENT_TASK{ TASK.MKLINK, entry.link, full_path }
         elseif entry.is_directory then
           APPENT_TASK{ TASK.MKMDIR, full_path }
         else
@@ -494,11 +490,7 @@ local fn_BufWriteCmd = promisify_wrap(function(promise)
           APPENT_TASK{ TASK.COPY, PATHS[entry.id], full_path }
         else
           APPENT_TASK{ TASK.REMOVE, PATHS[entry.id] }
-          if fs.isabsolutepath(entry.link) then
-            APPENT_TASK{ TASK.MKLINK, entry.link, full_path }
-          else
-            APPENT_TASK{ TASK.MKLINK, buffer_name .. slash .. entry.link, full_path }
-          end
+          APPENT_TASK{ TASK.MKLINK, entry.link, full_path }
         end
       elseif entry.is_directory then
         if cached_entry.is_directory then
