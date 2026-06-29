@@ -33,8 +33,8 @@ map({"i", "t"}, "<M-o>", "<c-\\><c-n>", { desc = "escape" })
 
 -- map("n", "k", "v:count == 0 ? 'gk' : 'k'", { expr = true, silent = true, desc = "move up" })
 -- map("n", "j", "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = true, desc = "move down" })
-map("n", "k", "gk", { desc = "move up" })
-map("n", "j", "gj", { desc = "move down" })
+map({ "n", "v" }, "k", "gk", { desc = "move up" })
+map({ "n", "v" }, "j", "gj", { desc = "move down" })
 
 map("n", "U", "<C-r>", { desc = "redo" })
 
