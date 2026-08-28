@@ -98,7 +98,7 @@ map("n", "<leader>gf", function()
   if #p == 0 then return end
 
   if String.match(p, "^\\w\\+://") then
-    return notify.warn("URL are not supported")
+    return notify.warn("URLs are not supported")
   end
   explorer.resume()
   vim.cmd.edit(vim.fn.fnameescape(fs.dirname(p)))
